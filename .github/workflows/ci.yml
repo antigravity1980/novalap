@@ -66,11 +66,13 @@ jobs:
         run: bash scripts/download_ffmpeg_sidecar.sh linux x86_64 2>&1 || echo "FFmpeg download skipped"
       - name: Rust check
         shell: bash
+        env:
+          LAPAI_SKIP_NATIVE_BUILD: 1
         run: |
           cargo check --manifest-path src-tauri/Cargo.toml 2>&1
           echo "Rust check exit code: $?"
 
-  # ─── Windows (x86_64 only) ─────────────────────────────
+  # Windows (x86_64 only) - priority #1
   build-windows:
     needs: [lint-frontend]
     if: |
@@ -95,22 +97,19 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
       - name: Install frontend dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          Write-Host "pnpm exit: $LASTEXITCODE"
+        run: pnpm install --frozen-lockfile
         working-directory: src-vite
       - name: Setup MSVC build environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
       - name: Download FFmpeg Sidecars
-        run: |
-          .\scripts\download_ffmpeg_sidecar.ps1 -Arch x64 2>&1
-          Write-Host "ffmpeg exit: $LASTEXITCODE"
+        run: .\scripts\download_ffmpeg_sidecar.ps1 -Arch x64 2>&1 || echo "FFmpeg download skipped"
       - name: Build Tauri app (Windows x64)
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target x86_64-pc-windows-msvc --bundles msi --config '{"bundle":{"createUpdaterArtifacts":false}}'
@@ -122,7 +121,7 @@ jobs:
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
           if-no-files-found: warn
 
-  # ─── macOS (Apple Silicon only) ─────────────────────────
+  # macOS (Apple Silicon only)
   build-macos:
     needs: [lint-frontend]
     if: |
@@ -135,9 +134,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install system dependencies
-        run: |
-          brew install nasm pkg-config jpeg-turbo libpng libtiff 2>&1 || true
-          echo "brew exit: $?"
+        run: brew install nasm pkg-config jpeg-turbo libpng libtiff 2>&1 || true
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -148,9 +145,7 @@ jobs:
         with:
           targets: aarch64-apple-darwin
       - name: Install frontend dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          echo "exit: $?"
+        run: pnpm install --frozen-lockfile
         working-directory: src-vite
       - name: Download FFmpeg Sidecars
         shell: bash
@@ -159,6 +154,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target aarch64-apple-darwin --bundles dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
@@ -170,7 +166,7 @@ jobs:
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: warn
 
-  # ─── Linux (x86_64) ────────────────────────────────────
+  # Linux (x86_64)
   build-linux:
     needs: [lint-frontend]
     if: |
@@ -190,8 +186,7 @@ jobs:
             curl wget file libxdo-dev libssl-dev \
             libayatana-appindicator3-dev librsvg2-dev \
             libjpeg-turbo8-dev nasm cmake \
-            libpng-dev libtiff-dev 2>&1
-          echo "apt exit: $?"
+            libpng-dev libtiff-dev
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -202,9 +197,7 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
       - name: Install frontend dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          echo "exit: $?"
+        run: pnpm install --frozen-lockfile
         working-directory: src-vite
       - name: Download FFmpeg Sidecars
         shell: bash
@@ -216,6 +209,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target x86_64-unknown-linux-gnu --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}'

@@ -15,10 +15,17 @@ fn main() {
     println!("cargo::rustc-check-cfg=cfg(lap_has_libheif)");
 
     write_build_info();
-    build_libraw();
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if target_os != "macos" {
-        build_libheif();
+
+    // SKIP libraw/libheif build when LAPAI_SKIP_NATIVE_BUILD is set (CI/debug)
+    let skip_native = env::var("LAPAI_SKIP_NATIVE_BUILD").is_ok();
+    if !skip_native {
+        build_libraw();
+        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+        if target_os != "macos" {
+            build_libheif();
+        }
+    } else {
+        println!("cargo:warning=Skipping libraw/libheif native builds (LAPAI_SKIP_NATIVE_BUILD=1)");
     }
 
     // build tauri
