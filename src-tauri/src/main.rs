@@ -204,13 +204,13 @@ async fn main() {
             // Module 1: Navigation & File Manager
             module1_navigation::list_directory,
             module1_navigation::get_drives,
-            module1_navigation::get_file_info,
+            module1_navigation::get_file_entry,
             module1_navigation::expand_folder,
             module1_navigation::get_parent_folders,
             module1_navigation::get_root_folders,
             module1_navigation::cross_copy,
             module1_navigation::cross_move,
-            module1_navigation::create_folder,
+            module1_navigation::mkdir_folder,
             module1_navigation::delete_file_system,
             module1_navigation::open_in_explorer,
             // Module 4: AI Parsing & Batch Operations
