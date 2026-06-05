@@ -198,46 +198,108 @@ fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
     Ok(metadata)
 }
 
-// --- JPEG парсер ---
+// --- JPEG парсер (binary EXIF reader, no external crate) ---
 
 fn parse_jpeg_metadata(path: &Path) -> Result<AiMetadata, String> {
-    // Используем kamadak-exif для чтения EXIF
-    let file = fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut reader = std::io::BufReader::new(file);
-
-    let exif_reader = kamadak_exif::Reader::new();
-    let exif = exif_reader
-        .read_from_container(&mut reader)
-        .map_err(|e| format!("Failed to read EXIF: {}", e))?;
-
+    let data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
-    // Ищем user comment
-    if let Some(comment_field) = exif.get_field(kamadak_exif::Tag::UserComment, kamadak_exif::In::PRIMARY) {
-        let comment = comment_field.display_value().to_string();
-        raw_entries.push(RawMetadataEntry {
-            key: "UserComment".to_string(),
-            value: comment.clone(),
-        });
-        // Пытаемся распарсить JSON из комментария (ComfyUI, etc.)
-        try_parse_json_metadata(&mut metadata, &comment);
+    // SOI marker check
+    if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
+        return Err("Not a valid JPEG file".to_string());
     }
 
-    // Ищем XMP
-    if let Some(xmp_field) = exif.get_field(kamadak_exif::Tag::ImageDescription, kamadak_exif::In::PRIMARY) {
-        let xmp = xmp_field.display_value().to_string();
-        raw_entries.push(RawMetadataEntry {
-            key: "ImageDescription".to_string(),
-            value: xmp.clone(),
-        });
-        try_parse_json_metadata(&mut metadata, &xmp);
+    let mut pos = 2usize;
+    while pos + 4 <= data.len() {
+        if data[pos] != 0xFF {
+            pos += 1;
+            continue;
+        }
+        let marker = data[pos + 1];
+        // Skip standalone 0xFF bytes
+        if marker == 0x00 || marker == 0xFF {
+            pos += 1;
+            continue;
+        }
+        // SOS — end of metadata area
+        if marker == 0xDA {
+            break;
+        }
+        // Markers without length
+        if matches!(marker, 0xD0..=0xD7) {
+            pos += 2;
+            continue;
+        }
+        if pos + 4 > data.len() {
+            break;
+        }
+        let seg_len = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
+        if seg_len < 2 || pos + 2 + seg_len > data.len() {
+            break;
+        }
+
+        let seg_start = pos + 2;
+        let seg_end = pos + 2 + seg_len;
+        let seg_data = &data[seg_start..seg_end];
+
+        // APP1 — EXIF data
+        if marker == 0xE1 {
+            if let Some(exif_text) = extract_jpeg_exif_text(seg_data) {
+                raw_entries.push(RawMetadataEntry {
+                    key: "EXIF".to_string(),
+                    value: exif_text.clone(),
+                });
+                try_parse_json_metadata(&mut metadata, &exif_text);
+                // Also try key:value parsing
+                for line in exif_text.lines() {
+                    if let Some((k, v)) = line.split_once(':') {
+                        parse_metadata_key(&mut metadata, k.trim(), v.trim());
+                    }
+                }
+            }
+        }
+
+        pos = seg_end;
     }
 
     metadata.raw_metadata = raw_entries;
     metadata.source_engine = Some(detect_engine(&metadata));
-
     Ok(metadata)
+}
+
+/// Extract readable text from JPEG EXIF block
+fn extract_jpeg_exif_text(data: &[u8]) -> Option<String> {
+    if data.len() < 6 {
+        return None;
+    }
+    // Skip EXIF header
+    let exif_data = &data[4..]; // skip "Exif\0\0" prefix
+
+    // Simple scan for readable ASCII text sequences
+    let mut result = String::new();
+    let mut current = String::new();
+    for &b in exif_data {
+        if b >= 0x20 && b <= 0x7E {
+            current.push(b as char);
+        } else {
+            if current.len() >= 4 {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(&current);
+            }
+            current.clear();
+        }
+    }
+    if current.len() >= 4 {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&current);
+    }
+
+    if result.is_empty() { None } else { Some(result) }
 }
 
 // --- Видео парсер ---
