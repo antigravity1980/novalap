@@ -53,14 +53,14 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install & build frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
         working-directory: src-vite
       - name: Download FFmpeg Sidecars
         run: bash scripts/download_ffmpeg_sidecar.sh linux x86_64 2>&1 || true
       - name: Rust check
-        env:
-          LAPAI_SKIP_NATIVE_BUILD: 1
         run: cargo check --manifest-path src-tauri/Cargo.toml 2>&1; echo "EXIT=$?"
 
   build-windows:
