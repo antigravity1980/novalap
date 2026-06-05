@@ -256,8 +256,8 @@
     "dedup": {
       "title": "Duplicados",
       "tabs": {
-        "exact": "Exatos",
-        "similar": "Semelhantes"
+        "exact": "Duplicados exatos",
+        "similar": "Duplicados semelhantes"
       },
       "scanning": "Escaneando duplicados...",
       "empty_title": "Nenhum duplicado potencial nesta lista",
@@ -266,7 +266,7 @@
       "similar_desc": "Esta aba será usada para imagens visualmente semelhantes quando o fluxo de duplicatas exatas for expandido.",
       "reclaimable_size": "Recuperável",
       "groups_title": "Grupos",
-      "group_limit_hint": "Mostrando ate {count} grupos",
+      "group_limit_hint": "Mostrando os primeiros {count} grupos",
       "group_label": "Grupo {index}",
       "items": "itens",
       "keep_strategy": "Regra de retenção padrão",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "Selecionar todos os duplicados",
       "compare_group": "Comparar",
       "set_keep": "Definir como manter",
-      "duplicate_files_summary": "{count} arquivos duplicados ({size})"
+      "duplicate_files_summary": "{count} duplicados ({size})",
+      "mode_changed": "Modo de detecção alterado para '{mode}'",
+      "mode_current": "Modo atual: {mode}",
+      "scan": "Escanear",
+      "rescan": "Reescanear"
     }
   },
   "tooltip": {

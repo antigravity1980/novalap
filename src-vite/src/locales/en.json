@@ -256,8 +256,8 @@
     "dedup": {
       "title": "Duplicates",
       "tabs": {
-        "exact": "Exact",
-        "similar": "Similar"
+        "exact": "Exact dupes",
+        "similar": "Similar dupes"
       },
       "scanning": "Scanning duplicates...",
       "empty_title": "No duplicates found",
@@ -266,7 +266,7 @@
       "similar_desc": "This tab will be used for visually similar images after the exact-duplicate workflow is expanded.",
       "reclaimable_size": "Reclaimable",
       "groups_title": "Groups",
-      "group_limit_hint": "Showing up to {count} groups",
+      "group_limit_hint": "Showing the first {count} groups",
       "group_label": "Group {index}",
       "items": "items",
       "keep_strategy": "Default keep rule",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "Select all duplicates",
       "compare_group": "Compare",
       "set_keep": "Set as keep",
-      "duplicate_files_summary": "{count} duplicate files ({size})"
+      "duplicate_files_summary": "{count} duplicates ({size})",
+      "mode_changed": "Detection mode changed to '{mode}'",
+      "mode_current": "Current mode: {mode}",
+      "scan": "Scan",
+      "rescan": "Rescan"
     }
   },
   "tooltip": {

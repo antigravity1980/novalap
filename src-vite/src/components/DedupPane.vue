@@ -1,17 +1,19 @@
 <template>
   <div class="w-full h-full rounded-box bg-base-200 flex flex-col overflow-hidden">
-    <div class="flex items-center w-full shrink-0 px-2 mb-2">
-      <div class="flex-1 pl-1">
-        <span class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('info_panel.dedup.title') }}</span>
+    <div class="flex items-center w-full shrink-0 border-b border-base-content/5 px-2">
+      <div role="tablist" class="sidebar-header-tabs">
+        <button
+          v-for="tab in dedupModeTabs"
+          :key="tab.value"
+          role="tab"
+          type="button"
+          :class="['sidebar-header-tab', { 'tab-active': currentDedupMode === tab.value }]"
+          @click="setDedupMode(tab.value)"
+        >
+          {{ tab.label }}
+        </button>
       </div>
       <div class="mt-2 flex items-center gap-1">
-        <TButton
-          :icon="IconRefresh"
-          :tooltip="$t('toolbar.tooltip.refresh')"
-          :buttonSize="'small'"
-          :disabled="isDedupLoading"
-          @click.stop="triggerBackendDedup(true)"
-        />
         <TButton
           :icon="IconClose"
           :tooltip="$t('msgbox.close')"
@@ -22,14 +24,14 @@
     </div>
 
     <div class="mb-2 px-2 flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
-      <div v-if="isDedupLoading" class="border-t border-base-content/5 p-4 flex-1 flex items-center justify-center">
+      <div v-if="isDedupLoading || !hasDedupScanResult" class="p-4 flex-1 flex items-center justify-center">
         <div class="text-center text-base-content/40 space-y-3 max-w-[260px]">
           <span class="loading loading-spinner text-primary w-8 h-8 mx-auto"></span>
           <p class="text-xs font-medium">{{ $t('info_panel.dedup.scanning') }}</p>
         </div>
       </div>
 
-      <div v-else-if="duplicateGroups.length === 0" class="border-t border-base-content/5 p-4 flex-1 flex items-center justify-center">
+      <div v-else-if="duplicateGroups.length === 0" class="p-4 flex-1 flex items-center justify-center">
         <div class="text-center text-base-content/40 space-y-3 max-w-[260px]">
           <IconSimilar class="w-8 h-8 mx-auto text-base-content/30" />
           <p class="text-xs font-medium">{{ $t('info_panel.dedup.empty_title') }}</p>
@@ -38,17 +40,20 @@
       </div>
 
       <template v-else>
-        <div class="border-t border-base-content/5 px-1 py-3 space-y-3">
+
+        <div class="px-1 py-3 space-y-3">
           <div class="flex items-center gap-2 text-base-content/70">
             <span class="font-bold uppercase text-xs tracking-wide">{{ $t('info_panel.dedup.groups_title') }}</span>
-          </div>
-          <div class="text-xs font-semibold text-base-content/60">
-            <span>
-              {{ $t('info_panel.dedup.duplicate_files_summary', { count: totalDuplicateFileCount.toLocaleString(), size: formatFileSize(totalReclaimableBytes) }) }}
+            <span class="ml-auto min-w-0 truncate text-right text-[11px] font-semibold text-base-content/60">
+              {{ duplicateSummaryText }}
             </span>
           </div>
-          <div v-if="showGroupLimitHint" class="pt-0.5 text-xs font-medium leading-relaxed text-warning">
-            {{ $t('info_panel.dedup.group_limit_hint', { count: DEDUP_GROUP_LIMIT }) }}
+          <div
+            v-if="showGroupLimitHint"
+            class="mx-2 flex items-center gap-1.5 rounded-box bg-base-100/40 px-2 py-1.5 text-[11px] font-medium leading-snug text-base-content/50"
+          >
+            <IconInformation class="h-3.5 w-3.5 shrink-0 text-base-content/35" />
+            <span>{{ $t('info_panel.dedup.group_limit_hint', { count: DEDUP_GROUP_LIMIT }) }}</span>
           </div>
           <div class="space-y-1.5 max-h-44 overflow-y-auto overflow-x-hidden pr-1">
             <button
@@ -198,11 +203,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { formatFileSize, getFolderName, getFolderPath, formatFolderBreadcrumb, getThumbnailDataUrl, isMac, formatTimestamp } from '@/common/utils';
 import TButton from '@/components/TButton.vue';
 import PanelActionButton from '@/components/PanelActionButton.vue';
-import { IconCheckAll, IconCheckNone, IconClose, IconLock, IconSimilar, IconSplitOn, IconTrash, IconRefresh } from '@/common/icons';
-import { dedupStartScan, dedupGetScanStatus, dedupGetOverview, listenDedupScanProgress, dedupListGroups, dedupSetKeep, getAlbum, getFileThumb } from '@/common/api';
+import { IconCheckAll, IconCheckNone, IconClose, IconInformation, IconLock, IconSimilar, IconSplitOn, IconTrash } from '@/common/icons';
+import { dedupStartScan, dedupCancelScan, dedupGetScanStatus, dedupGetOverview, listenDedupScanProgress, dedupListGroups, dedupSetKeep, getAlbum, getFileThumb } from '@/common/api';
 import { config } from '@/common/config';
 
 const dedupPaneGlobalState = ((globalThis as any).__lapDedupPaneState ||= {
@@ -213,7 +219,7 @@ const thumbnailPlaceholder = new URL('@/assets/images/image-file.png', import.me
 
 const props = defineProps({
   selectedFileId: {
-    type: Number,
+    type: [Number, String],
     default: -1,
   },
   dedupScanKey: {
@@ -238,10 +244,33 @@ const emit = defineEmits<{
   'trash-selected-duplicates': [groupId: string, fileIds: number[], reclaimableBytes: number];
 }>();
 
+const { t, messages, locale } = useI18n();
+const localeMsg = computed(() => (messages.value as any)[locale.value]);
+const normalizeDedupMode = (mode: unknown) => (Number(mode) === 1 ? 1 : 0);
+const currentDedupMode = computed(() => normalizeDedupMode(config.dedup?.mode));
+const dedupModeTabs = computed(() => {
+  const tabs = localeMsg.value?.info_panel?.dedup?.tabs || {};
+  return [
+    { value: 0, label: tabs.exact || 'Exact dupes' },
+    { value: 1, label: tabs.similar || 'Similar dupes' },
+  ];
+});
+async function setDedupMode(mode: number) {
+  const nextMode = normalizeDedupMode(mode);
+  if (nextMode === currentDedupMode.value) return;
+
+  if (!config.dedup) {
+    config.dedup = { mode: 0 };
+  }
+  config.dedup.mode = nextMode;
+  dedupPaneGlobalState.lastScanKey = '';
+  await triggerBackendDedup(true);
+}
 const selectedDupIdsByGroup = ref<Map<number, Set<number>>>(new Map());
 const isDedupLoading = ref(false);
+const hasDedupScanResult = ref(false);
 const unlistenDedupProgress = ref<null | (() => void)>(null);
-const queuedScanKey = ref('');
+const queuedDedupScan = ref(false);
 const rawGroups = ref<any[]>([]);
 const selectedGroupId = ref<number | null>(null);
 const totalGroupCount = ref(0);
@@ -250,6 +279,7 @@ const totalReclaimableBytes = ref(0);
 const albumRootPaths = ref<Map<number, string>>(new Map());
 const dedupStatusPollTimer = ref<ReturnType<typeof setInterval> | null>(null);
 const isPollingDedupStatus = ref(false);
+
 const duplicateGroups = computed(() =>
   rawGroups.value.map((group: any) => {
     const keepItem = (group.items || []).find((i: any) => i.is_keep === 1) || null;
@@ -267,6 +297,12 @@ const activeGroup = computed(() => {
   if (selectedGroupId.value === null) return null;
   return duplicateGroups.value.find(group => group.id === selectedGroupId.value) || null;
 });
+const duplicateSummaryText = computed(() =>
+  t('info_panel.dedup.duplicate_files_summary', {
+    count: totalDuplicateFileCount.value.toLocaleString(),
+    size: formatFileSize(totalReclaimableBytes.value),
+  })
+);
 
 const activeGroupIndex = computed(() => {
   if (!activeGroup.value) return -1;
@@ -464,14 +500,17 @@ async function fetchGroups(preferredGroupId: number | null = null) {
     }
 
     if (selectedGroupId.value && rawGroups.value.some((group: any) => group.id === selectedGroupId.value)) {
+      hasDedupScanResult.value = true;
       return;
     }
 
     selectedGroupId.value = rawGroups.value.length > 0 ? Number(rawGroups.value[0].id) : null;
+    hasDedupScanResult.value = true;
   } catch (error) {
     console.error('fetchGroups error:', error);
     rawGroups.value = [];
     selectedGroupId.value = null;
+    hasDedupScanResult.value = true;
   }
 }
 
@@ -484,16 +523,16 @@ function stopDedupStatusPolling() {
 
 async function handleDedupScanSettled() {
   stopDedupStatusPolling();
+  if (queuedDedupScan.value) {
+    queuedDedupScan.value = false;
+    await triggerBackendDedup(true);
+    return;
+  }
+
   await fetchGroups();
   // Only clear the loading flag after results are ready, so the
   // template never shows "no duplicates" before the scan finishes.
-  if (!queuedScanKey.value || queuedScanKey.value === dedupPaneGlobalState.lastScanKey) {
-    isDedupLoading.value = false;
-  }
-  if (queuedScanKey.value && queuedScanKey.value !== dedupPaneGlobalState.lastScanKey) {
-    queuedScanKey.value = '';
-    await triggerBackendDedup(true);
-  }
+  isDedupLoading.value = false;
 }
 
 function ensureDedupStatusPolling() {
@@ -506,7 +545,7 @@ function ensureDedupStatusPolling() {
     try {
       const status = await dedupGetScanStatus();
       totalGroupCount.value = Math.max(Number(status?.groups || 0), rawGroups.value.length);
-      if (status?.state && status.state !== 'running') {
+      if (status?.state && status.state !== 'running' && !status?.isScanning) {
         await handleDedupScanSettled();
       }
     } catch (error) {
@@ -524,33 +563,27 @@ async function triggerBackendDedup(force = false) {
     return;
   }
 
-  if (!force && dedupPaneGlobalState.lastScanKey === props.dedupScanKey) {
-    isDedupLoading.value = true;
-    const status = await dedupGetScanStatus();
-    totalGroupCount.value = Math.max(Number(status?.groups || 0), rawGroups.value.length);
-    if (status?.state === 'running') {
-      queuedScanKey.value = props.dedupScanKey;
-      ensureDedupStatusPolling();
-      return;
-    }
-    await fetchGroups();
-    isDedupLoading.value = false;
-    return;
-  }
-
   isDedupLoading.value = true;
+  hasDedupScanResult.value = false;
 
   try {
     const status = await dedupGetScanStatus();
     totalGroupCount.value = Math.max(Number(status?.groups || 0), rawGroups.value.length);
-    if (status?.state === 'running') {
-      queuedScanKey.value = props.dedupScanKey;
+
+    if (status?.state === 'running' || status?.isScanning) {
+      queuedDedupScan.value = true;
+      await dedupCancelScan();
       ensureDedupStatusPolling();
+      return;
+    } else if (!force && dedupPaneGlobalState.lastScanKey === props.dedupScanKey) {
+      await fetchGroups();
+      isDedupLoading.value = false;
       return;
     }
 
     dedupPaneGlobalState.lastScanKey = props.dedupScanKey;
-    await dedupStartScan(props.dedupQueryParams || null);
+
+    await dedupStartScan(props.dedupQueryParams || null, config.dedup?.mode ?? 0);
 
     const latest = await dedupGetScanStatus();
     totalGroupCount.value = Math.max(Number(latest?.groups || 0), rawGroups.value.length);
@@ -560,8 +593,14 @@ async function triggerBackendDedup(force = false) {
       await handleDedupScanSettled();
     }
   } catch (error) {
+    if (String(error).includes('already running')) {
+      queuedDedupScan.value = true;
+      ensureDedupStatusPolling();
+      return;
+    }
     console.error('triggerBackendDedup error:', error);
     stopDedupStatusPolling();
+    hasDedupScanResult.value = true;
     isDedupLoading.value = false;
   }
 }
@@ -571,13 +610,17 @@ watch(
   (newKey) => {
     if (!newKey) {
       stopDedupStatusPolling();
-      isDedupLoading.value = false;
+      isDedupLoading.value = true;
+      hasDedupScanResult.value = false;
       rawGroups.value = [];
       selectedGroupId.value = null;
+      queuedDedupScan.value = false;
       totalGroupCount.value = 0;
       totalDuplicateFileCount.value = 0;
       totalReclaimableBytes.value = 0;
+      return;
     }
+    triggerBackendDedup();
   }
 );
 
@@ -599,9 +642,9 @@ watch(selectedGroupId, (groupId, prevGroupId) => {
 });
 
 onMounted(async () => {
+  isDedupLoading.value = true;
   if (!props.dedupScanKey) return;
 
-  isDedupLoading.value = true;
   await nextTick();
 
   unlistenDedupProgress.value = await listenDedupScanProgress(async (event: any) => {

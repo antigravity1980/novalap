@@ -256,8 +256,8 @@
     "dedup": {
       "title": "Doublons",
       "tabs": {
-        "exact": "Exacts",
-        "similar": "Similaires"
+        "exact": "Doublons exacts",
+        "similar": "Doublons similaires"
       },
       "scanning": "Analyse des doublons en cours...",
       "empty_title": "Aucun doublon potentiel dans cette liste",
@@ -266,7 +266,7 @@
       "similar_desc": "Cet onglet sera utilisé pour les images visuellement similaires lorsque le flux des doublons exacts sera étendu.",
       "reclaimable_size": "Récupérable",
       "groups_title": "Groupes",
-      "group_limit_hint": "Affichage jusqu a {count} groupes",
+      "group_limit_hint": "Affichage des {count} premiers groupes",
       "group_label": "Groupe {index}",
       "items": "éléments",
       "keep_strategy": "Règle de conservation par défaut",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "Sélectionner tous les doublons",
       "compare_group": "Comparer",
       "set_keep": "Définir comme à conserver",
-      "duplicate_files_summary": "{count} fichiers en double ({size})"
+      "duplicate_files_summary": "{count} doublons ({size})",
+      "mode_changed": "Mode de détection changé en '{mode}'",
+      "mode_current": "Mode actuel : {mode}",
+      "scan": "Scanner",
+      "rescan": "Rescanner"
     }
   },
   "tooltip": {

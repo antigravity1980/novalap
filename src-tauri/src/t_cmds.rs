@@ -1302,15 +1302,19 @@ pub fn dedup_start_scan(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, crate::t_dedup::DedupState>,
     params: Option<crate::t_sqlite::QueryParams>,
+    dedup_mode: Option<u8>,
 ) -> Result<(), String> {
-    crate::t_dedup::start_scan(app_handle, state, params)
+    crate::t_dedup::start_scan(app_handle, state, params, dedup_mode)
 }
 
 #[tauri::command]
 pub fn dedup_get_scan_status(
     state: tauri::State<'_, crate::t_dedup::DedupState>,
 ) -> Result<crate::t_dedup::DedupScanStatus, String> {
-    let status = state.status.lock().unwrap();
+    let mut status = state.status.lock().unwrap().clone();
+    status.is_scanning = state
+        .is_scanning
+        .load(std::sync::atomic::Ordering::SeqCst);
     Ok(status.clone())
 }
 

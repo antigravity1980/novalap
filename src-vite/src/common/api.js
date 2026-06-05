@@ -1391,13 +1391,8 @@ export async function listenIndexProgress(callback) {
 // deduplication
 
 // start deduplication scan
-export async function dedupStartScan(params = null) {
-  try {
-    const result = await invoke('dedup_start_scan', { params });
-    return result;
-  } catch (error) {
-    console.error('dedupStartScan error:', error);
-  }
+export async function dedupStartScan(params = null, dedupMode = null) {
+  return await invoke('dedup_start_scan', { params, dedupMode });
 }
 
 // get deduplication scan status

@@ -256,8 +256,8 @@
     "dedup": {
       "title": "重复项",
       "tabs": {
-        "exact": "完全相同",
-        "similar": "相似图片"
+        "exact": "完全重复",
+        "similar": "相似重复"
       },
       "scanning": "扫描重复项中...",
       "empty_title": "未发现重复项",
@@ -266,7 +266,7 @@
       "similar_desc": "这个标签页将用于视觉上相似的图片分组，当前先保留完全重复的清理流程。",
       "reclaimable_size": "可回收",
       "groups_title": "分组列表",
-      "group_limit_hint": "最多显示 {count} 个分组",
+      "group_limit_hint": "正在显示前 {count} 个分组",
       "group_label": "分组 {index}",
       "items": "项",
       "keep_strategy": "默认保留规则",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "选择所有重复项",
       "compare_group": "对比",
       "set_keep": "设为保留",
-      "duplicate_files_summary": "{count} 个重复的文件（{size}）"
+      "duplicate_files_summary": "{count} 个重复项（{size}）",
+      "mode_changed": "检测模式已更改为'{mode}'",
+      "mode_current": "当前模式：{mode}",
+      "scan": "扫描",
+      "rescan": "重新扫描"
     }
   },
   "tooltip": {

@@ -256,8 +256,8 @@
     "dedup": {
       "title": "Duplikate",
       "tabs": {
-        "exact": "Exakt",
-        "similar": "Ähnlich"
+        "exact": "Exakte Dubletten",
+        "similar": "Ähnliche Dubletten"
       },
       "scanning": "Duplikate werden gescannt...",
       "empty_title": "Keine potenziellen Duplikate in dieser Liste",
@@ -266,7 +266,7 @@
       "similar_desc": "Dieser Tab wird für visuell ähnliche Bilder verwendet, sobald der Workflow für exakte Duplikate erweitert wurde.",
       "reclaimable_size": "Freigebbar",
       "groups_title": "Gruppen",
-      "group_limit_hint": "Es werden bis zu {count} Gruppen angezeigt",
+      "group_limit_hint": "Die ersten {count} Gruppen werden angezeigt",
       "group_label": "Gruppe {index}",
       "items": "Elemente",
       "keep_strategy": "Standard-Regel zum Behalten",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "Alle Duplikate auswählen",
       "compare_group": "Vergleichen",
       "set_keep": "Als Behalten markieren",
-      "duplicate_files_summary": "{count} doppelte Dateien ({size})"
+      "duplicate_files_summary": "{count} Duplikate ({size})",
+      "mode_changed": "Erkennungsmodus auf '{mode}' geändert",
+      "mode_current": "Aktueller Modus: {mode}",
+      "scan": "Scannen",
+      "rescan": "Erneut scannen"
     }
   },
   "tooltip": {

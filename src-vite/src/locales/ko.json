@@ -256,8 +256,8 @@
     "dedup": {
       "title": "중복",
       "tabs": {
-        "exact": "동일",
-        "similar": "유사"
+        "exact": "완전 중복",
+        "similar": "유사 중복"
       },
       "scanning": "중복 항목 스캔 중...",
       "empty_title": "현재 목록에 중복 후보가 없습니다",
@@ -266,7 +266,7 @@
       "similar_desc": "정확한 중복 워크플로를 확장한 뒤 이 탭은 시각적으로 유사한 이미지를 위해 사용됩니다.",
       "reclaimable_size": "정리 가능",
       "groups_title": "그룹",
-      "group_limit_hint": "최대 {count}개 그룹 표시",
+      "group_limit_hint": "처음 {count}개 그룹을 표시합니다",
       "group_label": "그룹 {index}",
       "items": "개",
       "keep_strategy": "기본 유지 규칙",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "모든 중복 선택",
       "compare_group": "비교",
       "set_keep": "유지 항목으로 설정",
-      "duplicate_files_summary": "중복 파일 {count}개 ({size})"
+      "duplicate_files_summary": "중복 {count}개 ({size})",
+      "mode_changed": "감지 모드가 '{mode}'(으)로 변경됨",
+      "mode_current": "현재 모드: {mode}",
+      "scan": "스캔",
+      "rescan": "재스캔"
     }
   },
   "tooltip": {

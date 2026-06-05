@@ -256,8 +256,8 @@
     "dedup": {
       "title": "Дубликаты",
       "tabs": {
-        "exact": "Точные",
-        "similar": "Похожие"
+        "exact": "Точные дубли",
+        "similar": "Похожие дубли"
       },
       "scanning": "Сканирование дубликатов...",
       "empty_title": "В этом списке нет потенциальных дубликатов",
@@ -266,7 +266,7 @@
       "similar_desc": "Эта вкладка будет использоваться для визуально похожих изображений после расширения сценария точных дубликатов.",
       "reclaimable_size": "Освободить",
       "groups_title": "Группы",
-      "group_limit_hint": "Показано до {count} групп",
+      "group_limit_hint": "Показаны первые {count} групп",
       "group_label": "Группа {index}",
       "items": "элементов",
       "keep_strategy": "Правило сохранения по умолчанию",
@@ -279,7 +279,11 @@
       "select_group_duplicates": "Выбрать все дубликаты",
       "compare_group": "Сравнить",
       "set_keep": "Сделать сохраняемым",
-      "duplicate_files_summary": "{count} дублирующихся файлов ({size})"
+      "duplicate_files_summary": "{count} дубликатов ({size})",
+      "mode_changed": "Режим обнаружения изменён на '{mode}'",
+      "mode_current": "Текущий режим: {mode}",
+      "scan": "Сканировать",
+      "rescan": "Пересканировать"
     }
   },
   "tooltip": {

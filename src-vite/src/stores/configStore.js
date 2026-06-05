@@ -27,6 +27,10 @@ export const useConfigStore = defineStore('configStore', {
       mode: 'info',               // right panel mode ('info' | 'dedup')
     },
 
+    dedup: {
+      mode: 0,                   // 0: exact, 1: similar
+    },
+
     infoPanel: {
       showPreview: true,         // show preview thumbnail
       previewMode: 'thumbnail',  // preview section mode ('thumbnail' | 'histogram')
