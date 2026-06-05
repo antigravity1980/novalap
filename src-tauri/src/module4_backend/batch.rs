@@ -139,7 +139,7 @@ pub fn batch_convert(
                     img.as_bytes(),
                     img.width(),
                     img.height(),
-                    img.color(),
+                    img.color().into(),
                 )
                 .map_err(|e| format!("Failed to encode JPEG: {}", e))
             }

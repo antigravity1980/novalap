@@ -17,10 +17,7 @@ use std::fs;
 use std::path::Path;
 use tauri::command;
 
-use crate::t_common;
-
-extern crate kamadak_exif;
-
+use kamadak_exif;
 
 /// AI-метаданные
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

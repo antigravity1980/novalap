@@ -61,8 +61,10 @@ pub fn cross_move(src: String, dest: String) -> Result<(), String> {
 
     // Если rename не сработал (cross-disk) — копируем + удаляем
     if src_path.is_dir() {
-        copy_directory_recursive(src_path, dest_path)?;
-        fs::remove_dir_all(src_path).map_err(|e| format!("Failed to remove source directory after copy: {}", e))?;
+        copy_directory_recursive(src_path, dest_path)
+            .map_err(|e| format!("Failed to copy directory: {}", e))?;
+        fs::remove_dir_all(src_path)
+            .map_err(|e| format!("Failed to remove source directory after copy: {}", e))?;
     } else {
         fs::copy(src_path, dest_path).map_err(|e| format!("Failed to copy file: {}", e))?;
         fs::remove_file(src_path).map_err(|e| format!("Failed to remove source file after copy: {}", e))?;
