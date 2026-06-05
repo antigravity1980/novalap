@@ -1,7 +1,7 @@
 {
-  "productName": "Lap",
-  "version": "0.2.3",
-  "identifier": "com.julyx10.lap",
+  "productName": "LapAI",
+  "version": "0.1.0",
+  "identifier": "com.novalap.lapai",
   "build": {
     "beforeBuildCommand": "pnpm --dir ../src-vite build",
     "beforeDevCommand": "pnpm --dir ../src-vite dev",
