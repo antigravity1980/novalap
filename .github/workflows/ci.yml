@@ -163,7 +163,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target x86_64-unknown-linux-gnu --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
