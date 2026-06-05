@@ -7,7 +7,7 @@
     "allowJs": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -15,7 +15,8 @@
     "module": "esnext",
     "strict": true,
     "skipLibCheck": true,
-    "lib": ["esnext", "dom", "dom.iterable"]
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/**/*.ts",
