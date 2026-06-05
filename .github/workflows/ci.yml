@@ -77,6 +77,8 @@ jobs:
         with: { version: 9 }
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: x86_64-pc-windows-msvc }
+      - name: Install NASM
+        run: choco install -y nasm
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
         working-directory: src-vite
@@ -89,7 +91,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target x86_64-pc-windows-msvc --bundles msi --config '{"bundle":{"createUpdaterArtifacts":false}}'
@@ -124,7 +125,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LAPAI_SKIP_NATIVE_BUILD: 1
         with:
           projectPath: .
           args: --verbose --target aarch64-apple-darwin --bundles dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
