@@ -17,8 +17,6 @@ use std::fs;
 use std::path::Path;
 use tauri::command;
 
-use kamadak_exif;
-
 /// AI-метаданные
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
