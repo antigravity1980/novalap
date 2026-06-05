@@ -73,7 +73,7 @@ pub fn cross_move(src: String, dest: String) -> Result<(), String> {
 
 /// Создать папку
 #[command]
-pub fn create_folder(path: String) -> Result<(), String> {
+pub fn mkdir_folder(path: String) -> Result<(), String> {
     fs::create_dir_all(&path).map_err(|e| format!("Failed to create folder: {}", e))
 }
 

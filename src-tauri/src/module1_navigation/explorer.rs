@@ -168,12 +168,15 @@ pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
     let drives = mount_paths
         .into_iter()
         .filter(|p| Path::new(p).exists())
-        .map(|path| DriveInfo {
-            name: path.clone(),
-            path,
-            total_space: 0,
-            free_space: 0,
-            is_removable: path.contains("media") || path.contains("Volumes") || path == "/mnt",
+        .map(|p| {
+            let is_rem = p.contains("media") || p.contains("Volumes") || p == "/mnt";
+            DriveInfo {
+                name: p.clone(),
+                path: p,
+                total_space: 0,
+                free_space: 0,
+                is_removable: is_rem,
+            }
         })
         .collect();
     Ok(drives)
@@ -187,7 +190,7 @@ pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
 
 /// Получить информацию о файле
 #[command]
-pub fn get_file_info(path: String) -> Result<FileEntry, String> {
+pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
     let file_path = Path::new(&path);
     if !file_path.exists() {
         return Err(format!("File does not exist: {}", path));
