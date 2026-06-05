@@ -1,0 +1,248 @@
+import { defineStore } from 'pinia'
+import { invoke } from '@tauri-apps/api/core'
+
+/**
+ * Store для галереи (Модуль 2)
+ * Управляет отображением миниатюр, выделением, сортировками, историей действий
+ */
+export const useGalleryStore = defineStore('gallery', {
+  state: () => ({
+    // Настройки отображения
+    thumbnailSize: 200,
+    files: [],             // текущий список файлов для отображения
+    filteredFiles: [],     // после применения фильтров/сортировки
+
+    // Сортировка
+    sortBy: 'name',        // name, size, date, resolution, ai_source, model, loras
+    sortOrder: 'asc',      // asc, desc
+
+    // Фильтры
+    filters: {
+      search: '',
+      format: '',          // png, jpg, webp, mp4, etc.
+      minSize: 0,
+      maxSize: 0,
+      aiSource: '',         // ComfyUI, Midjourney, etc.
+      dateFrom: '',
+      dateTo: '',
+      model: '',            // checkpoint / model filter
+      lora: '',             // LoRA filter
+    },
+
+    // Кеш AI-метаданных для сортировки по компонентам
+    metadataCache: {},    // { [path]: AiMetadata }
+
+    // Выделение (Command pattern)
+    selectedIds: [],       // массив путей выбранных файлов
+    selectionHistory: [],  // стек для Ctrl+Z / Ctrl+Shift+Z
+    historyIndex: -1,
+
+    // Масштабирование
+    zoomLevel: 1,
+  }),
+
+  getters: {
+    displayedFiles: (state) => {
+      let files = [...state.files]
+
+      // Фильтрация по формату
+      if (state.filters.format) {
+        files = files.filter(f => f.extension === state.filters.format)
+      }
+
+      // Фильтрация по AI-источнику
+      if (state.filters.aiSource) {
+        files = files.filter(f => f.ai_source === state.filters.aiSource)
+      }
+
+      // Фильтрация по дате
+      if (state.filters.dateFrom) {
+        const from = new Date(state.filters.dateFrom)
+        files = files.filter(f => new Date(f.modified) >= from)
+      }
+      if (state.filters.dateTo) {
+        const to = new Date(state.filters.dateTo)
+        files = files.filter(f => new Date(f.modified) <= to)
+      }
+
+      // Поиск по имени
+      if (state.filters.search) {
+        const q = state.filters.search.toLowerCase()
+        files = files.filter(f => f.name.toLowerCase().includes(q))
+      }
+
+      // Сортировка
+      files.sort((a, b) => {
+        let cmp = 0
+        switch (state.sortBy) {
+          case 'name':
+            cmp = a.name.localeCompare(b.name)
+            break
+          case 'size':
+            cmp = a.size - b.size
+            break
+          case 'date':
+            cmp = new Date(a.modified) - new Date(b.modified)
+            break
+          case 'resolution':
+            const ar = a.resolution?.width || 0
+            const br = b.resolution?.width || 0
+            cmp = ar - br
+            break
+          case 'ai_source':
+            cmp = (a.ai_source || '').localeCompare(b.ai_source || '')
+            break
+        }
+        return state.sortOrder === 'asc' ? cmp : -cmp
+      })
+
+      return files
+    },
+
+    canUndo: (state) => state.historyIndex >= 0,
+    canRedo: (state) => state.historyIndex < state.selectionHistory.length - 1,
+  },
+
+  actions: {
+    setFiles(files) {
+      this.files = files
+      this.filteredFiles = [...files]
+    },
+
+    setSorting(sortBy, order) {
+      this.sortBy = sortBy
+      this.sortOrder = order
+    },
+
+    setFilter(key, value) {
+      this.filters[key] = value
+    },
+
+    clearFilters() {
+      this.filters = {
+        search: '',
+        format: '',
+        minSize: 0,
+        maxSize: 0,
+        aiSource: '',
+        dateFrom: '',
+        dateTo: '',
+      }
+    },
+
+    setZoom(level) {
+      this.zoomLevel = Math.max(0.5, Math.min(3, level))
+      this.thumbnailSize = Math.round(200 * this.zoomLevel)
+    },
+
+    // --- Command pattern для выделения ---
+
+    _pushSelectionState() {
+      // Обрезаем будущие состояния при новом действии
+      if (this.historyIndex < this.selectionHistory.length - 1) {
+        this.selectionHistory = this.selectionHistory.slice(0, this.historyIndex + 1)
+      }
+      this.selectionHistory.push([...this.selectedIds])
+      this.historyIndex = this.selectionHistory.length - 1
+
+      // Ограничиваем историю 50 шагами
+      if (this.selectionHistory.length > 50) {
+        this.selectionHistory.shift()
+        this.historyIndex--
+      }
+    },
+
+    toggleSelection(filePath) {
+      this._pushSelectionState()
+      const index = this.selectedIds.indexOf(filePath)
+      if (index >= 0) {
+        this.selectedIds.splice(index, 1)
+      } else {
+        this.selectedIds.push(filePath)
+      }
+    },
+
+    selectAll() {
+      this._pushSelectionState()
+      this.selectedIds = this.displayedFiles.map(f => f.path)
+    },
+
+    clearSelection() {
+      if (this.selectedIds.length > 0) {
+        this._pushSelectionState()
+        this.selectedIds = []
+      }
+    },
+
+    undo() {
+      if (this.canUndo) {
+        this.selectedIds = [...this.selectionHistory[this.historyIndex]]
+        this.historyIndex--
+      }
+    },
+
+    redo() {
+      if (this.canRedo) {
+        this.historyIndex++
+        this.selectedIds = [...this.selectionHistory[this.historyIndex]]
+      }
+    },
+
+    // --- Действия с файлами ---
+
+    async deleteSelectedFiles() {
+      if (this.selectedIds.length === 0) return
+
+      try {
+        const result = await invoke('move_to_trash', { paths: this.selectedIds })
+        // Удаляем из текущего списка
+        this.files = this.files.filter(f => !this.selectedIds.includes(f.path))
+        this.selectedIds = []
+        return result
+      } catch (error) {
+        console.error('Failed to delete files:', error)
+        throw error
+      }
+    },
+
+    async copySelectedFiles(destPath) {
+      if (this.selectedIds.length === 0) return
+
+      for (const src of this.selectedIds) {
+        try {
+          const fileName = src.split('\\').pop() || src.split('/').pop()
+          await invoke('cross_copy', { src, dest: `${destPath}\\${fileName}` })
+        } catch (error) {
+          console.error('Failed to copy:', error)
+        }
+      }
+    },
+
+    async moveSelectedFiles(destPath) {
+      if (this.selectedIds.length === 0) return
+
+      for (const src of this.selectedIds) {
+        try {
+          const fileName = src.split('\\').pop() || src.split('/').pop()
+          await invoke('cross_move', { src, dest: `${destPath}\\${fileName}` })
+        } catch (error) {
+          console.error('Failed to move:', error)
+        }
+      }
+
+      // Обновляем список
+      this.files = this.files.filter(f => !this.selectedIds.includes(f.path))
+      this.selectedIds = []
+    },
+
+    // --- Работа с AI метаданными ---
+
+    async getAiMetadata(filePath) {
+      try {
+        return await invoke('parse_ai_metadata', { path: filePath })
+      } catch {
+        return null
+      }
+    },
+  },
+})

@@ -36,6 +36,8 @@ mod t_sqlite;
 mod t_utils;
 mod t_http;
 mod t_video;
+mod module1_navigation;
+mod module4_backend;
 
 /// The main function is the entry point for the Tauri application.
 #[tokio::main]
@@ -199,6 +201,35 @@ async fn main() {
             t_menu::handle_menu_event(app, event);
         })
         .invoke_handler(tauri::generate_handler![
+            // Module 1: Navigation & File Manager
+            module1_navigation::list_directory,
+            module1_navigation::get_drives,
+            module1_navigation::get_file_info,
+            module1_navigation::expand_folder,
+            module1_navigation::get_parent_folders,
+            module1_navigation::get_root_folders,
+            module1_navigation::cross_copy,
+            module1_navigation::cross_move,
+            module1_navigation::create_folder,
+            module1_navigation::delete_file_system,
+            module1_navigation::open_in_explorer,
+            // Module 4: AI Parsing & Batch Operations
+            module4_backend::parse_ai_metadata,
+            module4_backend::detect_ai_source,
+            module4_backend::batch_resize,
+            module4_backend::batch_convert,
+            module4_backend::batch_rename,
+            module4_backend::strip_metadata,
+            module4_backend::move_to_trash,
+            module4_backend::restore_from_trash,
+            module4_backend::get_trash_contents,
+            module4_backend::empty_trash,
+            module4_backend::backup_originals,
+            module4_backend::restore_originals,
+            module4_backend::batch_color_correct,
+            module4_backend::optimize_with_pngquant,
+            module4_backend::optimize_with_mozjpeg,
+            module4_backend::check_optimizer,
             // library
             t_cmds::get_app_config,
             t_cmds::set_last_selected_item_index,
