@@ -1,8 +1,11 @@
 <template>
-  <div v-if="!isReady" class="w-screen h-screen flex items-center justify-center bg-base-300">
+  <!-- Splash Screen (показывается 2.2 секунды при первом запуске) -->
+  <SplashScreen v-if="showSplash" @done="showSplash = false" :duration="2200" />
+
+  <div v-if="!isReady && !showSplash" class="w-screen h-screen flex items-center justify-center bg-base-300">
     <span class="loading loading-spinner loading-lg text-primary app-loading-delayed"></span>
   </div>
-  <template v-else>
+  <template v-else-if="!showSplash">
     <router-view />
     <ToastContainer />
   </template>
@@ -18,9 +21,11 @@ import { clearIndexRecoveryInfo } from '@/common/api';
 import { isMac, setTheme, SCALE_VALUES } from '@/common/utils';
 import { matchesShortcut } from '@/common/shortcuts';
 import ToastContainer from '@/components/ToastContainer.vue';
+import SplashScreen from '@/components/SplashScreen.vue';
 
 const libConfig = useLibraryStore();
 const isReady = ref(false);
+const showSplash = ref(true); // Показываем сплэш при старте
 const config = useConfigStore();
 let unlistenMainCloseRequested = null;
 let isHandlingMainClose = false;

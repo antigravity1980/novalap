@@ -1231,6 +1231,7 @@
     "all_sources": "All sources",
     "unknown_source": "Unknown",
     "details_tab": "Details",
+    "comfyui_workflow_detected": "Contains ComfyUI Workflow",
     "ai_prompts_tab": "AI Prompts",
     "file_name": "File name",
     "save": "Save",

@@ -760,6 +760,7 @@ pub struct EditParams {
     blur: Option<f32>,       // sigma > 0
     hue_rotate: Option<i32>, // degrees
     saturation: Option<f32>, // multiplier, 1.0 is normal
+    gamma: Option<f32>,
 }
 
 /// edit an image and save to dest file
@@ -1352,6 +1353,20 @@ async fn get_edited_image(params: &EditParams) -> Result<DynamicImage, String> {
                 img = DynamicImage::ImageRgba8(rgba);
             }
             _ => {}
+        }
+    }
+
+    // Gamma
+    if let Some(gamma) = params.gamma {
+        if (gamma - 1.0).abs() > f32::EPSILON && gamma > 0.0 {
+            let inv_gamma = 1.0 / gamma;
+            let mut rgba = img.to_rgba8();
+            for pixel in rgba.pixels_mut() {
+                pixel[0] = (255.0 * (pixel[0] as f32 / 255.0).powf(inv_gamma)).clamp(0.0, 255.0) as u8;
+                pixel[1] = (255.0 * (pixel[1] as f32 / 255.0).powf(inv_gamma)).clamp(0.0, 255.0) as u8;
+                pixel[2] = (255.0 * (pixel[2] as f32 / 255.0).powf(inv_gamma)).clamp(0.0, 255.0) as u8;
+            }
+            img = DynamicImage::ImageRgba8(rgba);
         }
     }
 

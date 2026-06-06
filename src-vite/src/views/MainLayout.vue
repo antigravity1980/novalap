@@ -496,6 +496,11 @@
               </div>
             </div>
 
+            <!-- ComfyUI Workflow Detected Badge -->
+            <div v-if="hasComfyWorkflow" class="p-2 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm">
+              <span>⚡ {{ $t('explorer.comfyui_workflow_detected') }}</span>
+            </div>
+
             <!-- Full Details list -->
             <div class="space-y-3 text-xs border-t border-neutral/20 pt-3">
               <div>
@@ -570,6 +575,7 @@
       :files="filteredFiles"
       :initial-index="quickLookIndex"
       @update:visible="quickLookVisible = $event"
+      @saved="refreshData"
     />
 
     <!-- Compare View Overlay -->
@@ -732,9 +738,26 @@ const renamingState = reactive({
   name: '',
 })
 
-watch(selectedFile, (newFile) => {
+const hasComfyWorkflow = ref(false)
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+watch(selectedFile, async (newFile) => {
+  hasComfyWorkflow.value = false
   if (newFile) {
     renamingState.name = newFile.name
+    if (isTauri && isImage(newFile)) {
+      try {
+        const metadata = await invoke('parse_ai_metadata', { path: newFile.path })
+        if (metadata && metadata.workflow) {
+          hasComfyWorkflow.value = true
+        }
+      } catch (e) {
+        console.error('Failed to parse AI metadata for workflow check:', e)
+      }
+    } else if (!isTauri && newFile.name === 'comfyui_00124_.png') {
+      // Mock workflow for browser verification
+      hasComfyWorkflow.value = true
+    }
   } else {
     renamingState.name = ''
   }
@@ -829,33 +852,37 @@ function toggleInspector() {
   configStore.rightPanel.show = !configStore.rightPanel.show
 }
 
+// Сортировка и фильтрация
+function onSortChange() {
+  // Реактивность Pinia автоматически обновит displayedFiles
+}
+
+function onFilterChange() {
+  // Реактивность Pinia автоматически обновит displayedFiles
+}
+
+function toggleSortOrder() {
+  galleryStore.sortOrder = galleryStore.sortOrder === 'asc' ? 'desc' : 'asc'
+}
+
 // Dialog functions
 function openSettings() {
-  try {
-    invoke('get_app_config').then(() => {
-      invoke('select_folder', { albumId: 0, folderPath: '' }).catch(() => {}) 
-    }).catch(() => {})
-  } catch (e) {}
-
-  try {
-    emit('app-open-preferences')
-  } catch (e) {}
-
-  // Safe fallback to route navigation in browser mode
-  if (typeof window !== 'undefined' && !window.__TAURI_INTERNALS__) {
-    router.push('/settings')
-  }
+  router.push('/settings')
 }
 
 // Explorer File actions
 async function createFolder() {
-  const name = prompt('Enter folder name:')
+  const name = prompt('Введите имя папки:')
   if (name && navigationStore.currentPath) {
+    const newPath = navigationStore.currentPath.endsWith('\\')
+      ? navigationStore.currentPath + name
+      : navigationStore.currentPath + '\\' + name
     try {
-      await invoke('create_folder', { path: navigationStore.currentPath, folderName: name })
+      await invoke('mkdir_folder', { path: newPath })
       await refreshData()
     } catch (e) {
       console.error(e)
+      alert('Не удалось создать папку: ' + e)
     }
   }
 }
@@ -882,26 +909,26 @@ function revealInExplorer(path) {
 
 // Single delete
 async function deleteSingleFile(file) {
-  if (confirm(`Move ${file.name} to trash?`)) {
+  if (confirm(`Переместить файл "${file.name}" в корзину?`)) {
     try {
       await invoke('move_to_trash', { paths: [file.path] })
       await refreshData()
       galleryStore.clearSelection()
     } catch (err) {
-      alert('Delete failed')
+      alert('Не удалось удалить файл: ' + err)
     }
   }
 }
 
 // Multiple deletes
 async function deleteMultipleSelected() {
-  if (confirm(`Move ${galleryStore.selectedIds.length} items to trash?`)) {
+  if (confirm(`Переместить ${galleryStore.selectedIds.length} файлов в корзину?`)) {
     try {
       await invoke('move_to_trash', { paths: galleryStore.selectedIds })
       await refreshData()
       galleryStore.clearSelection()
     } catch (err) {
-      alert('Delete failed')
+      alert('Не удалось удалить файлы: ' + err)
     }
   }
 }
@@ -936,30 +963,30 @@ async function restoreTrashFile(trashPath) {
     await invoke('restore_from_trash', { trashPaths: [trashPath] })
     await refreshData()
   } catch (err) {
-    alert('Failed to restore file')
+    alert('Не удалось восстановить файл: ' + err)
   }
 }
 
 async function deleteTrashFilePermanently(item) {
-  if (confirm('Permanently delete this file from disk? This cannot be undone.')) {
+  if (confirm('Удалить файл навсегда? Это действие нельзя отменить.')) {
     try {
       await invoke('delete_file_system', { path: item.trashPath })
       const meta = item.trashPath.replace(/\.[^/.]+$/, "") + ".meta.json"
       await invoke('delete_file_system', { path: meta }).catch(() => {})
       await refreshData()
     } catch (err) {
-      alert('Failed to delete file')
+      alert('Не удалось удалить файл: ' + err)
     }
   }
 }
 
 async function clearTrash() {
-  if (confirm('Empty trash bin permanently? This deletes all files inside the trash bin.')) {
+  if (confirm('Очистить корзину навсегда? Все файлы внутри будут удалены окончательно.')) {
     try {
       await invoke('empty_trash')
       await refreshData()
     } catch (err) {
-      alert('Failed to empty trash')
+      alert('Не удалось очистить корзину: ' + err)
     }
   }
 }
@@ -1097,6 +1124,23 @@ function toggleTheme() {
 
 // Keyboard shortcuts global handler
 function handleKeyDown(e) {
+  // Игнорируем пробел/горячие клавиши, если фокус в инпуте
+  const activeEl = document.activeElement
+  const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
+  if (isInput) return
+
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault()
+    const count = galleryStore.selectedIds.length
+    if (count === 1) {
+      if (selectedFile.value && (isImage(selectedFile.value) || isVideo(selectedFile.value))) {
+        openQuickLook(selectedFile.value)
+      }
+    } else if (count >= 2 && count <= 6) {
+      openCompare()
+    }
+  }
+
   if (e.key === 'k' && selectedFile.value && isImage(selectedFile.value)) {
     e.preventDefault()
     openCrop(selectedFile.value)

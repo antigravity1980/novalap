@@ -171,8 +171,6 @@ function onMouseDown(e) {
   } else {
     selectionBeforeDrag = [...galleryStore.selectedIds]
   }
-
-  e.preventDefault()
 }
 
 function onMouseMove(e) {

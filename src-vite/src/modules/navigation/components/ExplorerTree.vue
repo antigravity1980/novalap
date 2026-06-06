@@ -36,11 +36,13 @@
 </template>
 
 <script setup>
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, watch } from 'vue'
 import { useNavigationStore } from '../store'
+import { useGalleryStore } from '../../gallery/store'
 import TreeFolderNode from './TreeFolderNode.vue'
 
 const navigationStore = useNavigationStore()
+const galleryStore = useGalleryStore()
 const expandedNodes = reactive({})
 
 async function navigateTo(path) {
@@ -48,6 +50,7 @@ async function navigateTo(path) {
     expandedNodes[path] = true
     await navigationStore.expandTreeFolder(path)
     await navigationStore.navigateTo(path)
+    galleryStore.setFiles(navigationStore.folders)
   }
 }
 
@@ -60,6 +63,16 @@ onMounted(() => {
   // If there's an active path, expand its drive node
   if (navigationStore.currentPath) {
     const drive = navigationStore.drives.find(d => navigationStore.currentPath.startsWith(d.path))
+    if (drive) {
+      expandedNodes[drive.path] = true
+    }
+  }
+})
+
+// Авторазвёртывание дерева при навигации
+watch(() => navigationStore.currentPath, (newPath) => {
+  if (newPath) {
+    const drive = navigationStore.drives.find(d => newPath.startsWith(d.path))
     if (drive) {
       expandedNodes[drive.path] = true
     }

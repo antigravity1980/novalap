@@ -1,5 +1,5 @@
 <template>
-  <div class="gallery-container w-full h-full relative" @wheel.prevent="onWheel">
+  <div class="gallery-container w-full h-full relative" @wheel="onWheel">
     <div v-if="galleryStore.isLoading" class="flex items-center justify-center h-full">
       <span class="loading loading-spinner loading-lg text-primary"></span>
     </div>
@@ -49,6 +49,7 @@ function onZoomChange(event) {
 
 function onWheel(event) {
   if (event.ctrlKey || event.metaKey) {
+    event.preventDefault()
     const delta = event.deltaY > 0 ? -0.1 : 0.1
     galleryStore.setZoom(galleryStore.zoomLevel + delta)
   }

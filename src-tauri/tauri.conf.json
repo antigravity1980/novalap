@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "identifier": "com.novalap.lapai",
   "build": {
-    "beforeBuildCommand": "pnpm --dir ../src-vite build",
-    "beforeDevCommand": "pnpm --dir ../src-vite dev",
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "pnpm --dir ..\\src-vite dev",
     "devUrl": "http://localhost:3580",
-    "frontendDist": "../src-vite/dist"
+    "frontendDist": "..\\src-vite\\dist"
   },
   "app": {
     "withGlobalTauri": true,
@@ -42,7 +42,13 @@
           "/Volumes/**",
           "/media/**",
           "/mnt/**",
-          "/run/media/**"
+          "/run/media/**",
+          "C:\\**",
+          "D:\\**",
+          "E:\\**",
+          "F:\\**",
+          "G:\\**",
+          "H:\\**"
         ]
       }
     }

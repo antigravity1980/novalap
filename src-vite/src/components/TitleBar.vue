@@ -153,14 +153,17 @@ const toggleMaximizeWindow = () => {
 };
 
 const closeWindow = () => {
-  if (isTauri) {
-    appWindow.close();
+  if (props.viewName === 'Home') {
+    if (isTauri) {
+      appWindow.close();
+    } else {
+      window.close();
+    }
   } else {
-    // Browser dev mode: navigate back
     if (window.history.length > 1) {
       router.go(-1);
     } else {
-      window.close();
+      router.push('/');
     }
   }
 };
