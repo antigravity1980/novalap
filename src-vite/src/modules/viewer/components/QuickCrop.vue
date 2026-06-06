@@ -2,13 +2,13 @@
   <div class="quick-crop fixed inset-0 z-40 bg-black/90 flex flex-col" @keydown.escape="cancel">
     <!-- Header -->
     <div class="crop-header flex items-center justify-between px-4 py-2 bg-base-200/20 text-white">
-      <h3 class="text-sm">Crop: {{ file?.name }}</h3>
+      <h3 class="text-sm">{{ $t('viewer.crop_title', { name: file?.name || '' }) }}</h3>
       <div class="flex items-center gap-2">
         <button class="btn btn-ghost btn-xs text-white/60 hover:text-white" @click="resetCrop">
-          Reset
+          {{ $t('viewer.reset') }}
         </button>
         <button class="btn btn-primary btn-xs" @click="saveCrop" :disabled="saving">
-          {{ saving ? 'Saving...' : 'Save As...' }}
+          {{ saving ? $t('viewer.saving') : $t('viewer.save_as') }}
         </button>
         <button class="text-white/60 hover:text-white text-xl ml-2" @click="cancel">✕</button>
       </div>
@@ -72,19 +72,19 @@
     <!-- Controls -->
     <div class="crop-controls flex items-center justify-center gap-4 px-4 py-2 bg-base-200/20 text-white/60 text-xs">
       <div class="flex items-center gap-2">
-        <span>Zoom:</span>
+        <span>{{ $t('viewer.zoom') }}</span>
         <input type="range" min="0.1" max="3" step="0.1" v-model.number="zoom" class="range range-xs w-20" />
         <span>{{ Math.round(zoom * 100) }}%</span>
       </div>
       <div class="flex items-center gap-2">
-        <span>Aspect:</span>
+        <span>{{ $t('viewer.aspect') }}</span>
         <select v-model="aspectRatio" class="select select-bordered select-xs bg-base-300/50 text-white">
-          <option value="free">Free</option>
+          <option value="free">{{ $t('viewer.aspect_options.free') }}</option>
           <option value="1:1">1:1</option>
           <option value="4:3">4:3</option>
           <option value="16:9">16:9</option>
           <option value="3:2">3:2</option>
-          <option value="9:16">9:16 (Portrait)</option>
+          <option value="9:16">{{ $t('viewer.aspect_options.portrait_9_16') }}</option>
         </select>
       </div>
       <span>{{ Math.round(crop.width) }} × {{ Math.round(crop.height) }}px</span>

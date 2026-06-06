@@ -611,7 +611,16 @@ const settingsTabs = [
   'settings.about.title',
 ];
 
-const appWindow = getCurrentWebviewWindow()
+let appWindow: any;
+try {
+  appWindow = getCurrentWebviewWindow();
+} catch (e) {
+  appWindow = {
+    show: () => Promise.resolve(),
+    setSize: () => Promise.resolve(),
+    listen: () => Promise.resolve(() => {}),
+  };
+}
 let gridSizeEmitTimer: number | null = null;
 const SETTINGS_BASE_WIDTH = 600;
 const SETTINGS_BASE_HEIGHT = 620;
@@ -1137,16 +1146,32 @@ onMounted(async () => {
   if (typeof config.settings.imageSearch.model !== 'number') {
     config.settings.imageSearch.model = 0;
   }
-  unlistenImageSearchModelDownloadProgress = await listenImageSearchModelDownloadProgress((event: any) => {
-    const progress = Number(event?.payload?.progress ?? 0);
-    multilingualModelDownloadProgress.value = Math.max(0, Math.min(100, progress));
-    multilingualModelDownloadedBytes.value = Math.max(0, Number(event?.payload?.downloadedBytes ?? 0));
-    multilingualModelTotalBytes.value = Math.max(0, Number(event?.payload?.totalBytes ?? 0));
-  });
-  await syncImageSearchModelStatus();
+  try {
+    unlistenImageSearchModelDownloadProgress = await listenImageSearchModelDownloadProgress((event: any) => {
+      const progress = Number(event?.payload?.progress ?? 0);
+      multilingualModelDownloadProgress.value = Math.max(0, Math.min(100, progress));
+      multilingualModelDownloadedBytes.value = Math.max(0, Number(event?.payload?.downloadedBytes ?? 0));
+      multilingualModelTotalBytes.value = Math.max(0, Number(event?.payload?.totalBytes ?? 0));
+    });
+  } catch (e) {
+    console.warn('Failed to listen to model progress in browser:', e);
+  }
+  try {
+    await syncImageSearchModelStatus();
+  } catch (e) {
+    console.warn('Failed to sync model status in browser:', e);
+  }
   applyWindowScale(Number(config.settings.scale || 1));
-  dbStorageDir.value = (await getDbStorageDir()) || '';
-  hasCustomDbStorage.value = await isUsingCustomDbStorage();
+  try {
+    dbStorageDir.value = (await getDbStorageDir()) || '';
+  } catch (e) {
+    dbStorageDir.value = '';
+  }
+  try {
+    hasCustomDbStorage.value = await isUsingCustomDbStorage();
+  } catch (e) {
+    hasCustomDbStorage.value = false;
+  }
 
   if (config.settings.externalImageAppPath) {
     try {
@@ -1165,7 +1190,9 @@ onMounted(async () => {
   }
   
   // Show window after mount
-  await appWindow.show();
+  try {
+    await appWindow.show();
+  } catch (e) {}
 });
 
 onUnmounted(() => {

@@ -5,7 +5,7 @@
       <input
         type="text"
         v-model="searchQuery"
-        placeholder="Search files..."
+        :placeholder="$t('gallery.search_files_placeholder')"
         class="input input-bordered input-sm w-full"
         @input="onSearchChange"
       />
@@ -13,11 +13,11 @@
 
     <!-- Сортировка -->
     <select v-model="galleryStore.sortBy" class="select select-bordered select-sm" @change="onSortChange">
-      <option value="name">Name</option>
-      <option value="size">Size</option>
-      <option value="date">Date</option>
-      <option value="resolution">Resolution</option>
-      <option value="ai_source">AI Source</option>
+      <option value="name">{{ $t('gallery.sort_options.name') }}</option>
+      <option value="size">{{ $t('gallery.sort_options.size') }}</option>
+      <option value="date">{{ $t('gallery.sort_options.date') }}</option>
+      <option value="resolution">{{ $t('gallery.sort_options.resolution') }}</option>
+      <option value="ai_source">{{ $t('gallery.sort_options.ai_source') }}</option>
     </select>
 
     <button class="btn btn-ghost btn-sm" @click="toggleSortOrder">
@@ -28,7 +28,7 @@
 
     <!-- Фильтр по формату -->
     <select v-model="galleryStore.filters.format" class="select select-bordered select-sm" @change="onFilterChange">
-      <option value="">All formats</option>
+      <option value="">{{ $t('explorer.all_formats') }}</option>
       <option value="png">PNG</option>
       <option value="jpg">JPEG</option>
       <option value="jpeg">JPEG</option>
@@ -42,7 +42,7 @@
 
     <!-- Фильтр по AI-источнику -->
     <select v-model="galleryStore.filters.aiSource" class="select select-bordered select-sm" @change="onFilterChange">
-      <option value="">All sources</option>
+      <option value="">{{ $t('explorer.all_sources') }}</option>
       <option value="ComfyUI">ComfyUI</option>
       <option value="Midjourney">Midjourney</option>
       <option value="Stable Diffusion">Stable Diffusion</option>
@@ -51,12 +51,12 @@
       <option value="Grok Image">Grok Image</option>
       <option value="DALL-E">DALL-E</option>
       <option value="Krita AI">Krita AI</option>
-      <option value="Unknown">Unknown</option>
+      <option value="Unknown">{{ $t('explorer.unknown_source') }}</option>
     </select>
 
     <!-- Кол-во выбранных -->
     <span class="text-xs text-base-content/50 ml-auto whitespace-nowrap">
-      {{ galleryStore.selectedIds.length }} selected
+      {{ $t('gallery.selected_count', { count: galleryStore.selectedIds.length }) }}
     </span>
 
     <button class="btn btn-ghost btn-xs" @click="galleryStore.clearSelection()">✕</button>

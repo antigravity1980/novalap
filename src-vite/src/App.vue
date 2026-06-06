@@ -32,10 +32,23 @@ watch(() => libConfig.$state, () => {
   }
 }, { deep: true });
 
+function getSafeWebviewWindow() {
+  try {
+    return getCurrentWebviewWindow();
+  } catch (e) {
+    return {
+      label: 'main',
+      listen: () => Promise.resolve(() => {}),
+      show: () => Promise.resolve(),
+      close: () => Promise.resolve(),
+    };
+  }
+}
+
 watch(
   () => Number(config.settings.scale || 1),
   (newScale) => {
-    const win = getCurrentWebviewWindow();
+    const win = getSafeWebviewWindow();
     if (win.label === 'main') {
       applyMainWindowScale(newScale);
     }
@@ -43,7 +56,7 @@ watch(
 );
 
 onMounted(async () => {
-  const win = getCurrentWebviewWindow();
+  const win = getSafeWebviewWindow();
   if (win.label === 'main') {
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     applyMainWindowScale(Number(config.settings.scale || 1));
@@ -103,7 +116,7 @@ onMounted(async () => {
 });
 
 onUnmounted(async () => {
-  const win = getCurrentWebviewWindow();
+  const win = getSafeWebviewWindow();
   if (win.label === 'main') {
     window.removeEventListener('keydown', handleKeyDown, { capture: true });
     document.documentElement.style.fontSize = '';
@@ -147,7 +160,7 @@ function applyMainWindowScale(scale) {
 }
 
 function handleMainWindowScaleShortcut(event) {
-  const win = getCurrentWebviewWindow();
+  const win = getSafeWebviewWindow();
   if (win.label !== 'main') return false;
 
   const isScaleUp = matchesShortcut('app.scale.increase', event);

@@ -1,8 +1,5 @@
-/**
- * project: Lap
- * author:  julyx10
- * date:    2024-08-08
- */
+#![allow(dead_code)]
+
 use std::env;
 use std::fmt::Write;
 use std::fs;

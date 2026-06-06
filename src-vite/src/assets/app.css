@@ -146,3 +146,87 @@ html, body {
   background: color-mix(in srgb, var(--color-warning) 22%, black 48%);
   color: color-mix(in srgb, white 88%, var(--color-warning) 12%);
 }
+
+/* Windows 11 Colors and Theme Overrides */
+:root[data-theme="light"] {
+  --color-primary: #0067c0 !important;
+  --color-primary-content: #ffffff !important;
+  --color-base-100: #ffffff !important; /* Workspace background */
+  --color-base-200: #f3f3f3 !important; /* Sidebar/Toolbar background */
+  --color-base-300: #f9f9f9 !important; /* Window border/base background */
+  --color-base-content: #1f1f1f !important;
+  --color-neutral: #e0e0e0 !important;
+  --color-neutral-content: #1f1f1f !important;
+  
+  --win11-border: #e2e2e2;
+  --win11-border-secondary: #dcdcdc;
+  --win11-hover: rgba(0, 0, 0, 0.04);
+  --win11-active: rgba(0, 0, 0, 0.07);
+  --win11-selected: #e5f1fb;
+  --win11-selected-border: #0067c0;
+}
+
+:root[data-theme="dark"] {
+  --color-primary: #60cdff !important;
+  --color-primary-content: #000000 !important;
+  --color-base-100: #202020 !important; /* Workspace background */
+  --color-base-200: #1b1b1b !important; /* Sidebar/Toolbar background */
+  --color-base-300: #2b2b2b !important; /* Window border/base background */
+  --color-base-content: #f5f5f5 !important;
+  --color-neutral: #2c2c2c !important;
+  --color-neutral-content: #f5f5f5 !important;
+  
+  --win11-border: #2e2e2e;
+  --win11-border-secondary: #3e3e3e;
+  --win11-hover: rgba(255, 255, 255, 0.05);
+  --win11-active: rgba(255, 255, 255, 0.09);
+  --win11-selected: #26384a;
+  --win11-selected-border: #60cdff;
+}
+
+/* Base resets for Win11 style */
+.main-layout {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif !important;
+}
+
+/* Rounded corners and spacing like Windows 11 */
+.win11-btn {
+  @apply btn btn-ghost btn-sm text-xs font-medium rounded-md gap-1 px-2.5 h-8 min-h-[32px] transition-colors duration-100 ease-in-out select-none border-0;
+  color: var(--color-base-content);
+}
+.win11-btn:hover {
+  background-color: var(--win11-hover);
+}
+.win11-btn:active {
+  background-color: var(--win11-active);
+}
+.win11-btn:disabled {
+  @apply opacity-40 cursor-not-allowed bg-transparent;
+}
+
+/* Unified clean sidebar scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 120, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 120, 0.45);
+}
+
+.active-nav-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background-color: var(--color-primary);
+  border-radius: 2px;
+}

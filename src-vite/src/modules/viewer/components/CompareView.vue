@@ -2,7 +2,7 @@
   <div class="compare-view fixed inset-0 z-40 bg-black/95 flex flex-col" @keydown.escape="close">
     <!-- Top bar -->
     <div class="compare-header flex items-center justify-between px-4 py-2 bg-base-200/20">
-      <h3 class="text-white/80 text-sm">Compare: {{ leftFile?.name }} ↔ {{ rightFile?.name }}</h3>
+      <h3 class="text-white/80 text-sm">{{ $t('viewer.compare_title', { left: leftFile?.name || '', right: rightFile?.name || '' }) }}</h3>
       <button class="text-white/60 hover:text-white text-xl" @click="close">✕</button>
     </div>
 
@@ -15,7 +15,7 @@
         :class="{ 'text-primary bg-primary/10': compareMode === mode.id }"
         @click="compareMode = mode.id"
       >
-        {{ mode.label }}
+        {{ $t('viewer.compare_modes.' + mode.id) }}
       </button>
     </div>
 
@@ -68,7 +68,7 @@
     <!-- File selection bar -->
     <div class="compare-files-bar flex items-center gap-4 px-4 py-2 bg-base-200/10">
       <div class="flex-1 flex items-center gap-2">
-        <span class="text-white/40 text-xs">Left:</span>
+        <span class="text-white/40 text-xs">{{ $t('viewer.left_label') }}</span>
         <select v-model="leftIndex" class="select select-bordered select-xs text-white bg-base-300/50 max-w-[200px]">
           <option v-for="(file, i) in files" :key="file.path" :value="i" :disabled="i === rightIndex">
             {{ file.name }}
@@ -76,7 +76,7 @@
         </select>
       </div>
       <div class="flex-1 flex items-center gap-2 justify-end">
-        <span class="text-white/40 text-xs">Right:</span>
+        <span class="text-white/40 text-xs">{{ $t('viewer.right_label') }}</span>
         <select v-model="rightIndex" class="select select-bordered select-xs text-white bg-base-300/50 max-w-[200px]">
           <option v-for="(file, i) in files" :key="file.path" :value="i" :disabled="i === leftIndex">
             {{ file.name }}

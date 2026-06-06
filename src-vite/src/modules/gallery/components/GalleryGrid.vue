@@ -6,7 +6,7 @@
 
     <div v-else-if="galleryStore.displayedFiles.length === 0" class="flex flex-col items-center justify-center h-full text-base-content/40 space-y-2">
       <span class="text-4xl">📂</span>
-      <span class="text-sm">No files in this directory</span>
+      <span class="text-sm">{{ $t('gallery.no_files') }}</span>
     </div>
 
     <!-- Virtual scroll container -->

@@ -4,19 +4,19 @@
       <!-- Drives list -->
       <div v-for="drive in navigationStore.drives" :key="drive.path" class="tree-node px-1">
         <div
-          class="tree-item flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-xs font-bold transition-all duration-150"
+          class="tree-item flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
           :class="{
-            'bg-primary text-primary-content shadow-lg shadow-primary/20': drive.path === navigationStore.currentPath,
+            'bg-primary/15 text-primary font-bold active-nav-item': drive.path === navigationStore.currentPath,
             'text-base-content/75 hover:bg-base-100/35 hover:text-base-content': drive.path !== navigationStore.currentPath,
           }"
           @click="navigateTo(drive.path)"
         >
           <div class="flex items-center gap-2 truncate">
             <span class="text-sm">💾</span>
-            <span class="truncate font-semibold">{{ drive.name }} Drive</span>
+            <span class="truncate font-semibold">{{ drive.name }}</span>
           </div>
-          <span v-if="drive.is_removable" class="text-[9px] uppercase tracking-wider bg-base-300 text-base-content/50 px-1 py-0.5 rounded">
-            Rem
+          <span v-if="drive.is_removable" class="text-[9px] uppercase tracking-wider bg-base-300 text-base-content/50 px-1 py-0.5 rounded shrink-0">
+            {{ $t('explorer.drives.removable') }}
           </span>
         </div>
 

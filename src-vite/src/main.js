@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { createPinia } from 'pinia'
 import piniaPersistedState from 'pinia-plugin-persistedstate'
@@ -46,6 +46,17 @@ const i18n = createI18n({
     pt
   },
 })
+
+// Sync config language with global i18n locale
+watch(
+  () => config.settings.language,
+  (newLang) => {
+    if (i18n.global.locale.value !== newLang) {
+      i18n.global.locale.value = newLang
+    }
+  },
+  { immediate: true }
+)
 
 // Set up global properties
 app.config.globalProperties.$invoke = invoke

@@ -53,7 +53,7 @@
           autoplay
         ></video>
         <div v-else class="text-white/50 text-lg">
-          Unsupported file type: {{ currentFile?.extension }}
+          {{ $t('viewer.unsupported_file_type', { ext: currentFile?.extension || '' }) }}
         </div>
 
         <!-- File info bar -->

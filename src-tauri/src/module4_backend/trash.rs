@@ -263,7 +263,7 @@ pub fn restore_originals(session_id: String) -> Result<(), String> {
 
         // Пытаемся найти оригинал по тому же имени в исходной локации
         // (упрощённо — сохраняем поверх)
-        let original_path = &backup_path; // временно
+        let _original_path = &backup_path; // временно
 
         // В реальности нужно хранить mapping оригинальных путей
         // Пока просто восстанавливаем в ту же папку backup

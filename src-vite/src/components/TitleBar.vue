@@ -75,6 +75,7 @@ import { ref, watch } from 'vue';
 import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow  } from '@tauri-apps/api/window';
 import { isWin, isMac, isLinux } from '@/common/utils';
+import { useRouter } from 'vue-router';
 
 import { 
   IconWinMinus,
@@ -82,6 +83,8 @@ import {
   IconWinRestore,
   IconClose 
 } from '@/common/icons';
+
+const router = useRouter();
 
 const props = defineProps({
   titlebar: {
@@ -104,9 +107,22 @@ const props = defineProps({
 
 const searchValue = ref('');
 
-const appWindow = getCurrentWindow();
+let appWindow;
+try {
+  appWindow = getCurrentWindow();
+} catch (e) {
+  appWindow = {
+    minimize: () => console.log('minimize'),
+    isMaximized: () => Promise.resolve(false),
+    maximize: () => console.log('maximize'),
+    unmaximize: () => console.log('unmaximize'),
+    close: () => console.log('close'),
+  };
+}
 const isMaximized = ref(false);
 const showDesktopWindowControls = isWin || isLinux;
+// Detect if running inside Tauri
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 watch(() => searchValue.value, (newValue) => { 
   console.log('searchValue:', newValue);
@@ -137,7 +153,16 @@ const toggleMaximizeWindow = () => {
 };
 
 const closeWindow = () => {
-  appWindow.close();
+  if (isTauri) {
+    appWindow.close();
+  } else {
+    // Browser dev mode: navigate back
+    if (window.history.length > 1) {
+      router.go(-1);
+    } else {
+      window.close();
+    }
+  }
 };
 
 </script>

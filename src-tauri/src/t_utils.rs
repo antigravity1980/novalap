@@ -542,6 +542,7 @@ fn fallback_external_app_name(app_path: &str) -> String {
     normalize_external_app_name(fallback)
 }
 
+#[allow(dead_code)]
 fn command_stdout(mut command: Command) -> Option<String> {
     let output = command.output().ok()?;
     if !output.status.success() {

@@ -41,13 +41,6 @@ pub struct RawMetadataEntry {
     pub value: String,
 }
 
-/// Результат парсинга
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParseResult {
-    pub metadata: AiMetadata,
-    pub source_engine: String,
-}
 
 /// Парсинг AI-метаданных из файла
 #[command]

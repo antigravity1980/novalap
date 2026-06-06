@@ -512,7 +512,20 @@ const filenameMaxWidth = computed(() => {
 const showExtraIcons = computed(() => containerWidth.value > 600);
 // Window control state (Windows + ImageViewer mode)
 const showDesktopWindowControls = isWin || isLinux;
-const desktopAppWindow = showDesktopWindowControls ? getCurrentWindow() : null;
+let desktopAppWindow: any = null;
+if (showDesktopWindowControls) {
+  try {
+    desktopAppWindow = getCurrentWindow();
+  } catch (e) {
+    desktopAppWindow = {
+      minimize: () => console.log('minimize'),
+      isMaximized: () => Promise.resolve(false),
+      maximize: () => console.log('maximize'),
+      unmaximize: () => console.log('unmaximize'),
+      close: () => console.log('close'),
+    };
+  }
+}
 const isMaximized = ref(false);
 
 const minimizeWindow = () => desktopAppWindow?.minimize();

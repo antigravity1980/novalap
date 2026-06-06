@@ -90,7 +90,7 @@ export const useConfigStore = defineStore('configStore', {
       tabIndex: 0,               // settings tab index (0: general, 1: view, 2: library, 3: image search, 4: shortcuts, 5: about)
 
       // general settings
-      language: 'en',             // default language
+      language: 'ru',             // default language
       appearance: 1,              // appearance (0: light; 1: dark)
       lightTheme: 0,              // light theme color index
       darkTheme: 0,               // dark theme color index

@@ -1,9 +1,9 @@
 <template>
   <div class="prompt-viewer bg-base-200/50 rounded-lg p-3 max-w-md w-full">
     <div class="flex items-center justify-between mb-2">
-      <h3 class="text-sm font-semibold">Prompt Inspector</h3>
+      <h3 class="text-sm font-semibold">{{ $t('viewer.prompt_inspector') }}</h3>
       <button class="btn btn-ghost btn-xs" @click="loadMetadata" :disabled="loading">
-        {{ loading ? 'Loading...' : '🔄' }}
+        {{ loading ? $t('viewer.loading') : '🔄' }}
       </button>
     </div>
 
@@ -16,7 +16,7 @@
     </div>
 
     <div v-else-if="!metadata" class="text-base-content/40 text-xs text-center py-4">
-      Select a file or click refresh to load metadata
+      {{ $t('viewer.select_file_metadata') }}
     </div>
 
     <div v-else class="metadata-content space-y-2 max-h-96 overflow-y-auto text-xs">
@@ -27,7 +27,7 @@
 
       <!-- Positive Prompt -->
       <div v-if="metadata.positive_prompt" class="metadata-section">
-        <div class="font-semibold text-green-600 dark:text-green-400">Positive Prompt</div>
+        <div class="font-semibold text-green-600 dark:text-green-400">{{ $t('viewer.positive_prompt') }}</div>
         <div class="mt-0.5 text-base-content/80 bg-base-100 rounded p-1.5 break-words">
           {{ metadata.positive_prompt }}
         </div>
@@ -35,7 +35,7 @@
 
       <!-- Negative Prompt -->
       <div v-if="metadata.negative_prompt" class="metadata-section">
-        <div class="font-semibold text-red-600 dark:text-red-400">Negative Prompt</div>
+        <div class="font-semibold text-red-600 dark:text-red-400">{{ $t('viewer.negative_prompt') }}</div>
         <div class="mt-0.5 text-base-content/80 bg-base-100 rounded p-1.5 break-words">
           {{ metadata.negative_prompt }}
         </div>
@@ -74,7 +74,7 @@
       <!-- Workflow (collapsible) -->
       <div v-if="metadata.workflow">
         <details class="metadata-section">
-          <summary class="font-semibold text-base-content/70 cursor-pointer">Workflow JSON</summary>
+          <summary class="font-semibold text-base-content/70 cursor-pointer">{{ $t('viewer.workflow_json') }}</summary>
           <pre class="mt-0.5 text-[10px] bg-base-100 rounded p-1.5 overflow-x-auto max-h-32">{{ formatWorkflow(metadata.workflow) }}</pre>
         </details>
       </div>
@@ -83,7 +83,7 @@
       <div v-if="metadata.raw_metadata && metadata.raw_metadata.length > 0">
         <details class="metadata-section">
           <summary class="font-semibold text-base-content/50 cursor-pointer">
-            Raw Metadata ({{ metadata.raw_metadata.length }})
+            {{ $t('viewer.raw_metadata', { count: metadata.raw_metadata.length }) }}
           </summary>
           <div class="mt-0.5 space-y-0.5">
             <div v-for="entry in metadata.raw_metadata" :key="entry.key" class="text-[10px] bg-base-100 rounded p-1">
@@ -100,6 +100,9 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   filePath: { type: String, default: '' },
@@ -123,7 +126,7 @@ async function loadMetadata() {
   try {
     metadata.value = await invoke('parse_ai_metadata', { path: props.filePath })
   } catch (err) {
-    error.value = typeof err === 'string' ? err : 'Failed to load metadata'
+    error.value = typeof err === 'string' ? err : (t('viewer.loading') === 'Загрузка...' ? 'Не удалось загрузить метаданные' : 'Failed to load metadata')
   } finally {
     loading.value = false
   }

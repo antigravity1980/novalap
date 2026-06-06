@@ -24,16 +24,21 @@
       <!-- Video tag/icon overlay -->
       <div v-else-if="isVideo" class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-base-300 to-base-200 text-base-content/40 hover:text-base-content/60">
         <span class="text-3xl filter drop-shadow">🎬</span>
-        <span class="text-[10px] uppercase font-bold tracking-wider opacity-60">Video</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider opacity-60">{{ $t('gallery.video_label') }}</span>
         <div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1">
           <span>▶</span>
-          <span>VIDEO</span>
+          <span>{{ $t('gallery.video_label').toUpperCase() }}</span>
         </div>
+      </div>
+      <!-- Папка -->
+      <div v-else-if="isFolder" class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/50">
+        <span class="text-4xl">📁</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider">{{ $t('gallery.folder_label').toUpperCase() }}</span>
       </div>
       <!-- Other files generic -->
       <div v-else class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/40">
         <span class="text-3xl">📄</span>
-        <span class="text-[10px] uppercase font-bold tracking-wider">{{ file.extension?.toUpperCase() || 'FILE' }}</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider">{{ file.extension?.toUpperCase() || $t('gallery.file_label').toUpperCase() }}</span>
       </div>
 
       <!-- AI Source indicator (corner badge) -->
@@ -78,6 +83,10 @@ const props = defineProps({
 })
 
 defineEmits(['click', 'dblclick'])
+
+const isFolder = computed(() => {
+  return props.file.is_dir === true || props.file.file_type === 'directory' || props.file.is_directory === true
+})
 
 const isImage = computed(() => {
   const ext = props.file.extension?.toLowerCase()
