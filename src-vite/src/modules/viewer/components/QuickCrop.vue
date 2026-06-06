@@ -95,8 +95,8 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { save, writeFile } from '@tauri-apps/plugin-dialog'
-import { writeBinaryFile } from '@tauri-apps/api/fs'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeFile } from '@tauri-apps/plugin-fs'
 
 const props = defineProps({
   file: { type: Object, default: null },
@@ -244,13 +244,8 @@ async function saveCrop() {
       return
     }
 
-    // Сохраняем через Rust
-    // Пока используем cross_copy и crop на фронтенде через canvas
     const canvas = document.createElement('canvas')
-    canvas.width = crop.width
-    canvas.height = crop.height
-    const ctx = canvas.getContext('2d')
-
+    // Get natural image dimensions and calculate crop ratio
     const img = new Image()
     img.crossOrigin = 'anonymous'
 
@@ -260,25 +255,30 @@ async function saveCrop() {
       img.src = imageUrl.value
     })
 
-    ctx.drawImage(img, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height)
+    // Calculate actual crop coordinates based on natural dimensions
+    const displayWidth = imageRef.value.clientWidth
+    const displayHeight = imageRef.value.clientHeight
+    const scaleX = img.naturalWidth / displayWidth
+    const scaleY = img.naturalHeight / displayHeight
 
-    // Convert to blob and save via Tauri
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    const cropX = crop.x * scaleX
+    const cropY = crop.y * scaleY
+    const cropW = crop.width * scaleX
+    const cropH = crop.height * scaleY
 
-    // Save file via Rust command
-    await invoke('batch_convert', {
-      files: [savePath],
-      targetFormat: savePath.split('.').pop().toLowerCase(),
-      quality: 95,
-    }).catch(() => {})
+    canvas.width = cropW
+    canvas.height = cropH
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
 
-    // Write the blob data
+    // Convert to blob and save via Tauri plugin-fs
+    const ext = savePath.split('.').pop().toLowerCase()
+    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg'
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, 0.95))
     const arrayBuffer = await blob.arrayBuffer()
     const uint8Array = new Uint8Array(arrayBuffer)
-    const bytes = Array.from(uint8Array)
 
-    await invoke('cross_copy', { src: props.file.path, dest: savePath })
-    // TODO: write cropped bytes directly
+    await writeFile(savePath, uint8Array)
 
     emit('saved', savePath)
     emit('close')

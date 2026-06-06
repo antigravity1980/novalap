@@ -16,16 +16,16 @@ fn main() {
 
     write_build_info();
 
-    // SKIP libraw/libheif build when LAPAI_SKIP_NATIVE_BUILD is set (CI/debug)
-    let skip_native = env::var("LAPAI_SKIP_NATIVE_BUILD").is_ok();
-    if !skip_native {
-        build_libraw();
-        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-        if target_os != "macos" {
-            build_libheif();
-        }
-    } else {
-        println!("cargo:warning=Skipping libraw/libheif native builds (LAPAI_SKIP_NATIVE_BUILD=1)");
+    // Always skip libraw/libheif native builds for LapAI
+    println!("cargo:warning=Skipping libraw/libheif native builds for LapAI");
+
+    // We still compile the macOS pasteboard shim if we are on macOS
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "macos" {
+        cc::Build::new()
+            .file("src/pasteboard.mm")
+            .compile("lap_pasteboard");
+        println!("cargo:rustc-link-lib=framework=AppKit");
     }
 
     // build tauri

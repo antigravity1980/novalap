@@ -1,46 +1,68 @@
 <template>
   <div
-    class="thumbnail-card rounded-lg overflow-hidden border cursor-pointer transition-all duration-150"
+    class="thumbnail-card rounded-xl overflow-hidden border cursor-pointer transition-all duration-200 bg-base-200/40 relative flex flex-col justify-between"
     :class="{
-      'border-primary ring-2 ring-primary': selected,
-      'border-base-200 hover:border-base-300 hover:shadow-md': !selected,
+      'border-primary ring-2 ring-primary/45 shadow-lg shadow-primary/10 translate-y-[-2px] bg-base-100': selected,
+      'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30': !selected,
     }"
-    :style="{ maxWidth: size + 'px' }"
+    :style="{ width: size + 'px' }"
     @click="$emit('click')"
     @dblclick="$emit('dblclick')"
   >
-    <!-- Thumbnail -->
+    <!-- Thumbnail Image Container -->
     <div
-      class="thumbnail-image bg-base-200 flex items-center justify-center overflow-hidden"
+      class="thumbnail-image bg-base-300 flex items-center justify-center overflow-hidden relative select-none w-full"
       :style="{ height: size * 0.75 + 'px' }"
     >
       <img
         v-if="isImage"
         :src="getThumbnailUrl(file.path)"
         :alt="file.name"
-        class="w-full h-full object-cover"
+        class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
         loading="lazy"
       />
-      <div v-else-if="isVideo" class="flex flex-col items-center gap-1 text-base-content/50">
-        <span class="text-3xl">🎬</span>
-        <span class="text-xs">Video</span>
+      <!-- Video tag/icon overlay -->
+      <div v-else-if="isVideo" class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-base-300 to-base-200 text-base-content/40 hover:text-base-content/60">
+        <span class="text-3xl filter drop-shadow">🎬</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider opacity-60">Video</span>
+        <div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1">
+          <span>▶</span>
+          <span>VIDEO</span>
+        </div>
       </div>
-      <div v-else class="flex flex-col items-center gap-1 text-base-content/50">
+      <!-- Other files generic -->
+      <div v-else class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/40">
         <span class="text-3xl">📄</span>
-        <span class="text-xs">{{ file.extension?.toUpperCase() }}</span>
+        <span class="text-[10px] uppercase font-bold tracking-wider">{{ file.extension?.toUpperCase() || 'FILE' }}</span>
+      </div>
+
+      <!-- AI Source indicator (corner badge) -->
+      <div v-if="file.ai_source" class="absolute top-2 left-2 z-10">
+        <span
+          class="badge badge-xs text-[9px] font-bold py-1 px-1.5 border border-white/10 shadow shadow-black/20"
+          :class="getAiSourceClass(file.ai_source)"
+        >
+          {{ file.ai_source }}
+        </span>
+      </div>
+
+      <!-- Selection checkmark badge -->
+      <div v-if="selected" class="absolute top-2 right-2 bg-primary text-primary-content w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-white/20 shadow-md">
+        ✓
       </div>
     </div>
 
     <!-- Info row -->
-    <div class="thumbnail-info p-1.5 text-xs">
-      <div class="file-name truncate font-medium" :title="file.name">
+    <div class="thumbnail-info p-2.5 text-xs flex flex-col gap-1 shrink-0 border-t border-base-content/5 bg-base-200/20">
+      <div class="file-name truncate font-medium text-base-content/90" :title="file.name">
         {{ file.name }}
       </div>
-      <div v-if="file.resolution" class="resolution text-base-content/60">
-        {{ file.resolution.width }}x{{ file.resolution.height }}
-      </div>
-      <div v-if="file.ai_source" class="ai-source text-primary/70 text-[10px]">
-        {{ file.ai_source }}
+      <div class="flex items-center justify-between mt-0.5 text-[10px] text-base-content/40 font-mono">
+        <span v-if="file.resolution" class="font-semibold">
+          {{ file.resolution.width }}×{{ file.resolution.height }}
+        </span>
+        <span v-else>—</span>
+        <span>{{ formatBytes(file.size) }}</span>
       </div>
     </div>
   </div>
@@ -59,33 +81,60 @@ defineEmits(['click', 'dblclick'])
 
 const isImage = computed(() => {
   const ext = props.file.extension?.toLowerCase()
-  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'avif', 'jxl'].includes(ext)
+  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'avif', 'jxl', 'svg', 'ico'].includes(ext)
 })
 
 const isVideo = computed(() => {
   const ext = props.file.extension?.toLowerCase()
-  return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv'].includes(ext)
+  return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'mpeg', '3gp'].includes(ext)
 })
 
 function getThumbnailUrl(filePath) {
-  // Используем Tauri asset protocol для загрузки миниатюры
-  // В будущем можно добавить генерацию миниатюр через Rust
   return `asset://localhost/${encodeURI(filePath)}`
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return ''
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
+  }
+  return `${size.toFixed(0)} ${units[unitIndex]}`
+}
+
+function getAiSourceClass(source) {
+  const s = source.toLowerCase()
+  if (s.includes('comfyui')) {
+    return 'bg-purple-600/90 text-white'
+  }
+  if (s.includes('midjourney')) {
+    return 'bg-blue-600/90 text-white'
+  }
+  if (s.includes('stable diffusion') || s.includes('sd_')) {
+    return 'bg-teal-600/90 text-white'
+  }
+  if (s.includes('gpt')) {
+    return 'bg-emerald-600/90 text-white'
+  }
+  if (s.includes('grok')) {
+    return 'bg-amber-600/90 text-white'
+  }
+  if (s.includes('nano banana')) {
+    return 'bg-rose-600/90 text-white'
+  }
+  return 'bg-neutral-600/90 text-white'
 }
 </script>
 
 <style scoped>
 .thumbnail-card {
-  background: var(--fallback-b1, oklch(var(--b1)));
-  transition: transform 0.1s, box-shadow 0.1s;
-}
-.thumbnail-card:hover {
-  transform: scale(1.02);
-}
-.thumbnail-image {
-  position: relative;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s, border-color 0.2s, background-color 0.2s;
 }
 .thumbnail-image img {
   pointer-events: none;
+  backface-visibility: hidden;
 }
 </style>

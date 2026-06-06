@@ -1,23 +1,27 @@
 <template>
-  <div class="explorer-tree">
-    <div class="tree-header">
-      <h3 class="text-sm font-semibold px-2 py-1">Explorer</h3>
-    </div>
-    <div class="tree-content">
-      <!-- Диски -->
-      <div v-for="drive in navigationStore.drives" :key="drive.path" class="tree-node">
+  <div class="explorer-tree py-2">
+    <div class="tree-content space-y-1">
+      <!-- Drives list -->
+      <div v-for="drive in navigationStore.drives" :key="drive.path" class="tree-node px-1">
         <div
-          class="tree-item flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-base-200 rounded"
-          :class="{ 'bg-primary/10': drive.path === navigationStore.currentPath }"
+          class="tree-item flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-xs font-bold transition-all duration-150"
+          :class="{
+            'bg-primary text-primary-content shadow-lg shadow-primary/20': drive.path === navigationStore.currentPath,
+            'text-base-content/75 hover:bg-base-100/35 hover:text-base-content': drive.path !== navigationStore.currentPath,
+          }"
           @click="navigateTo(drive.path)"
         >
-          <span class="text-lg">💾</span>
-          <span class="text-sm truncate">{{ drive.name }}</span>
-          <span v-if="drive.is_removable" class="text-xs text-base-content/50">(removable)</span>
+          <div class="flex items-center gap-2 truncate">
+            <span class="text-sm">💾</span>
+            <span class="truncate font-semibold">{{ drive.name }} Drive</span>
+          </div>
+          <span v-if="drive.is_removable" class="text-[9px] uppercase tracking-wider bg-base-300 text-base-content/50 px-1 py-0.5 rounded">
+            Rem
+          </span>
         </div>
 
-        <!-- Поддерево папок для активного диска -->
-        <div v-if="expandedNodes[drive.path]" class="tree-children ml-3">
+        <!-- Drive root child folders -->
+        <div v-if="expandedNodes[drive.path]" class="tree-children ml-2 mt-1 border-l border-base-content/5 pl-2 space-y-0.5">
           <TreeFolderNode
             v-for="folder in navigationStore.treeFolders[drive.path]"
             :key="folder.path"
@@ -32,7 +36,7 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, onMounted } from 'vue'
 import { useNavigationStore } from '../store'
 import TreeFolderNode from './TreeFolderNode.vue'
 
@@ -52,21 +56,19 @@ async function expandFolder(path) {
   await navigationStore.expandTreeFolder(path)
 }
 
-async function toggleExpand(path) {
-  if (expandedNodes[path]) {
-    expandedNodes[path] = false
-  } else {
-    await expandFolder(path)
+onMounted(() => {
+  // If there's an active path, expand its drive node
+  if (navigationStore.currentPath) {
+    const drive = navigationStore.drives.find(d => navigationStore.currentPath.startsWith(d.path))
+    if (drive) {
+      expandedNodes[drive.path] = true
+    }
   }
-}
+})
 </script>
 
 <style scoped>
 .explorer-tree {
   height: 100%;
-  overflow-y: auto;
-}
-.tree-content {
-  min-height: 100px;
 }
 </style>
