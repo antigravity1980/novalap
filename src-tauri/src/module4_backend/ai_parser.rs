@@ -13,7 +13,6 @@
  */
 
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::Path;
 use tauri::command;
 
@@ -76,60 +75,38 @@ pub fn detect_ai_source(path: String) -> Result<String, String> {
 // --- PNG парсер ---
 
 fn parse_png_metadata(path: &Path) -> Result<AiMetadata, String> {
-    let file_data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let decoder = png::Decoder::new(file);
+    let reader = decoder.read_info().map_err(|e| format!("PNG decode error: {}", e))?;
+    let info = reader.info();
 
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
-    // Простой парсер PNG chunks
-    let file_len = file_data.len();
-    if file_len < 8 {
-        return Err("Invalid PNG file".to_string());
+    for chunk in &info.uncompressed_latin1_text {
+        raw_entries.push(RawMetadataEntry {
+            key: chunk.keyword.clone(),
+            value: chunk.text.clone(),
+        });
+        parse_metadata_key(&mut metadata, &chunk.keyword, &chunk.text);
     }
 
-    // Проверяем PNG signature
-    let png_signature = [137, 80, 78, 71, 13, 10, 26, 10];
-    if file_data[..8] != png_signature {
-        return Err("Not a valid PNG file".to_string());
+    for chunk in &info.compressed_latin1_text {
+        let text = chunk.get_text().unwrap_or_else(|_| String::new());
+        raw_entries.push(RawMetadataEntry {
+            key: chunk.keyword.clone(),
+            value: text.clone(),
+        });
+        parse_metadata_key(&mut metadata, &chunk.keyword, &text);
     }
 
-    let mut pos = 8;
-    while pos + 8 <= file_len {
-        // Читаем длину chunk (4 байта, big-endian)
-        let chunk_len = u32::from_be_bytes([
-            file_data[pos],
-            file_data[pos + 1],
-            file_data[pos + 2],
-            file_data[pos + 3],
-        ]) as usize;
-
-        let chunk_type = &file_data[pos + 4..pos + 8];
-        let chunk_type_str = std::str::from_utf8(chunk_type).unwrap_or("????");
-
-        if chunk_type_str == "tEXt" || chunk_type_str == "iTXt" {
-            let chunk_data_start = pos + 8;
-            let chunk_data_end = chunk_data_start + chunk_len;
-
-            if chunk_data_end <= file_len {
-                let chunk_data = &file_data[chunk_data_start..chunk_data_end];
-
-                // Ищем нулевой байт (разделитель ключ/значение)
-                if let Some(null_pos) = chunk_data.iter().position(|&b| b == 0) {
-                    let key = String::from_utf8_lossy(&chunk_data[..null_pos]).to_string();
-                    let value = String::from_utf8_lossy(&chunk_data[null_pos + 1..]).to_string();
-
-                    raw_entries.push(RawMetadataEntry {
-                        key: key.clone(),
-                        value: value.clone(),
-                    });
-
-                    // Парсим известные ключи
-                    parse_metadata_key(&mut metadata, &key, &value);
-                }
-            }
-        }
-
-        pos += 8 + chunk_len + 4; // +4 для CRC
+    for chunk in &info.utf8_text {
+        let text = chunk.get_text().unwrap_or_else(|_| String::new());
+        raw_entries.push(RawMetadataEntry {
+            key: chunk.keyword.clone(),
+            value: text.clone(),
+        });
+        parse_metadata_key(&mut metadata, &chunk.keyword, &text);
     }
 
     metadata.raw_metadata = raw_entries;
@@ -142,7 +119,10 @@ fn parse_png_metadata(path: &Path) -> Result<AiMetadata, String> {
 
 fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
     // Для WebP используем существующий EXIF парсер
-    let file_data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let mut file_data = vec![0u8; 256 * 1024];
+    let n = std::io::Read::read(&mut file, &mut file_data).map_err(|e| format!("Failed to read file: {}", e))?;
+    file_data.truncate(n);
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
@@ -195,7 +175,10 @@ fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
 // --- JPEG парсер (binary EXIF reader, no external crate) ---
 
 fn parse_jpeg_metadata(path: &Path) -> Result<AiMetadata, String> {
-    let data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let mut data = vec![0u8; 256 * 1024];
+    let n = std::io::Read::read(&mut file, &mut data).map_err(|e| format!("Failed to read file: {}", e))?;
+    data.truncate(n);
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
@@ -531,7 +514,10 @@ fn extract_from_xml(xml: &str, tag: &str) -> Option<String> {
 
 /// AVIF metadata parser (XMP, JSON and EXIF scanners)
 fn parse_avif_metadata(path: &Path) -> Result<AiMetadata, String> {
-    let file_data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let mut file_data = vec![0u8; 512 * 1024];
+    let n = std::io::Read::read(&mut file, &mut file_data).map_err(|e| format!("Failed to read file: {}", e))?;
+    file_data.truncate(n);
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 

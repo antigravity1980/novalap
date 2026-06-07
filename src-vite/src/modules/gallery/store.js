@@ -40,6 +40,7 @@ export const useGalleryStore = defineStore('gallery', {
     // Масштабирование
     zoomLevel: 1,
     selectionMode: false,
+    renamingPath: null,
 
     // Clipboard state
     clipboard: {

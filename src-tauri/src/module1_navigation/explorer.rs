@@ -30,6 +30,7 @@ pub struct FileEntry {
     pub resolution: Option<Resolution>,
     pub dir_count: Option<u32>,
     pub file_count: Option<u32>,
+    pub ai_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,6 +137,15 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
                 (None, None)
             };
 
+            let ai_source = if is_file {
+                match crate::module4_backend::detect_ai_source(path_str.clone()) {
+                    Ok(src) => if src == "Unknown" { None } else { Some(src) },
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+
             entries.push(FileEntry {
                 name: file_name,
                 path: path_str,
@@ -148,6 +158,7 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
                 resolution,
                 dir_count,
                 file_count,
+                ai_source,
             });
         }
 
@@ -279,6 +290,15 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
         (None, None)
     };
 
+    let ai_source = if is_file {
+        match crate::module4_backend::detect_ai_source(file_path.to_string_lossy().to_string()) {
+            Ok(src) => if src == "Unknown" { None } else { Some(src) },
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
     Ok(FileEntry {
         name,
         path: file_path.to_string_lossy().to_string(),
@@ -291,6 +311,7 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
         resolution,
         dir_count,
         file_count,
+        ai_source,
     })
 }
 

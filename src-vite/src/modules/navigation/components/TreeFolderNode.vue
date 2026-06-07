@@ -3,11 +3,16 @@
     <div
       class="tree-item flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150"
       :class="{
-        'bg-primary/10 text-primary font-bold shadow-sm': isActive,
-        'text-base-content/70 hover:bg-base-100/30 hover:text-base-content': !isActive,
+        'bg-primary/10 text-primary font-bold shadow-sm': isActive && dragOverFolderPath !== folder.path,
+        'text-base-content/70 hover:bg-base-100/30 hover:text-base-content': !isActive && dragOverFolderPath !== folder.path,
+        'bg-secondary/20 text-secondary border border-dashed border-secondary/50': dragOverFolderPath === folder.path,
       }"
       @click="navigate"
       @contextmenu.prevent.stop="handleContextMenu"
+      @dragover.prevent="dragOverFolderPath = folder.path"
+      @dragenter.prevent="dragOverFolderPath = folder.path"
+      @dragleave="dragOverFolderPath = ''"
+      @drop.prevent="handleFolderDrop($event, folder.path)"
     >
       <!-- Expand chevron arrow -->
       <span
@@ -51,8 +56,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useNavigationStore } from '../store'
+import { useGalleryStore } from '../../gallery/store'
 import { useConfigStore } from '@/stores/configStore'
 import { getAssetSrc } from '@/common/utils'
+import { invoke } from '@tauri-apps/api/core'
 import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = defineProps({
@@ -63,12 +70,39 @@ const props = defineProps({
 const emit = defineEmits(['navigate', 'expand'])
 
 const navigationStore = useNavigationStore()
+const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
 const isExpanded = ref(false)
 const children = ref(props.folder.children || [])
 const hasChildren = computed(() => props.folder.has_subfolders)
 const isActive = computed(() => props.folder.path === navigationStore.currentPath)
 const contextMenuRef = ref(null)
+const dragOverFolderPath = ref('')
+
+async function handleFolderDrop(e, destPath) {
+  dragOverFolderPath.value = ''
+  try {
+    const data = e.dataTransfer.getData('text/plain')
+    if (!data) return
+    const paths = JSON.parse(data)
+    if (!Array.isArray(paths) || paths.length === 0) return
+
+    for (const src of paths) {
+      if (src === destPath) continue
+      const lastSlash = Math.max(src.lastIndexOf('\\'), src.lastIndexOf('/'))
+      const fileName = lastSlash !== -1 ? src.substring(lastSlash + 1) : src
+      const dest = `${destPath}${destPath.endsWith('\\') || destPath.endsWith('/') ? '' : '\\'}${fileName}`
+      if (src.toLowerCase() === dest.toLowerCase()) continue
+
+      await invoke('cross_move', { src, dest })
+    }
+
+    await navigationStore.navigateTo(navigationStore.currentPath)
+    galleryStore.setFiles(navigationStore.folders)
+  } catch (err) {
+    console.error('Folder drop failed:', err)
+  }
+}
 
 const folderIconUrl = computed(() => {
   const customIcon = configStore.folderIcons?.[props.folder.path]

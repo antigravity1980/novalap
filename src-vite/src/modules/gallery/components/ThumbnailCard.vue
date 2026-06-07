@@ -9,6 +9,8 @@
     @click="$emit('click', $event)"
     @dblclick="$emit('dblclick', $event)"
     @contextmenu.prevent.stop="handleContextMenu($event)"
+    draggable="true"
+    @dragstart="handleDragStart"
   >
     <!-- Thumbnail Image Container -->
     <div
@@ -59,7 +61,19 @@
 
     <!-- Info row -->
     <div class="thumbnail-info p-2.5 text-xs flex flex-col gap-1 shrink-0 border-t border-base-content/5 bg-base-200/20">
-      <div class="file-name truncate font-medium text-base-content/90" :title="file.name">
+      <div v-if="isRenaming" class="w-full">
+        <input
+          ref="renameInputRef"
+          v-model="renameText"
+          type="text"
+          class="input input-xs input-bordered w-full text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary bg-base-100 text-base-content px-1.5 py-0.5 rounded"
+          @keydown.enter.stop="saveRename"
+          @keydown.esc.stop="cancelRename"
+          @blur="saveRename"
+          @click.stop
+        />
+      </div>
+      <div v-else class="file-name truncate font-medium text-base-content/90" :title="file.name">
         {{ file.name }}
       </div>
       <div class="flex items-center justify-between mt-0.5 text-[10px] text-base-content/40 font-mono">
@@ -77,7 +91,7 @@
     <MessageBox
       v-if="showConfirm"
       :title="$t('settings.general.delete_confirm_title') || 'Удаление'"
-      :message="`Переместить ${isFolder ? 'папку' : 'файл'} &quot;${file.name}&quot; в корзину?`"
+      :message="deleteMessage"
       :OkText="$t('explorer.delete') || 'Удалить'"
       :cancelText="$t('batch_ops.cancel') || 'Отмена'"
       :warningOk="true"
@@ -98,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { getAssetSrc } from '@/common/utils'
 import { useConfigStore } from '@/stores/configStore'
 import { useNavigationStore } from '@/modules/navigation/store'
@@ -119,6 +133,10 @@ const configStore = useConfigStore()
 const navigationStore = useNavigationStore()
 const galleryStore = useGalleryStore()
 const contextMenuRef = ref(null)
+
+const isRenaming = ref(false)
+const renameText = ref('')
+const renameInputRef = ref(null)
 
 const isFolder = computed(() => {
   return props.file.is_dir === true || props.file.file_type === 'directory' || props.file.is_directory === true
@@ -237,29 +255,85 @@ const contextMenuItems = computed(() => {
   return items
 })
 
-async function renameItem() {
-  const newName = prompt('Введите новое имя:', props.file.name)
-  if (newName && newName !== props.file.name) {
-    const lastSlash = Math.max(props.file.path.lastIndexOf('\\'), props.file.path.lastIndexOf('/'))
-    const parentPath = lastSlash !== -1 ? props.file.path.substring(0, lastSlash) : ''
-    const separator = props.file.path.includes('/') ? '/' : '\\'
-    const newPath = parentPath ? `${parentPath}${separator}${newName}` : newName
-    try {
-      await invoke('cross_move', { src: props.file.path, dest: newPath })
-      await navigationStore.navigateTo(navigationStore.currentPath)
-      galleryStore.setFiles(navigationStore.folders)
-    } catch (e) {
-      alert('Ошибка переименования: ' + e)
-    }
+watch(() => galleryStore.renamingPath, (newVal) => {
+  if (newVal === props.file.path) {
+    startRename()
+  } else {
+    isRenaming.value = false
   }
+}, { immediate: true })
+
+function startRename() {
+  isRenaming.value = true
+  renameText.value = props.file.name
+  nextTick(() => {
+    if (renameInputRef.value) {
+      renameInputRef.value.focus()
+      const dotIndex = props.file.name.lastIndexOf('.')
+      if (dotIndex > 0 && !isFolder.value) {
+        renameInputRef.value.setSelectionRange(0, dotIndex)
+      } else {
+        renameInputRef.value.select()
+      }
+    }
+  })
+}
+
+async function saveRename() {
+  if (!isRenaming.value) return
+  isRenaming.value = false
+  galleryStore.renamingPath = null
+  const newName = renameText.value.trim()
+  if (!newName || newName === props.file.name) return
+
+  const lastSlash = Math.max(props.file.path.lastIndexOf('\\'), props.file.path.lastIndexOf('/'))
+  const parentPath = lastSlash !== -1 ? props.file.path.substring(0, lastSlash) : ''
+  const separator = props.file.path.includes('/') ? '/' : '\\'
+  const newPath = parentPath ? `${parentPath}${separator}${newName}` : newName
+  try {
+    await invoke('cross_move', { src: props.file.path, dest: newPath })
+    await navigationStore.navigateTo(navigationStore.currentPath)
+    galleryStore.setFiles(navigationStore.folders)
+  } catch (e) {
+    alert('Ошибка переименования: ' + e)
+  }
+}
+
+function cancelRename() {
+  isRenaming.value = false
+  galleryStore.renamingPath = null
+}
+
+function renameItem() {
+  galleryStore.renamingPath = props.file.path
+}
+
+function handleDragStart(e) {
+  let paths = []
+  if (props.selected) {
+    paths = [...galleryStore.selectedIds]
+  } else {
+    paths = [props.file.path]
+  }
+  e.dataTransfer.setData('text/plain', JSON.stringify(paths))
+  e.dataTransfer.effectAllowed = 'move'
 }
 
 const showConfirm = ref(false)
 const skipDeleteCheckboxVal = ref(false)
 
+const deleteMessage = computed(() => {
+  const count = props.selected ? galleryStore.selectedIds.length : 1
+  if (count > 1) {
+    return `Вы действительно хотите удалить эти ${count} элементов?`
+  }
+  return `Вы действительно хотите удалить "${props.file.name}"?`
+})
+
 async function performDelete() {
+  const paths = props.selected ? [...galleryStore.selectedIds] : [props.file.path]
   try {
-    await invoke('move_to_trash', { paths: [props.file.path] })
+    await galleryStore.deleteFiles(paths)
     await navigationStore.navigateTo(navigationStore.currentPath)
     galleryStore.setFiles(navigationStore.folders)
   } catch (e) {
@@ -285,11 +359,13 @@ async function deleteItem() {
 }
 
 function copyItem() {
-  galleryStore.setClipboard('copy', [props.file.path])
+  const paths = props.selected ? [...galleryStore.selectedIds] : [props.file.path]
+  galleryStore.setClipboard('copy', paths)
 }
 
 function cutItem() {
-  galleryStore.setClipboard('cut', [props.file.path])
+  const paths = props.selected ? [...galleryStore.selectedIds] : [props.file.path]
+  galleryStore.setClipboard('cut', paths)
 }
 
 function handleContextMenu(e) {
@@ -315,7 +391,7 @@ function formatBytes(bytes) {
 function getAiSourceClass(source) {
   const s = source.toLowerCase()
   if (s.includes('comfyui')) {
-    return 'bg-purple-600/90 text-white'
+    return 'bg-yellow-500 text-black font-bold'
   }
   if (s.includes('midjourney')) {
     return 'bg-blue-600/90 text-white'

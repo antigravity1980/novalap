@@ -781,7 +781,10 @@ pub async fn edit_image(params: EditParams) -> bool {
         let metadata_backup_path = if format == image::ImageFormat::Jpeg || format == image::ImageFormat::WebP {
             match prepare_metadata_backup_path(&params.source_file_path, &params.dest_file_path) {
                 Ok(path) => path,
-                Err(_) => return false,
+                Err(e) => {
+                    eprintln!("[edit_image] Warning: failed to prepare metadata backup: {:?}", e);
+                    None
+                }
             }
         } else {
             None
@@ -810,16 +813,9 @@ pub async fn edit_image(params: EditParams) -> bool {
         }
 
         if format == image::ImageFormat::Jpeg || format == image::ImageFormat::WebP {
-            if let Err(_) = copy_metadata_to_output(metadata_source, path) {
-                if metadata_backup_path.is_some() {
-                    let _ = fs::copy(metadata_source, path);
-                } else {
-                    let _ = fs::remove_file(path);
-                }
-                cleanup_metadata_backup(&metadata_backup_path);
-                return false;
+            if let Err(e) = copy_metadata_to_output(metadata_source, path) {
+                eprintln!("[edit_image] Warning: failed to copy metadata to output: {:?}", e);
             }
-
             cleanup_metadata_backup(&metadata_backup_path);
         }
 

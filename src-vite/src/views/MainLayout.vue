@@ -37,8 +37,15 @@
             v-for="path in configStore.settings.favorites"
             :key="path"
             class="group flex items-center gap-2.5 px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
-            :class="activeTab === 'explorer' && navigationStore.currentPath === path ? 'bg-primary/15 text-primary font-bold active-nav-item' : 'text-base-content/75 hover:bg-base-100/50 hover:text-base-content'"
+            :class="[
+              activeTab === 'explorer' && navigationStore.currentPath === path ? 'bg-primary/15 text-primary font-bold active-nav-item' : 'text-base-content/75 hover:bg-base-100/50 hover:text-base-content',
+              dragOverFavPath === path ? 'bg-secondary/20 text-secondary border border-dashed border-secondary/50' : ''
+            ]"
             @click="navigateTo(path)"
+            @dragover.prevent="dragOverFavPath = path"
+            @dragenter.prevent="dragOverFavPath = path"
+            @dragleave="dragOverFavPath = ''"
+            @drop.prevent="handleFavDrop($event, path)"
           >
             <span class="text-sm shrink-0 flex items-center justify-center w-4 h-4">⭐</span>
             <span class="flex-1 truncate" :title="path">{{ getFileName(path) }}</span>
@@ -52,9 +59,31 @@
         </div>
 
         <!-- This PC / Drives Section -->
-        <div class="space-y-1">
-          <div class="px-3 py-1 text-[10px] font-bold text-base-content/40 uppercase tracking-widest">
-            {{ $t('explorer.this_pc') }}
+        <div class="space-y-1 relative">
+          <div class="px-3 py-1 text-[10px] font-bold text-base-content/40 uppercase tracking-widest flex items-center justify-between">
+            <span>{{ $t('explorer.this_pc') }}</span>
+            <button
+              class="hover:text-base-content hover:bg-base-100/40 rounded p-0.5"
+              title="Показать/скрыть диски"
+              @click.stop="showDrivesDropdown = !showDrivesDropdown"
+            >
+              👁️
+            </button>
+          </div>
+          <!-- Dropdown container -->
+          <div v-if="showDrivesDropdown" class="absolute left-3 top-6 bg-base-300 border border-neutral/30 rounded-lg shadow-xl py-2 px-3 z-50 text-xs text-base-content normal-case font-semibold w-48 space-y-1">
+            <div class="text-[10px] font-bold text-base-content/40 uppercase tracking-wider mb-1.5 pb-1 border-b border-base-content/5">
+              Показать диски:
+            </div>
+            <label v-for="d in navigationStore.drives" :key="d.path" class="flex items-center gap-2 cursor-pointer hover:bg-base-100/40 p-1 rounded">
+              <input
+                type="checkbox"
+                :checked="!configStore.settings.hiddenDrives?.includes(d.path)"
+                @change="configStore.toggleDriveVisibility(d.path)"
+                class="checkbox checkbox-primary checkbox-xs"
+              />
+              <span class="truncate">{{ d.name }}</span>
+            </label>
           </div>
           <!-- Render the Drive list and ExplorerTree folders under it -->
           <ExplorerTree />
@@ -304,13 +333,13 @@
 
           <!-- Multi-select Mode -->
           <button
-            class="win11-btn text-xs font-semibold flex items-center gap-1.5"
-            :class="{ 'bg-primary/15 text-primary font-bold': galleryStore.selectionMode }"
+            class="win11-btn text-xs flex items-center gap-1.5 transition-all duration-150"
+            :class="galleryStore.selectionMode ? 'bg-primary text-primary-content font-bold border border-primary shadow shadow-primary/30' : 'font-semibold'"
             @click="galleryStore.selectionMode = !galleryStore.selectionMode"
             title="Режим выбора нескольких элементов без зажатия Ctrl"
           >
             <span class="w-3.5 h-3.5 flex items-center justify-center border rounded border-current text-[9px] font-bold">✓</span>
-            <span>Режим выбора</span>
+            <span>Режим выбора: {{ galleryStore.selectionMode ? 'ВКЛ' : 'ВЫКЛ' }}</span>
           </button>
 
           <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
@@ -322,14 +351,36 @@
               <span>{{ $t('explorer.sort') }}</span>
               <span class="opacity-50">▾</span>
             </label>
-            <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-44 z-30 text-xs mt-1">
-              <li><a :class="{ 'active': galleryStore.sortBy === 'name' }" @click="galleryStore.sortBy = 'name'; onSortChange()">{{ $t('album.edit.name') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'size' }" @click="galleryStore.sortBy = 'size'; onSortChange()">{{ $t('explorer.size') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'date' }" @click="galleryStore.sortBy = 'date'; onSortChange()">{{ $t('calendar.title') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'resolution' }" @click="galleryStore.sortBy = 'resolution'; onSortChange()">{{ $t('explorer.resolution') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'ai_source' }" @click="galleryStore.sortBy = 'ai_source'; onSortChange()">{{ $t('explorer.ai_source') }}</a></li>
+            <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-52 z-30 text-xs mt-1">
+              <li><a :class="{ 'active': galleryStore.sortBy === 'name' }" @click="galleryStore.sortBy = 'name'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('album.edit.name') }}</span>
+                <span v-if="galleryStore.sortBy === 'name'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.sortBy === 'size' }" @click="galleryStore.sortBy = 'size'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.size') }}</span>
+                <span v-if="galleryStore.sortBy === 'size'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.sortBy === 'date' }" @click="galleryStore.sortBy = 'date'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('calendar.title') }}</span>
+                <span v-if="galleryStore.sortBy === 'date'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.sortBy === 'resolution' }" @click="galleryStore.sortBy = 'resolution'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.resolution') }}</span>
+                <span v-if="galleryStore.sortBy === 'resolution'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.sortBy === 'ai_source' }" @click="galleryStore.sortBy = 'ai_source'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.ai_source') }}</span>
+                <span v-if="galleryStore.sortBy === 'ai_source'">✓</span>
+              </a></li>
               <div class="divider my-1"></div>
-              <li><a @click="toggleSortOrder">{{ $t('toolbar.tooltip.sort') }}: {{ galleryStore.sortOrder === 'asc' ? $t('toolbar.filter.sort_order_options[0]') + ' (↑)' : $t('toolbar.filter.sort_order_options[1]') + ' (↓)' }}</a></li>
+              <li><a @click="galleryStore.sortOrder = 'asc'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('toolbar.filter.sort_order_options[0]') }} (↑)</span>
+                <span v-if="galleryStore.sortOrder === 'asc'">✓</span>
+              </a></li>
+              <li><a @click="galleryStore.sortOrder = 'desc'; onSortChange()" class="flex justify-between items-center">
+                <span>{{ $t('toolbar.filter.sort_order_options[1]') }} (↓)</span>
+                <span v-if="galleryStore.sortOrder === 'desc'">✓</span>
+              </a></li>
             </ul>
           </div>
 
@@ -340,7 +391,7 @@
               <span>{{ $t('explorer.filter') }}</span>
               <span class="opacity-50">▾</span>
             </label>
-            <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-48 z-30 text-xs mt-1 max-h-96 overflow-y-auto custom-scrollbar">
+            <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-56 overflow-x-hidden z-30 text-xs mt-1 max-h-96 overflow-y-auto custom-scrollbar">
               <div class="px-2 py-1 text-[9px] font-bold text-base-content/40 uppercase">{{ $t('explorer.format') }}</div>
               <li><a :class="{ 'active': galleryStore.filters.format === '' }" @click="galleryStore.filters.format = ''; onFilterChange()">{{ $t('explorer.all_formats') }}</a></li>
               <li><a :class="{ 'active': galleryStore.filters.format === 'png' }" @click="galleryStore.filters.format = 'png'; onFilterChange()">PNG</a></li>
@@ -736,6 +787,33 @@ const navigationStore = useNavigationStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
 
+const showDrivesDropdown = ref(false)
+const dragOverFavPath = ref('')
+
+async function handleFavDrop(e, destPath) {
+  dragOverFavPath.value = ''
+  try {
+    const data = e.dataTransfer.getData('text/plain')
+    if (!data) return
+    const paths = JSON.parse(data)
+    if (!Array.isArray(paths) || paths.length === 0) return
+
+    for (const src of paths) {
+      if (src === destPath) continue
+      const lastSlash = Math.max(src.lastIndexOf('\\'), src.lastIndexOf('/'))
+      const fileName = lastSlash !== -1 ? src.substring(lastSlash + 1) : src
+      const dest = `${destPath}${destPath.endsWith('\\') || destPath.endsWith('/') ? '' : '\\'}${fileName}`
+      if (src.toLowerCase() === dest.toLowerCase()) continue
+
+      await invoke('cross_move', { src, dest })
+    }
+
+    await refreshData()
+  } catch (err) {
+    console.error('Fav drop failed:', err)
+  }
+}
+
 // Delete confirmation modal state
 const showDeleteConfirmModal = ref(false)
 const deleteConfirmMessage = ref('')
@@ -1095,18 +1173,32 @@ function openSettings() {
 
 // Explorer File actions
 async function createFolder() {
-  const name = prompt('Введите имя папки:')
-  if (name && navigationStore.currentPath) {
-    const newPath = navigationStore.currentPath.endsWith('\\')
-      ? navigationStore.currentPath + name
-      : navigationStore.currentPath + '\\' + name
-    try {
-      await invoke('mkdir_folder', { path: newPath })
-      await refreshData()
-    } catch (e) {
-      console.error(e)
-      alert('Не удалось создать папку: ' + e)
-    }
+  if (!navigationStore.currentPath) return
+  const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
+  
+  let name = 'Новая папка'
+  let counter = 1
+  const checkNameExists = (n) => {
+    return galleryStore.files.some(f => f.name.toLowerCase() === n.toLowerCase())
+  }
+  
+  while (checkNameExists(name)) {
+    counter++
+    name = `Новая папка (${counter})`
+  }
+
+  const newPath = navigationStore.currentPath.endsWith(separator)
+    ? navigationStore.currentPath + name
+    : navigationStore.currentPath + separator + name
+    
+  try {
+    await invoke('mkdir_folder', { path: newPath })
+    await refreshData()
+    // Trigger inline renaming
+    galleryStore.renamingPath = newPath
+  } catch (e) {
+    console.error(e)
+    alert('Не удалось создать папку: ' + e)
   }
 }
 
@@ -1351,8 +1443,11 @@ function handleKeyDown(e) {
   const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
   if (isInput) return
 
-  // Ctrl+Z Undo
-  if (e.ctrlKey && e.code === 'KeyZ') {
+  const key = e.key.toLowerCase()
+  const code = e.code
+
+  // Ctrl+Z / Ctrl+Shift+Z Undo & Redo
+  if (e.ctrlKey && (code === 'KeyZ' || key === 'z' || key === 'я')) {
     e.preventDefault()
     if (e.shiftKey) {
       galleryStore.redo()
@@ -1368,21 +1463,21 @@ function handleKeyDown(e) {
   }
 
   // Ctrl+Y Redo
-  if (e.ctrlKey && e.code === 'KeyY') {
+  if (e.ctrlKey && (code === 'KeyY' || key === 'y' || key === 'н')) {
     e.preventDefault()
     galleryStore.redo()
     return
   }
 
   // Ctrl+A Select All
-  if (e.ctrlKey && (e.code === 'KeyA' || e.key.toLowerCase() === 'a' || e.key === 'ф' || e.key === 'Ф')) {
+  if (e.ctrlKey && (code === 'KeyA' || key === 'a' || key === 'ф')) {
     e.preventDefault()
     galleryStore.selectAll()
     return
   }
 
   // Ctrl+C Copy
-  if (e.ctrlKey && e.code === 'KeyC') {
+  if (e.ctrlKey && (code === 'KeyC' || key === 'c' || key === 'с')) {
     e.preventDefault()
     if (galleryStore.selectedIds.length > 0) {
       galleryStore.setClipboard('copy', [...galleryStore.selectedIds])
@@ -1391,7 +1486,7 @@ function handleKeyDown(e) {
   }
 
   // Ctrl+X Cut
-  if (e.ctrlKey && e.code === 'KeyX') {
+  if (e.ctrlKey && (code === 'KeyX' || key === 'x' || key === 'ч')) {
     e.preventDefault()
     if (galleryStore.selectedIds.length > 0) {
       galleryStore.setClipboard('cut', [...galleryStore.selectedIds])
@@ -1400,7 +1495,7 @@ function handleKeyDown(e) {
   }
 
   // Ctrl+V Paste
-  if (e.ctrlKey && e.code === 'KeyV') {
+  if (e.ctrlKey && (code === 'KeyV' || key === 'v' || key === 'м')) {
     e.preventDefault()
     if (navigationStore.currentPath) {
       galleryStore.paste(navigationStore.currentPath)

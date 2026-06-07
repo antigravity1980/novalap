@@ -33,6 +33,7 @@ pub struct BatchResult {
 /// Массовый ресайз изображений
 #[command]
 pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchResult, String> {
+    println!("[BatchResize] Starting batch resize for {} files with preset: Width={}, Height={}, Fit={}", files.len(), preset.width, preset.height, preset.fit);
     let mut result = BatchResult {
         total: files.len(),
         succeeded: 0,
@@ -45,6 +46,7 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
 
         // Проверяем существование
         if !path.exists() {
+            println!("[BatchResize] Error: File not found - {}", file_path);
             result.failed += 1;
             result.errors.push(format!("File not found: {}", file_path));
             continue;
@@ -52,8 +54,12 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
 
         // Загружаем изображение
         let img = match image::open(path) {
-            Ok(img) => img,
+            Ok(img) => {
+                println!("[BatchResize] Opened: {} ({}x{})", file_path, img.width(), img.height());
+                img
+            }
             Err(e) => {
+                println!("[BatchResize] Error: Failed to open {} - {}", file_path, e);
                 result.failed += 1;
                 result.errors.push(format!("Failed to open {}: {}", file_path, e));
                 continue;
@@ -68,6 +74,7 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
             preset.height,
             &preset.fit,
         );
+        println!("[BatchResize] Resizing {} from {}x{} to {}x{}", file_path, img.width(), img.height(), new_width, new_height);
 
         // Ресайзим
         let resized = img.resize_exact(
@@ -78,14 +85,17 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
 
         // Сохраняем (перезаписываем)
         if let Err(e) = resized.save(path) {
+            println!("[BatchResize] Error: Failed to save {} - {}", file_path, e);
             result.failed += 1;
             result.errors.push(format!("Failed to save {}: {}", file_path, e));
             continue;
         }
 
+        println!("[BatchResize] Successfully resized and saved {}", file_path);
         result.succeeded += 1;
     }
 
+    println!("[BatchResize] Finished batch resize. Success: {}, Failed: {}", result.succeeded, result.failed);
     Ok(result)
 }
 

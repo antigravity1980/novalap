@@ -26,6 +26,7 @@ dependencies = [
  "opener",
  "ort",
  "pinyin",
+ "png 0.17.16",
  "rand 0.8.5",
  "reqwest 0.12.28",
  "rstar",

@@ -193,3 +193,4 @@ export { default as IconBolt } from '@/assets/icons/bolt.svg';
 export { default as IconIndexReady } from '@/assets/icons/index-ready.svg';
 export { default as IconIndexWaiting } from '@/assets/icons/index-waiting.svg';
 export { default as IconIndexRunning } from '@/assets/icons/index-running.svg';
+export { default as IconDrive } from '@/assets/icons/drive.svg';

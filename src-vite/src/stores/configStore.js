@@ -102,6 +102,7 @@ export const useConfigStore = defineStore('configStore', {
       debugMode: false,           // debug mode
       skipDeleteConfirmation: false,
       favorites: [],
+      hiddenDrives: [],
 
       // navigation settings
       folderSort: 0,              // folder_sort_options: 0=name asc, 1=name desc, 2=date asc(oldest first), 3=date desc(newest first)
@@ -321,6 +322,17 @@ export const useConfigStore = defineStore('configStore', {
         this.settings.favorites.push(folderPath);
       } else {
         this.settings.favorites.splice(idx, 1);
+      }
+    },
+    toggleDriveVisibility(drivePath) {
+      if (!this.settings.hiddenDrives) {
+        this.settings.hiddenDrives = [];
+      }
+      const idx = this.settings.hiddenDrives.indexOf(drivePath);
+      if (idx === -1) {
+        this.settings.hiddenDrives.push(drivePath);
+      } else {
+        this.settings.hiddenDrives.splice(idx, 1);
       }
     },
 

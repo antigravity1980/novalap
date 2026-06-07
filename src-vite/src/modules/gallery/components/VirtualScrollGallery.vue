@@ -281,19 +281,33 @@ function handleContextMenu(e) {
 }
 
 async function createFolderInCurrentDir() {
-  const name = prompt('Введите имя папки:')
-  if (name && navigationStore.currentPath) {
-    const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
-    const newPath = navigationStore.currentPath.endsWith(separator)
-      ? navigationStore.currentPath + name
-      : navigationStore.currentPath + separator + name
-    try {
-      await invoke('mkdir_folder', { path: newPath })
-      await navigationStore.refresh()
-      galleryStore.setFiles(navigationStore.folders)
-    } catch (e) {
-      alert('Не удалось создать папку: ' + e)
-    }
+  if (!navigationStore.currentPath) return
+  const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
+  
+  let name = 'Новая папка'
+  let counter = 1
+  const checkNameExists = (n) => {
+    return props.files.some(f => f.name.toLowerCase() === n.toLowerCase())
+  }
+  
+  while (checkNameExists(name)) {
+    counter++
+    name = `Новая папка (${counter})`
+  }
+
+  const newPath = navigationStore.currentPath.endsWith(separator)
+    ? navigationStore.currentPath + name
+    : navigationStore.currentPath + separator + name
+  
+  try {
+    await invoke('mkdir_folder', { path: newPath })
+    await navigationStore.refresh()
+    galleryStore.setFiles(navigationStore.folders)
+    
+    // Trigger inline-rename
+    galleryStore.renamingPath = newPath
+  } catch (e) {
+    alert('Не удалось создать папку: ' + e)
   }
 }
 
