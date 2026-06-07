@@ -100,6 +100,8 @@ export const useConfigStore = defineStore('configStore', {
       showToolTip: true,          // show button tooltip
       showStatusBar: true,        // show status bar
       debugMode: false,           // debug mode
+      skipDeleteConfirmation: false,
+      favorites: [],
 
       // navigation settings
       folderSort: 0,              // folder_sort_options: 0=name asc, 1=name desc, 2=date asc(oldest first), 3=date desc(newest first)
@@ -308,6 +310,17 @@ export const useConfigStore = defineStore('configStore', {
         this.folderIcons[folderPath] = iconName;
       } else {
         delete this.folderIcons[folderPath];
+      }
+    },
+    toggleFavorite(folderPath) {
+      if (!this.settings.favorites) {
+        this.settings.favorites = [];
+      }
+      const idx = this.settings.favorites.indexOf(folderPath);
+      if (idx === -1) {
+        this.settings.favorites.push(folderPath);
+      } else {
+        this.settings.favorites.splice(idx, 1);
       }
     },
 

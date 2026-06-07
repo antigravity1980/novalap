@@ -844,6 +844,9 @@
       "section_language": "Language",
       "section_appearance": "Appearance",
       "section_interface": "Display",
+      "delete_confirm_title": "File Deletion",
+      "skip_delete_confirm": "Skip delete confirmation",
+      "skip_delete_confirm_desc": "Do not ask for confirmation when moving files to trash",
       "appearance": "Color mode",
       "appearance_options": [
         "Light",
@@ -1200,6 +1203,8 @@
   "explorer": {
     "quick_access": "Quick access",
     "home": "Home",
+    "favorites": "Favorites",
+    "no_favorites": "No favorite folders",
     "recycle_bin": "Recycle Bin",
     "this_pc": "This PC",
     "settings": "Settings",
@@ -1346,6 +1351,13 @@
       "free": "Free",
       "portrait_9_16": "9:16 (Portrait)"
     },
-    "unsupported_file_type": "Unsupported file type: {ext}"
+    "unsupported_file_type": "Unsupported file type: {ext}",
+    "saturation": "Saturation",
+    "gamma": "Gamma",
+    "flip_horizontal": "Flip Horizontally",
+    "flip_horizontal_btn": "Mirror",
+    "undo": "Undo",
+    "save_confirm": "Save",
+    "cancel": "Cancel"
   }
 }

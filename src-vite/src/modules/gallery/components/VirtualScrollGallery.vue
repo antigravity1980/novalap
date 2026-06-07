@@ -12,7 +12,7 @@
     @contextmenu.prevent.stop="handleContextMenu"
     style="user-select: none;"
   >
-    <div class="virtual-scroll-spacer" :style="{ height: totalHeight + 'px' }">
+    <div class="virtual-scroll-spacer" :style="{ height: (totalHeight + topPadding * 2) + 'px' }">
       <!-- Visible rows -->
       <div
         v-for="row in visibleRows"
@@ -20,7 +20,7 @@
         class="gallery-row flex gap-2 px-2"
         :style="{
           position: 'absolute',
-          top: row.top + 'px',
+          top: (row.top + topPadding) + 'px',
           left: 0,
           right: 0,
           height: rowHeight + 'px',
@@ -82,6 +82,7 @@ const scrollTop = ref(0)
 const containerHeight = ref(800)
 const containerWidth = ref(1200)
 const gap = 8
+const topPadding = 16
 
 // Row dimensions
 const rowHeight = computed(() => props.thumbnailSize * 0.75 + 64 + gap)
@@ -143,7 +144,7 @@ function getCardRect(fileIndex) {
   const rowIndex = Math.floor(fileIndex / cols)
   const colIndex = fileIndex % cols
   const px = 8 + colIndex * (props.thumbnailSize + gap) // px-2 = 8px padding
-  const py = rowIndex * rowHeight.value
+  const py = rowIndex * rowHeight.value + topPadding
   return {
     left: px,
     top: py,
@@ -300,7 +301,7 @@ async function createFolderInCurrentDir() {
 function scrollToIndex(index) {
   const cols = colsPerRow.value
   const rowIndex = Math.floor(index / cols)
-  const rowTop = rowIndex * rowHeight.value
+  const rowTop = rowIndex * rowHeight.value + topPadding
   const rowBottom = rowTop + rowHeight.value
 
   const container = containerRef.value
@@ -317,6 +318,13 @@ function scrollToIndex(index) {
 }
 
 function onKeyDown(e) {
+  // Ctrl+A Select All
+  if (e.ctrlKey && (e.code === 'KeyA' || e.key.toLowerCase() === 'a' || e.key === 'ф' || e.key === 'Ф')) {
+    e.preventDefault()
+    galleryStore.selectAll()
+    return
+  }
+
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
     e.preventDefault()
     if (props.files.length === 0) return
@@ -418,9 +426,9 @@ function openQuickLook(file) {
 .rubber-band {
   position: absolute;
   pointer-events: none;
-  border: 1px solid oklch(var(--p));
-  background: oklch(var(--p) / 0.15);
+  border: 1.5px solid rgba(59, 130, 246, 0.8) !important;
+  background-color: rgba(59, 130, 246, 0.15) !important;
   border-radius: 2px;
-  z-index: 100;
+  z-index: 99999 !important;
 }
 </style>

@@ -844,6 +844,9 @@
       "section_language": "Язык",
       "section_appearance": "Внешний вид",
       "section_interface": "Отображение",
+      "delete_confirm_title": "Удаление файлов",
+      "skip_delete_confirm": "Пропускать подтверждение удаления",
+      "skip_delete_confirm_desc": "Не запрашивать подтверждение при перемещении файлов в корзину",
       "appearance": "Внешний вид",
       "appearance_options": [
         "Светлый",
@@ -1200,6 +1203,8 @@
   "explorer": {
     "quick_access": "Быстрый доступ",
     "home": "Главная",
+    "favorites": "Избранное",
+    "no_favorites": "Нет избранных папок",
     "recycle_bin": "Корзина",
     "this_pc": "Этот компьютер",
     "settings": "Настройки",
@@ -1346,6 +1351,13 @@
       "free": "Произвольно",
       "portrait_9_16": "9:16 (Портрет)"
     },
-    "unsupported_file_type": "Неподдерживаемый формат файла: {ext}"
+    "unsupported_file_type": "Неподдерживаемый формат файла: {ext}",
+    "saturation": "Насыщенность",
+    "gamma": "Гамма",
+    "flip_horizontal": "Отразить по горизонтали",
+    "flip_horizontal_btn": "Зеркало",
+    "undo": "Отменить",
+    "save_confirm": "Сохранить",
+    "cancel": "Отмена"
   }
 }

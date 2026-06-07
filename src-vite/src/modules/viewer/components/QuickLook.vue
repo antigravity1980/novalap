@@ -21,32 +21,30 @@
         </div>
 
         <!-- Adjustments Sliders (only for images) -->
-        <div v-if="isCurrentImage" class="flex items-center gap-6 bg-white/5 px-4 py-1.5 rounded-lg border border-white/5">
+        <div v-if="isCurrentImage" class="flex items-center gap-4 bg-white/5 px-4 py-1.5 rounded-lg border border-white/5">
           <!-- Saturation Slider -->
           <div class="flex items-center gap-2">
-            <span class="text-white/50 text-[11px] font-bold uppercase tracking-wider">{{ $t('viewer.saturation') || 'Насыщенность' }}:</span>
+            <span class="text-white/50 text-[11px] font-bold uppercase tracking-wider">{{ $t('viewer.saturation') }}:</span>
             <input
               type="range"
               min="0"
               max="2"
               step="0.05"
               v-model.number="saturation"
-              @change="triggerAutoSave"
               class="range range-xs range-primary w-24"
             />
             <span class="text-white/80 font-mono text-xs w-8 text-right">{{ Math.round(saturation * 100) }}%</span>
           </div>
 
           <!-- Gamma Slider -->
-          <div class="flex items-center gap-2 border-l border-white/10 pl-6">
-            <span class="text-white/50 text-[11px] font-bold uppercase tracking-wider">{{ $t('viewer.gamma') || 'Гамма' }}:</span>
+          <div class="flex items-center gap-2 border-l border-white/10 pl-4">
+            <span class="text-white/50 text-[11px] font-bold uppercase tracking-wider">{{ $t('viewer.gamma') }}:</span>
             <input
               type="range"
               min="0.2"
               max="2.5"
               step="0.05"
               v-model.number="gamma"
-              @change="triggerAutoSave"
               class="range range-xs range-primary w-24"
             />
             <span class="text-white/80 font-mono text-xs w-8 text-right">{{ Math.round(gamma * 100) }}%</span>
@@ -56,22 +54,47 @@
           <button
             class="btn btn-ghost btn-xs text-white/75 hover:text-white hover:bg-white/10 flex items-center gap-1 px-2 py-1 rounded border border-white/10"
             @click="toggleFlipHorizontal"
-            :title="$t('viewer.flip_horizontal') || 'Отразить по горизонтали'"
+            :title="$t('viewer.flip_horizontal')"
           >
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
-            <span>{{ $t('viewer.flip_horizontal_btn') || 'Отразить' }}</span>
+            <span>{{ $t('viewer.flip_horizontal_btn') }}</span>
           </button>
 
-          <!-- Undo Button Indicator -->
+          <!-- Reset Button -->
           <button
-            v-if="undoStack.length > 0"
-            class="btn btn-primary btn-xs rounded ml-2"
-            @click="handleUndo"
-            title="Отменить изменения (Ctrl+Z)"
+            v-if="isModified"
+            class="btn btn-ghost btn-xs text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1 px-2 py-1 rounded border border-white/10 ml-2"
+            @click="resetAllEdits"
+            title="Сбросить все изменения"
           >
-            ↩ {{ $t('viewer.undo') || 'Отменить' }}
+            <span>↩</span>
+            <span>{{ $t('viewer.reset') }}</span>
+          </button>
+
+          <div class="divider divider-horizontal h-4 bg-white/10 mx-1"></div>
+
+          <!-- Cancel (Cross) -->
+          <button
+            class="btn btn-ghost btn-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center gap-1 px-2 py-1 rounded border border-red-500/20"
+            @click="close"
+            :title="$t('viewer.cancel') + ' (Esc)'"
+          >
+            <span>✕</span>
+            <span>{{ $t('viewer.cancel') }}</span>
+          </button>
+
+          <!-- Save (Checkmark) -->
+          <button
+            class="btn btn-primary btn-xs flex items-center gap-1 px-2.5 py-1 rounded shadow shadow-primary/20"
+            :disabled="currentSaving"
+            @click="saveAndClose"
+            :title="$t('viewer.save_confirm') + ' (Enter)'"
+          >
+            <span v-if="currentSaving" class="loading loading-spinner loading-xs"></span>
+            <span v-else>✓</span>
+            <span>{{ $t('viewer.save_confirm') }}</span>
           </button>
         </div>
 
@@ -240,7 +263,7 @@ const imageLoaded = ref(false)
 // Undo stack in memory
 const undoStack = ref([])
 let originalBytes = null
-let currentSaving = false
+const currentSaving = ref(false)
 
 const crop = reactive({
   x: 0,
@@ -385,7 +408,6 @@ function handleWheel(event) {
 
 function toggleFlipHorizontal() {
   flipHorizontal.value = !flipHorizontal.value
-  triggerAutoSave()
 }
 
 function onMouseMove(event) {
@@ -471,19 +493,42 @@ function onMouseUp() {
     isDragging.value = false
     isResizing.value = false
     dragHandle.value = null
-    triggerAutoSave()
   }
 }
 
-// Auto Save mechanism
-async function triggerAutoSave() {
-  if (!currentFile.value) return
-  if (currentSaving) {
-    hasPendingSave = true
-    return
+// Computed modified state helper
+const isModified = computed(() => {
+  if (!imageLoaded.value || !imageRef.value) return false
+  const displayWidth = imageRef.value.clientWidth
+  const displayHeight = imageRef.value.clientHeight
+  const isCropModified = Math.abs(crop.x) > 1 || 
+                         Math.abs(crop.y) > 1 || 
+                         Math.abs(crop.width - displayWidth) > 2 || 
+                         Math.abs(crop.height - displayHeight) > 2
+  return saturation.value !== 1.0 || gamma.value !== 1.0 || flipHorizontal.value || isCropModified
+})
+
+// Reset edits manually
+function resetAllEdits() {
+  saturation.value = 1.0
+  gamma.value = 1.0
+  flipHorizontal.value = false
+  zoomScale.value = 1.0
+  panOffset.x = 0
+  panOffset.y = 0
+  if (imageRef.value) {
+    crop.x = 0
+    crop.y = 0
+    crop.width = imageRef.value.clientWidth
+    crop.height = imageRef.value.clientHeight
   }
-  currentSaving = true
-  hasPendingSave = false
+}
+
+// Explicit Save changes and close
+async function saveAndClose() {
+  if (!currentFile.value) return
+  if (currentSaving.value) return
+  currentSaving.value = true
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -492,42 +537,11 @@ async function triggerAutoSave() {
 
     if (!isTauri) {
       // Browser fallback simulation
-      undoStack.value.push({
-        bytes: new Uint8Array(),
-        crop: { ...crop },
-        saturation: saturation.value,
-        gamma: gamma.value,
-        flipHorizontal: flipHorizontal.value,
-      })
-      cacheBuster.value = Date.now()
-      emit('saved')
+      close()
       return
     }
 
-    // 1. Read original bytes first if not saved in memory yet
-    if (!originalBytes) {
-      originalBytes = await readFile(path)
-    }
-
-    // 2. Save current file state on disk to undoStack
-    const currentBytes = await readFile(path)
-    undoStack.value.push({
-      bytes: currentBytes,
-      crop: { ...crop },
-      saturation: saturation.value,
-      gamma: gamma.value,
-      flipHorizontal: flipHorizontal.value,
-    })
-
-    if (undoStack.value.length > 25) {
-      undoStack.value.shift()
-    }
-
-    // 3. Write originalBytes to a temp file
-    const tempPath = path + ".edit_temp"
-    await writeFile(tempPath, originalBytes)
-
-    // 4. Calculate coordinates based on image naturalWidth/Height
+    // 1. Calculate coordinates based on image naturalWidth/Height
     const displayWidth = imageRef.value.clientWidth
     const displayHeight = imageRef.value.clientHeight
     
@@ -537,28 +551,31 @@ async function triggerAutoSave() {
     await new Promise((resolve, reject) => {
       img.onload = resolve
       img.onerror = reject
-      img.src = getAssetSrc(tempPath)
+      img.src = getAssetSrc(path)
     })
 
     const scaleX = img.naturalWidth / displayWidth
     const scaleY = img.naturalHeight / displayHeight
 
-    const cropX = crop.x * scaleX
-    const cropY = crop.y * scaleY
-    const cropW = crop.width * scaleX
-    const cropH = crop.height * scaleY
+    // Check if the crop box is modified
+    const isCropModified = Math.abs(crop.x) > 1 || 
+                           Math.abs(crop.y) > 1 || 
+                           Math.abs(crop.width - displayWidth) > 2 || 
+                           Math.abs(crop.height - displayHeight) > 2
 
-    // 5. Invoke edit_image
-    const cropData = {
-      x: Math.round(cropX),
-      y: Math.round(cropY),
-      width: Math.round(cropW),
-      height: Math.round(cropH),
+    let cropData = { x: 0, y: 0, width: 0, height: 0 }
+    if (isCropModified) {
+      cropData = {
+        x: Math.round(crop.x * scaleX),
+        y: Math.round(crop.y * scaleY),
+        width: Math.round(crop.width * scaleX),
+        height: Math.round(crop.height * scaleY),
+      }
     }
 
     const params = {
-      sourceFilePath: tempPath,
-      destFilePath: path, // Overwrite original
+      sourceFilePath: path,
+      destFilePath: path, // Overwrite original directly
       outputFormat: currentFile.value.extension?.toLowerCase() || 'jpg',
       orientation: 1,
       flipHorizontal: flipHorizontal.value,
@@ -573,57 +590,18 @@ async function triggerAutoSave() {
 
     const success = await invoke('edit_image', { params })
 
-    // Delete temporary file
-    await invoke('delete_file_system', { path: tempPath }).catch(() => {})
-
     if (success) {
       cacheBuster.value = Date.now()
       emit('saved')
+      close()
+    } else {
+      alert('Не удалось сохранить изменения')
     }
   } catch (err) {
-    console.error('Auto save failed:', err)
+    console.error('Save failed:', err)
+    alert('Ошибка при сохранении: ' + err)
   } finally {
-    currentSaving = false
-    if (hasPendingSave) {
-      hasPendingSave = false
-      triggerAutoSave()
-    }
-  }
-}
-
-// Undo changes
-async function handleUndo() {
-  if (undoStack.value.length === 0) return
-  const prevState = undoStack.value.pop()
-
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-
-  try {
-    if (!isTauri) {
-      // Browser mode fallback
-      saturation.value = prevState.saturation
-      gamma.value = prevState.gamma
-      flipHorizontal.value = prevState.flipHorizontal || false
-      Object.assign(crop, prevState.crop)
-      cacheBuster.value = Date.now()
-      emit('saved')
-      return
-    }
-
-    // Write previous bytes back to original path
-    await writeFile(currentFile.value.path, prevState.bytes)
-
-    // Restore UI variables
-    saturation.value = prevState.saturation
-    gamma.value = prevState.gamma
-    flipHorizontal.value = prevState.flipHorizontal || false
-    Object.assign(crop, prevState.crop)
-
-    // Update screen
-    cacheBuster.value = Date.now()
-    emit('saved')
-  } catch (err) {
-    console.error('Undo failed:', err)
+    currentSaving.value = false
   }
 }
 
@@ -631,18 +609,14 @@ async function handleUndo() {
 function handleKeyDown(event) {
   if (!props.visible) return
 
-  // Ctrl+Z Undo
-  if (event.ctrlKey && event.key === 'z') {
-    event.preventDefault()
-    handleUndo()
-    return
-  }
-
   switch (event.key) {
     case 'Escape':
-    case ' ':
       event.preventDefault()
       close()
+      break
+    case 'Enter':
+      event.preventDefault()
+      saveAndClose()
       break
     case 'ArrowLeft':
       event.preventDefault()

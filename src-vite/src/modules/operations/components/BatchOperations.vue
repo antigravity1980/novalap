@@ -88,11 +88,11 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="label text-xs text-base-content/60 font-semibold mb-1">{{ $t('batch_ops.width_px') }}</label>
-                <input type="number" v-model.number="resize.width" class="input input-bordered input-sm w-full" min="10" />
+                <input type="number" v-model.number="resize.width" class="input input-bordered input-sm w-full" min="0" />
               </div>
               <div>
                 <label class="label text-xs text-base-content/60 font-semibold mb-1">{{ $t('batch_ops.height_px') }}</label>
-                <input type="number" v-model.number="resize.height" class="input input-bordered input-sm w-full" min="10" />
+                <input type="number" v-model.number="resize.height" class="input input-bordered input-sm w-full" min="0" />
               </div>
             </div>
           </div>
@@ -511,8 +511,8 @@ async function apply() {
         result = await invoke('batch_resize', {
           files: filesToProcess,
           preset: {
-            width: resize.width,
-            height: resize.height,
+            width: Math.max(0, parseInt(resize.width) || 0),
+            height: Math.max(0, parseInt(resize.height) || 0),
             fit: resize.fit,
           },
         })

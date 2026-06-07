@@ -13,15 +13,6 @@
           <div class="px-3 py-1 text-[10px] font-bold text-base-content/40 uppercase tracking-widest">
             {{ $t('explorer.quick_access') }}
           </div>
-          <!-- Home item -->
-          <div
-            class="flex items-center gap-2.5 px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
-            :class="activeTab === 'explorer' && !navigationStore.currentPath ? 'bg-primary/15 text-primary font-bold active-nav-item' : 'text-base-content/75 hover:bg-base-100/50 hover:text-base-content'"
-            @click="navigateToHome"
-          >
-            <IconHome class="w-4 h-4 shrink-0" />
-            <span>{{ $t('explorer.home') }}</span>
-          </div>
           <!-- Recycle Bin item -->
           <div
             class="flex items-center gap-2.5 px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
@@ -31,6 +22,32 @@
             <IconTrash class="w-4 h-4 shrink-0" />
             <span class="flex-1">{{ $t('explorer.recycle_bin') }}</span>
             <span v-if="trashCount > 0" class="badge badge-error badge-sm scale-75">{{ trashCount }}</span>
+          </div>
+        </div>
+
+        <!-- Favorites Section -->
+        <div class="space-y-1">
+          <div class="px-3 py-1 text-[10px] font-bold text-base-content/40 uppercase tracking-widest">
+            {{ $t('explorer.favorites') }}
+          </div>
+          <div v-if="!configStore.settings.favorites || configStore.settings.favorites.length === 0" class="px-3 py-2 text-xs text-base-content/40 italic">
+            {{ $t('explorer.no_favorites') }}
+          </div>
+          <div
+            v-for="path in configStore.settings.favorites"
+            :key="path"
+            class="group flex items-center gap-2.5 px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
+            :class="activeTab === 'explorer' && navigationStore.currentPath === path ? 'bg-primary/15 text-primary font-bold active-nav-item' : 'text-base-content/75 hover:bg-base-100/50 hover:text-base-content'"
+            @click="navigateTo(path)"
+          >
+            <span class="text-sm shrink-0 flex items-center justify-center w-4 h-4">⭐</span>
+            <span class="flex-1 truncate" :title="path">{{ getFileName(path) }}</span>
+            <button
+              class="opacity-0 group-hover:opacity-100 hover:bg-base-300 rounded-full w-4 h-4 flex items-center justify-center text-[10px] text-base-content transition-opacity duration-150 shrink-0"
+              @click.stop="configStore.toggleFavorite(path)"
+            >
+              ✕
+            </button>
           </div>
         </div>
 
@@ -655,6 +672,21 @@
       @close="batchOperationsVisible = false"
       @success="onBatchComplete"
     />
+
+    <!-- Delete Confirmation Modal -->
+    <MessageBox
+      v-if="showDeleteConfirmModal"
+      :title="$t('settings.general.delete_confirm_title') || 'Удаление'"
+      :message="deleteConfirmMessage"
+      :OkText="$t('explorer.delete') || 'Удалить'"
+      :cancelText="$t('batch_ops.cancel') || 'Отмена'"
+      :warningOk="true"
+      checkboxText="Больше не спрашивать"
+      :checkboxChecked="skipDeleteCheckboxVal"
+      @checkbox-change="(val) => skipDeleteCheckboxVal = val"
+      @ok="confirmDeletion"
+      @cancel="showDeleteConfirmModal = false"
+    />
   </div>
 </template>
 
@@ -697,11 +729,39 @@ import PromptViewer from '@/modules/viewer/components/PromptViewer.vue'
 import CompareView from '@/modules/viewer/components/CompareView.vue'
 import QuickCrop from '@/modules/viewer/components/QuickCrop.vue'
 import BatchOperations from '@/modules/operations/components/BatchOperations.vue'
+import MessageBox from '@/components/MessageBox.vue'
 
 const router = useRouter()
 const navigationStore = useNavigationStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
+
+// Delete confirmation modal state
+const showDeleteConfirmModal = ref(false)
+const deleteConfirmMessage = ref('')
+const deleteConfirmCallback = ref(null)
+const skipDeleteCheckboxVal = ref(false)
+
+function requestDeleteConfirmation(message, callback) {
+  if (configStore.settings.skipDeleteConfirmation) {
+    callback()
+    return
+  }
+  deleteConfirmMessage.value = message
+  deleteConfirmCallback.value = callback
+  skipDeleteCheckboxVal.value = false
+  showDeleteConfirmModal.value = true
+}
+
+function confirmDeletion() {
+  showDeleteConfirmModal.value = false
+  if (skipDeleteCheckboxVal.value) {
+    configStore.settings.skipDeleteConfirmation = true
+  }
+  if (deleteConfirmCallback.value) {
+    deleteConfirmCallback.value()
+  }
+}
 
 // Safe window control helper for browser dev server support
 function getSafeWindow() {
@@ -1072,26 +1132,27 @@ function revealInExplorer(path) {
 
 // Single delete
 async function deleteSingleFile(file) {
-  if (confirm(`Переместить файл "${file.name}" в корзину?`)) {
+  const typeStr = file.is_dir ? 'папку' : 'файл'
+  requestDeleteConfirmation(`Переместить ${typeStr} "${file.name}" в корзину?`, async () => {
     try {
       await galleryStore.deleteFiles([file.path])
       await refreshData()
     } catch (err) {
       alert('Не удалось удалить файл: ' + err)
     }
-  }
+  })
 }
 
 // Multiple deletes
 async function deleteMultipleSelected() {
-  if (confirm(`Переместить ${galleryStore.selectedIds.length} файлов в корзину?`)) {
+  requestDeleteConfirmation(`Переместить ${galleryStore.selectedIds.length} элементов в корзину?`, async () => {
     try {
       await galleryStore.deleteSelectedFiles()
       await refreshData()
     } catch (err) {
       alert('Не удалось удалить файлы: ' + err)
     }
-  }
+  })
 }
 
 // Compare
@@ -1313,6 +1374,13 @@ function handleKeyDown(e) {
     return
   }
 
+  // Ctrl+A Select All
+  if (e.ctrlKey && (e.code === 'KeyA' || e.key.toLowerCase() === 'a' || e.key === 'ф' || e.key === 'Ф')) {
+    e.preventDefault()
+    galleryStore.selectAll()
+    return
+  }
+
   // Ctrl+C Copy
   if (e.ctrlKey && e.code === 'KeyC') {
     e.preventDefault()
@@ -1385,7 +1453,9 @@ onMounted(async () => {
   await navigationStore.loadDrives()
   await fetchTrash()
 
-  if (navigationStore.drives.length > 0) {
+  if (navigationStore.currentPath) {
+    await navigateTo(navigationStore.currentPath)
+  } else if (navigationStore.drives.length > 0) {
     await navigateTo(navigationStore.drives[0].path)
   }
 })

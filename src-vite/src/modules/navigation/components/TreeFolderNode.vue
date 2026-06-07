@@ -79,12 +79,18 @@ const folderIconUrl = computed(() => {
   return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
 })
 
-const recolorMenuItems = computed(() => [
-  {
-    label: 'Перекрасить папку',
-    children: [
-      { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
-      { label: 'По умолчанию', action: () => setFolderIcon(null) },
+const recolorMenuItems = computed(() => {
+  const isFav = configStore.settings.favorites?.includes(props.folder.path)
+  return [
+    {
+      label: isFav ? 'Удалить из избранного' : 'Добавить в избранное',
+      action: () => configStore.toggleFavorite(props.folder.path)
+    },
+    {
+      label: 'Перекрасить папку',
+      children: [
+        { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
+        { label: 'По умолчанию', action: () => setFolderIcon(null) },
       { label: 'Папка 01', action: () => setFolderIcon('01.ico') },
       { label: 'Папка 02', action: () => setFolderIcon('02.ico') },
       { label: 'Папка 03', action: () => setFolderIcon('03.ico') },
@@ -100,7 +106,8 @@ const recolorMenuItems = computed(() => [
       { label: 'Папка 15', action: () => setFolderIcon('15.ico') },
     ]
   }
-])
+]
+})
 
 function handleContextMenu(e) {
   contextMenuRef.value?.open(e.clientX, e.clientY)

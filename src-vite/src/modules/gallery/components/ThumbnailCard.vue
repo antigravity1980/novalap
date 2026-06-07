@@ -19,7 +19,7 @@
         v-if="isImage"
         :src="thumbnailUrl"
         :alt="file.name"
-        class="max-w-full max-h-full object-contain transition-transform duration-300 hover:scale-105"
+        class="w-full h-full object-contain transition-transform duration-300 hover:scale-105"
         loading="lazy"
       />
       <!-- Video tag/icon overlay -->
@@ -74,6 +74,20 @@
       </div>
     </div>
 
+    <MessageBox
+      v-if="showConfirm"
+      :title="$t('settings.general.delete_confirm_title') || 'Удаление'"
+      :message="`Переместить ${isFolder ? 'папку' : 'файл'} &quot;${file.name}&quot; в корзину?`"
+      :OkText="$t('explorer.delete') || 'Удалить'"
+      :cancelText="$t('batch_ops.cancel') || 'Отмена'"
+      :warningOk="true"
+      checkboxText="Больше не спрашивать"
+      :checkboxChecked="skipDeleteCheckboxVal"
+      @checkbox-change="(val) => skipDeleteCheckboxVal = val"
+      @ok="confirmDeletion"
+      @cancel="showConfirm = false"
+    />
+
     <ContextMenu
       ref="contextMenuRef"
       :menuItems="contextMenuItems"
@@ -91,6 +105,7 @@ import { useNavigationStore } from '@/modules/navigation/store'
 import { useGalleryStore } from '@/modules/gallery/store'
 import { invoke } from '@tauri-apps/api/core'
 import ContextMenu from '@/components/ContextMenu.vue'
+import MessageBox from '@/components/MessageBox.vue'
 
 const props = defineProps({
   file: { type: Object, required: true },
@@ -121,19 +136,27 @@ const isVideo = computed(() => {
 
 // Async loading of generated thumbnails for large files to prevent UI freeze
 const thumbnailUrl = ref('')
+let debounceTimeout = null
 async function loadThumbnail() {
   if (!isImage.value) return
-  if (props.file.size < 200 * 1024) {
-    thumbnailUrl.value = getAssetSrc(props.file.path)
-  } else {
-    try {
-      thumbnailUrl.value = await invoke('get_explorer_thumbnail', { path: props.file.path, size: 256 })
-    } catch (e) {
-      thumbnailUrl.value = getAssetSrc(props.file.path)
-    }
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout)
   }
+  debounceTimeout = setTimeout(async () => {
+    const currentPath = props.file.path
+    const targetSize = Math.max(256, Math.round(props.size))
+    if (props.file.size < 200 * 1024) {
+      thumbnailUrl.value = getAssetSrc(currentPath)
+    } else {
+      try {
+        thumbnailUrl.value = await invoke('get_explorer_thumbnail', { path: currentPath, size: targetSize })
+      } catch (e) {
+        thumbnailUrl.value = getAssetSrc(currentPath)
+      }
+    }
+  }, 150)
 }
-watch(() => props.file.path, loadThumbnail, { immediate: true })
+watch([() => props.file.path, () => props.size], loadThumbnail, { immediate: true })
 
 const folderIconUrl = computed(() => {
   if (!isFolder.value) return ''
@@ -184,6 +207,11 @@ const contextMenuItems = computed(() => {
   }
 
   if (isFolder.value) {
+    const isFav = configStore.settings.favorites?.includes(props.file.path)
+    items.push({
+      label: isFav ? 'Удалить из избранного' : 'Добавить в избранное',
+      action: () => configStore.toggleFavorite(props.file.path)
+    })
     items.push({ separator: true })
     items.push({
       label: 'Перекрасить папку',
@@ -226,16 +254,33 @@ async function renameItem() {
   }
 }
 
+const showConfirm = ref(false)
+const skipDeleteCheckboxVal = ref(false)
+
+async function performDelete() {
+  try {
+    await invoke('move_to_trash', { paths: [props.file.path] })
+    await navigationStore.navigateTo(navigationStore.currentPath)
+    galleryStore.setFiles(navigationStore.folders)
+  } catch (e) {
+    alert('Ошибка удаления: ' + e)
+  }
+}
+
+function confirmDeletion() {
+  showConfirm.value = false
+  if (skipDeleteCheckboxVal.value) {
+    configStore.settings.skipDeleteConfirmation = true
+  }
+  performDelete()
+}
+
 async function deleteItem() {
-  const typeStr = isFolder.value ? 'папку' : 'файл'
-  if (confirm(`Удалить ${typeStr} "${props.file.name}"?`)) {
-    try {
-      await invoke('move_to_trash', { paths: [props.file.path] })
-      await navigationStore.navigateTo(navigationStore.currentPath)
-      galleryStore.setFiles(navigationStore.folders)
-    } catch (e) {
-      alert('Ошибка удаления: ' + e)
-    }
+  if (configStore.settings.skipDeleteConfirmation) {
+    await performDelete()
+  } else {
+    skipDeleteCheckboxVal.value = false
+    showConfirm.value = true
   }
 }
 

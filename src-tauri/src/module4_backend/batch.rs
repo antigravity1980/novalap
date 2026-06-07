@@ -255,6 +255,20 @@ fn calculate_dimensions(
     target_height: u32,
     fit: &str,
 ) -> (u32, u32) {
+    if target_width == 0 && target_height == 0 {
+        return (orig_width, orig_height);
+    }
+    if target_width == 0 {
+        let scale = target_height as f64 / orig_height as f64;
+        let new_width = (orig_width as f64 * scale).round() as u32;
+        return (new_width.max(1), target_height);
+    }
+    if target_height == 0 {
+        let scale = target_width as f64 / orig_width as f64;
+        let new_height = (orig_height as f64 * scale).round() as u32;
+        return (target_width, new_height.max(1));
+    }
+
     match fit {
         "exact" => (target_width, target_height),
         "contain" => {
@@ -263,8 +277,8 @@ fn calculate_dimensions(
                 target_height as f64 / orig_height as f64,
             );
             (
-                (orig_width as f64 * scale).round() as u32,
-                (orig_height as f64 * scale).round() as u32,
+                ((orig_width as f64 * scale).round() as u32).max(1),
+                ((orig_height as f64 * scale).round() as u32).max(1),
             )
         }
         "cover" => {
@@ -273,8 +287,8 @@ fn calculate_dimensions(
                 target_height as f64 / orig_height as f64,
             );
             (
-                (orig_width as f64 * scale).round() as u32,
-                (orig_height as f64 * scale).round() as u32,
+                ((orig_width as f64 * scale).round() as u32).max(1),
+                ((orig_height as f64 * scale).round() as u32).max(1),
             )
         }
         "fill" => (target_width, target_height),
