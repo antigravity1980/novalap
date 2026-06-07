@@ -101,7 +101,7 @@
             :src="currentFileUrl"
             class="max-w-[85vw] max-h-[72vh] rounded select-none pointer-events-none"
             :style="{
-              filter: `saturate(${saturation})`
+              filter: `url(#gamma-filter-ql) saturate(${saturation})`
             }"
             @load="onImageLoad"
             @error="onImageError"
@@ -172,6 +172,16 @@
           {{ currentFile.ai_source }}
         </span>
       </div>
+      <!-- SVG Gamma Filter -->
+      <svg style="position: absolute; width: 0; height: 0; pointer-events: none;">
+        <filter id="gamma-filter-ql">
+          <feComponentTransfer>
+            <feFuncR type="gamma" :exponent="gamma !== 0 ? 1 / gamma : 1" />
+            <feFuncG type="gamma" :exponent="gamma !== 0 ? 1 / gamma : 1" />
+            <feFuncB type="gamma" :exponent="gamma !== 0 ? 1 / gamma : 1" />
+          </feComponentTransfer>
+        </filter>
+      </svg>
     </div>
   </teleport>
 </template>
@@ -276,11 +286,10 @@ function onImageLoad() {
   if (imageRef.value) {
     const width = imageRef.value.clientWidth
     const height = imageRef.value.clientHeight
-    // Center a 80% size crop box
-    crop.x = width * 0.1
-    crop.y = height * 0.1
-    crop.width = width * 0.8
-    crop.height = height * 0.8
+    crop.x = 0
+    crop.y = 0
+    crop.width = width
+    crop.height = height
   }
 }
 

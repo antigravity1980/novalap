@@ -75,8 +75,7 @@ const folderIconUrl = computed(() => {
   if (customIcon) {
     return getAssetSrc(`D:\\NovaLAP\\Folder\\${customIcon}`)
   }
-  const isDark = configStore.settings.appearance === 1
-  const defaultIcon = isDark ? '14.ico' : '15.ico'
+  const defaultIcon = '14.ico'
   return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
 })
 
@@ -86,18 +85,19 @@ const recolorMenuItems = computed(() => [
     children: [
       { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
       { label: 'По умолчанию', action: () => setFolderIcon(null) },
-      { label: 'Красный', action: () => setFolderIcon('01.ico') },
-      { label: 'Оранжевый', action: () => setFolderIcon('02.ico') },
-      { label: 'Жёлтый', action: () => setFolderIcon('03.ico') },
-      { label: 'Зелёный', action: () => setFolderIcon('04.ico') },
-      { label: 'Голубой', action: () => setFolderIcon('05.ico') },
-      { label: 'Синий', action: () => setFolderIcon('06.ico') },
-      { label: 'Фиолетовый', action: () => setFolderIcon('07.ico') },
-      { label: 'Розовый', action: () => setFolderIcon('08.ico') },
-      { label: 'Коричневый', action: () => setFolderIcon('09.ico') },
-      { label: 'Серый', action: () => setFolderIcon('10.ico') },
-      { label: 'Тёмно-синий', action: () => setFolderIcon('11.ico') },
-      { label: 'Салатовый', action: () => setFolderIcon('12.ico') },
+      { label: 'Папка 01', action: () => setFolderIcon('01.ico') },
+      { label: 'Папка 02', action: () => setFolderIcon('02.ico') },
+      { label: 'Папка 03', action: () => setFolderIcon('03.ico') },
+      { label: 'Папка 04', action: () => setFolderIcon('04.ico') },
+      { label: 'Папка 05', action: () => setFolderIcon('05.ico') },
+      { label: 'Папка 06', action: () => setFolderIcon('06.ico') },
+      { label: 'Папка 07', action: () => setFolderIcon('07.ico') },
+      { label: 'Папка 08', action: () => setFolderIcon('08.ico') },
+      { label: 'Папка 09', action: () => setFolderIcon('09.ico') },
+      { label: 'Папка 10', action: () => setFolderIcon('10.ico') },
+      { label: 'Папка 11', action: () => setFolderIcon('11.ico') },
+      { label: 'Папка 12', action: () => setFolderIcon('12.ico') },
+      { label: 'Папка 15', action: () => setFolderIcon('15.ico') },
     ]
   }
 ])
@@ -124,8 +124,9 @@ async function toggle() {
   }
 }
 
-function navigate() {
+async function navigate() {
   emit('navigate', props.folder.path)
+  await toggle()
 }
 </script>
 

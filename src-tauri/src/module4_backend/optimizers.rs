@@ -7,11 +7,79 @@
  * - check_optimizer(name) — проверить доступность оптимизатора
  */
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::env;
 use tauri::command;
 
 use super::batch::BatchResult;
+
+/// Поиск пути к исполняемому файлу утилиты
+fn find_tool_path(name: &str) -> Option<PathBuf> {
+    // 1. Проверяем в системном PATH
+    if let Ok(paths) = env::var("PATH") {
+        for path in env::split_paths(&paths) {
+            let exe_name = if cfg!(target_os = "windows") {
+                format!("{}.exe", name)
+            } else {
+                name.to_string()
+            };
+            let exe_path = path.join(&exe_name);
+            if exe_path.exists() && exe_path.is_file() {
+                return Some(exe_path);
+            }
+        }
+    }
+
+    // 2. Проверяем в папке запущенного исполняемого файла
+    if let Ok(mut current_exe) = env::current_exe() {
+        if current_exe.pop() {
+            let exe_name = if cfg!(target_os = "windows") {
+                format!("{}.exe", name)
+            } else {
+                name.to_string()
+            };
+            let exe_path = current_exe.join(&exe_name);
+            if exe_path.exists() && exe_path.is_file() {
+                return Some(exe_path);
+            }
+
+            // Дополнительные поддиректории
+            for sub in &["resources", "third_party", "optimizers", "bin", "ffmpeg"] {
+                let sub_path = current_exe.join(sub).join(&exe_name);
+                if sub_path.exists() && sub_path.is_file() {
+                    return Some(sub_path);
+                }
+            }
+        }
+    }
+
+    // 3. Проверяем в текущей рабочей директории
+    if let Ok(cwd) = env::current_dir() {
+        let exe_name = if cfg!(target_os = "windows") {
+            format!("{}.exe", name)
+        } else {
+            name.to_string()
+        };
+        let exe_path = cwd.join(&exe_name);
+        if exe_path.exists() && exe_path.is_file() {
+            return Some(exe_path);
+        }
+
+        for sub in &["resources", "third_party", "optimizers", "bin", "ffmpeg"] {
+            let sub_path = cwd.join(sub).join(&exe_name);
+            if sub_path.exists() && sub_path.is_file() {
+                return Some(sub_path);
+            }
+        }
+    }
+
+    None
+}
+
+fn is_tool_available(name: &str) -> bool {
+    find_tool_path(name).is_some()
+}
 
 /// Сжать PNG через pngquant
 #[command]
@@ -23,10 +91,8 @@ pub fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, String>
         errors: Vec::new(),
     };
 
-    // Проверяем доступность pngquant
-    if !is_tool_available("pngquant") {
-        return Err("pngquant not found. Install it first.".to_string());
-    }
+    let tool_path = find_tool_path("pngquant")
+        .ok_or_else(|| "pngquant not found. Install it first.".to_string())?;
 
     for file_path in &files {
         let path = Path::new(file_path);
@@ -51,7 +117,7 @@ pub fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, String>
 
         // pngquant --quality=65-80 --force --output output.png input.png
         let output_path = path.with_extension("pngquant.png");
-        let status = Command::new("pngquant")
+        let status = Command::new(&tool_path)
             .args([
                 "--quality=65-80",
                 "--force",
@@ -93,10 +159,8 @@ pub fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> 
         errors: Vec::new(),
     };
 
-    // Проверяем доступность cjpeg (mozjpeg)
-    if !is_tool_available("cjpeg") {
-        return Err("mozjpeg (cjpeg) not found. Install it first.".to_string());
-    }
+    let tool_path = find_tool_path("cjpeg")
+        .ok_or_else(|| "mozjpeg (cjpeg) not found. Install it first.".to_string())?;
 
     for file_path in &files {
         let path = Path::new(file_path);
@@ -121,7 +185,7 @@ pub fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> 
 
         // cjpeg -quality 85 -optimize -outfile output.jpg input.jpg
         let output_path = path.with_extension("mozjpeg.jpg");
-        let status = Command::new("cjpeg")
+        let status = Command::new(&tool_path)
             .args([
                 "-quality",
                 "85",
@@ -157,15 +221,6 @@ pub fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> 
 /// Проверить доступность внешнего инструмента
 #[command]
 pub fn check_optimizer(name: String) -> Result<bool, String> {
-    Ok(is_tool_available(&name))
-}
-
-// --- Вспомогательные функции ---
-
-fn is_tool_available(name: &str) -> bool {
-    Command::new(name)
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    let resolved_name = if name == "pngquant" { "pngquant" } else { "cjpeg" };
+    Ok(is_tool_available(resolved_name))
 }

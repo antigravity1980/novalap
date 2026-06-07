@@ -1,12 +1,14 @@
 <template>
   <div
-    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden relative"
+    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden relative focus:outline-none"
     ref="containerRef"
+    tabindex="0"
     @scroll="onScroll"
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
     @mouseleave="onMouseLeave"
+    @keydown="onKeyDown"
     style="user-select: none;"
   >
     <div class="virtual-scroll-spacer" :style="{ height: totalHeight + 'px' }">
@@ -198,24 +200,107 @@ function onMouseLeave(e) {
 }
 
 // ─── Card click with Ctrl/Shift support ─────────────────────────────────────
+const anchorIndex = ref(-1)
+
 function onCardClick(e, file) {
+  const clickedIndex = props.files.findIndex(f => f.path === file.path)
+  // Auto-focus container when clicking cards so keyboard navigation works immediately
+  containerRef.value?.focus()
+
   if (e.ctrlKey || e.metaKey) {
     // Toggle single item
     galleryStore.toggleSelection(file.path)
+    anchorIndex.value = clickedIndex
   } else if (e.shiftKey && galleryStore.selectedIds.length > 0) {
-    // Range selection from last selected to clicked
-    const lastPath = galleryStore.selectedIds[galleryStore.selectedIds.length - 1]
-    const lastIndex = props.files.findIndex(f => f.path === lastPath)
-    const clickedIndex = props.files.findIndex(f => f.path === file.path)
-    if (lastIndex >= 0 && clickedIndex >= 0) {
-      const from = Math.min(lastIndex, clickedIndex)
-      const to = Math.max(lastIndex, clickedIndex)
+    // Range selection from anchor to clicked
+    if (anchorIndex.value === -1) {
+      const lastPath = galleryStore.selectedIds[0]
+      anchorIndex.value = props.files.findIndex(f => f.path === lastPath)
+    }
+    if (anchorIndex.value >= 0 && clickedIndex >= 0) {
+      const from = Math.min(anchorIndex.value, clickedIndex)
+      const to = Math.max(anchorIndex.value, clickedIndex)
       const rangeIds = props.files.slice(from, to + 1).map(f => f.path)
-      galleryStore.selectedIds = [...new Set([...galleryStore.selectedIds, ...rangeIds])]
+      galleryStore.selectedIds = rangeIds
     }
   } else {
     // Single select (clear others)
     galleryStore.selectedIds = [file.path]
+    anchorIndex.value = clickedIndex
+  }
+}
+
+// ─── Keyboard Navigation ─────────────────────────────────────────────────────
+function scrollToIndex(index) {
+  const cols = colsPerRow.value
+  const rowIndex = Math.floor(index / cols)
+  const rowTop = rowIndex * rowHeight.value
+  const rowBottom = rowTop + rowHeight.value
+
+  const container = containerRef.value
+  if (!container) return
+
+  const curScrollTop = container.scrollTop
+  const viewHeight = containerHeight.value
+
+  if (rowTop < curScrollTop) {
+    container.scrollTop = rowTop
+  } else if (rowBottom > curScrollTop + viewHeight) {
+    container.scrollTop = rowBottom - viewHeight
+  }
+}
+
+function onKeyDown(e) {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+    e.preventDefault()
+    if (props.files.length === 0) return
+
+    let currentIndex = -1
+    if (galleryStore.selectedIds.length > 0) {
+      const lastSelectedPath = galleryStore.selectedIds[galleryStore.selectedIds.length - 1]
+      currentIndex = props.files.findIndex(f => f.path === lastSelectedPath)
+    }
+
+    if (currentIndex === -1) {
+      currentIndex = 0
+    }
+
+    const cols = colsPerRow.value
+    let nextIndex = currentIndex
+
+    if (e.key === 'ArrowLeft') {
+      nextIndex = Math.max(0, currentIndex - 1)
+    } else if (e.key === 'ArrowRight') {
+      nextIndex = Math.min(props.files.length - 1, currentIndex + 1)
+    } else if (e.key === 'ArrowUp') {
+      nextIndex = Math.max(0, currentIndex - cols)
+    } else if (e.key === 'ArrowDown') {
+      nextIndex = Math.min(props.files.length - 1, currentIndex + cols)
+    }
+
+    if (e.shiftKey) {
+      if (anchorIndex.value === -1) {
+        anchorIndex.value = currentIndex
+      }
+      const from = Math.min(anchorIndex.value, nextIndex)
+      const to = Math.max(anchorIndex.value, nextIndex)
+      const rangeIds = props.files.slice(from, to + 1).map(f => f.path)
+      galleryStore.selectedIds = rangeIds
+    } else {
+      anchorIndex.value = nextIndex
+      galleryStore.selectedIds = [props.files[nextIndex].path]
+    }
+
+    scrollToIndex(nextIndex)
+  } else if (e.key === ' ') {
+    e.preventDefault()
+    if (galleryStore.selectedIds.length > 0) {
+      const lastSelectedPath = galleryStore.selectedIds[galleryStore.selectedIds.length - 1]
+      const file = props.files.find(f => f.path === lastSelectedPath)
+      if (file) {
+        openQuickLook(file)
+      }
+    }
   }
 }
 

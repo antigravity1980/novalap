@@ -143,10 +143,10 @@ function onImageLoad() {
   imageLoaded.value = true
   if (imageRef.value) {
     const rect = imageRef.value.getBoundingClientRect()
-    crop.x = rect.width * 0.1
-    crop.y = rect.height * 0.1
-    crop.width = rect.width * 0.8
-    crop.height = rect.height * 0.8
+    crop.x = 0
+    crop.y = 0
+    crop.width = rect.width
+    crop.height = rect.height
   }
 }
 
@@ -222,10 +222,10 @@ function resizeCrop(handle, dx, dy) {
 function resetCrop() {
   if (imageRef.value) {
     const rect = imageRef.value.getBoundingClientRect()
-    crop.x = rect.width * 0.1
-    crop.y = rect.height * 0.1
-    crop.width = rect.width * 0.8
-    crop.height = rect.height * 0.8
+    crop.x = 0
+    crop.y = 0
+    crop.width = rect.width
+    crop.height = rect.height
   }
 }
 

@@ -205,6 +205,7 @@ async fn main() {
             module1_navigation::list_directory,
             module1_navigation::get_drives,
             module1_navigation::get_file_entry,
+            module1_navigation::get_explorer_thumbnail,
             module1_navigation::expand_folder,
             module1_navigation::get_parent_folders,
             module1_navigation::get_root_folders,

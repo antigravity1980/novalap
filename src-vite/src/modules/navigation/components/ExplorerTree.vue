@@ -55,9 +55,17 @@ const expandedNodes = reactive({})
 
 async function navigateTo(path) {
   if (path) {
-    if (!expandedNodes[path]) {
-      expandedNodes[path] = true
-      await navigationStore.expandTreeFolder(path)
+    const isDrive = navigationStore.drives.some(d => d.path === path)
+    if (isDrive) {
+      expandedNodes[path] = !expandedNodes[path]
+      if (expandedNodes[path]) {
+        await navigationStore.expandTreeFolder(path)
+      }
+    } else {
+      if (!expandedNodes[path]) {
+        expandedNodes[path] = true
+        await navigationStore.expandTreeFolder(path)
+      }
     }
     await navigationStore.navigateTo(path)
     galleryStore.setFiles(navigationStore.folders)

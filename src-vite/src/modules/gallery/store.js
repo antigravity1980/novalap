@@ -39,6 +39,14 @@ export const useGalleryStore = defineStore('gallery', {
 
     // Масштабирование
     zoomLevel: 1,
+
+    // Clipboard state
+    clipboard: {
+      action: null, // 'copy' | 'cut'
+      paths: [],    // array of file/folder paths
+    },
+    deletedHistory: [], // stack of arrays of TrashEntry
+    isUndoing: false,
   }),
 
   getters: {
@@ -152,6 +160,19 @@ export const useGalleryStore = defineStore('gallery', {
       }
     },
 
+    recordSelectionState(state) {
+      if (this.historyIndex < this.selectionHistory.length - 1) {
+        this.selectionHistory = this.selectionHistory.slice(0, this.historyIndex + 1)
+      }
+      this.selectionHistory.push([...state])
+      this.historyIndex = this.selectionHistory.length - 1
+
+      if (this.selectionHistory.length > 50) {
+        this.selectionHistory.shift()
+        this.historyIndex--
+      }
+    },
+
     toggleSelection(filePath) {
       this._pushSelectionState()
       const index = this.selectedIds.indexOf(filePath)
@@ -176,32 +197,63 @@ export const useGalleryStore = defineStore('gallery', {
 
     undo() {
       if (this.canUndo) {
+        this.isUndoing = true
         this.selectedIds = [...this.selectionHistory[this.historyIndex]]
         this.historyIndex--
+        this.isUndoing = false
       }
     },
 
     redo() {
       if (this.canRedo) {
+        this.isUndoing = true
         this.historyIndex++
         this.selectedIds = [...this.selectionHistory[this.historyIndex]]
+        this.isUndoing = false
       }
     },
 
     // --- Действия с файлами ---
 
-    async deleteSelectedFiles() {
-      if (this.selectedIds.length === 0) return
-
+    async deleteFiles(paths) {
+      if (!paths || paths.length === 0) return
       try {
-        const result = await invoke('move_to_trash', { paths: this.selectedIds })
-        // Удаляем из текущего списка
-        this.files = this.files.filter(f => !this.selectedIds.includes(f.path))
-        this.selectedIds = []
+        const result = await invoke('move_to_trash', { paths })
+        if (result && result.length > 0) {
+          this.deletedHistory.push(result)
+        }
+        // Remove from currently loaded files
+        this.files = this.files.filter(f => !paths.includes(f.path))
+        this.selectedIds = this.selectedIds.filter(id => !paths.includes(id))
         return result
       } catch (error) {
         console.error('Failed to delete files:', error)
         throw error
+      }
+    },
+
+    async deleteSelectedFiles() {
+      const paths = [...this.selectedIds]
+      const res = await this.deleteFiles(paths)
+      this.selectedIds = []
+      return res
+    },
+
+    async undoDelete() {
+      if (this.deletedHistory.length === 0) return
+      const lastDeleted = this.deletedHistory.pop()
+      if (!lastDeleted || lastDeleted.length === 0) return
+
+      const trashPaths = lastDeleted.map(entry => entry.trashPath)
+      try {
+        await invoke('restore_from_trash', { trashPaths })
+        const { useNavigationStore } = await import('../navigation/store')
+        const navigationStore = useNavigationStore()
+        await navigationStore.navigateTo(navigationStore.currentPath)
+        this.setFiles(navigationStore.folders)
+      } catch (error) {
+        console.error('Failed to undo delete:', error)
+        alert('Не удалось отменить удаление: ' + error)
       }
     },
 
@@ -233,6 +285,45 @@ export const useGalleryStore = defineStore('gallery', {
       // Обновляем список
       this.files = this.files.filter(f => !this.selectedIds.includes(f.path))
       this.selectedIds = []
+    },
+
+    setClipboard(action, paths) {
+      this.clipboard.action = action
+      this.clipboard.paths = paths
+    },
+
+    clearClipboard() {
+      this.clipboard.action = null
+      this.clipboard.paths = []
+    },
+
+    async paste(destPath) {
+      if (!this.clipboard.action || this.clipboard.paths.length === 0) return
+      const { action, paths } = this.clipboard
+
+      for (const src of paths) {
+        const fileName = src.split('\\').pop() || src.split('/').pop()
+        const dest = `${destPath}\\${fileName}`
+        try {
+          if (action === 'copy') {
+            await invoke('cross_copy', { src, dest })
+          } else if (action === 'cut') {
+            await invoke('cross_move', { src, dest })
+          }
+        } catch (error) {
+          console.error(`Failed to ${action} ${src} to ${dest}:`, error)
+        }
+      }
+
+      if (action === 'cut') {
+        this.clearClipboard()
+      }
+
+      // Refresh current directory
+      const { useNavigationStore } = await import('../navigation/store')
+      const navigationStore = useNavigationStore()
+      await navigationStore.navigateTo(destPath)
+      this.setFiles(navigationStore.folders)
     },
 
     // --- Работа с AI метаданными ---

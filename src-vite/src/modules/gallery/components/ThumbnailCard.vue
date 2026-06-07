@@ -6,9 +6,9 @@
       'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30': !selected,
     }"
     :style="{ width: size + 'px' }"
-    @click="$emit('click')"
-    @dblclick="$emit('dblclick')"
-    @contextmenu.prevent.stop="isFolder ? handleContextMenu($event) : null"
+    @click="$emit('click', $event)"
+    @dblclick="$emit('dblclick', $event)"
+    @contextmenu.prevent.stop="handleContextMenu($event)"
   >
     <!-- Thumbnail Image Container -->
     <div
@@ -17,9 +17,9 @@
     >
       <img
         v-if="isImage"
-        :src="getThumbnailUrl(file.path)"
+        :src="thumbnailUrl"
         :alt="file.name"
-        class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+        class="max-w-full max-h-full object-contain transition-transform duration-300 hover:scale-105"
         loading="lazy"
       />
       <!-- Video tag/icon overlay -->
@@ -32,9 +32,8 @@
         </div>
       </div>
       <!-- Папка -->
-      <div v-else-if="isFolder" class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/50">
+      <div v-else-if="isFolder" class="w-full h-full flex flex-col items-center justify-center bg-base-300/30">
         <img :src="folderIconUrl" class="w-16 h-16 object-contain select-none pointer-events-none" />
-        <span class="text-[10px] uppercase font-bold tracking-wider">{{ $t('gallery.folder_label').toUpperCase() }}</span>
       </div>
       <!-- Other files generic -->
       <div v-else class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/40">
@@ -64,18 +63,20 @@
         {{ file.name }}
       </div>
       <div class="flex items-center justify-between mt-0.5 text-[10px] text-base-content/40 font-mono">
-        <span v-if="file.resolution" class="font-semibold">
+        <span v-if="isFolder" class="font-semibold truncate pr-1">
+          {{ folderCountsText }}
+        </span>
+        <span v-else-if="file.resolution" class="font-semibold">
           {{ file.resolution.width }}×{{ file.resolution.height }}
         </span>
         <span v-else>—</span>
-        <span>{{ formatBytes(file.size) }}</span>
+        <span>{{ isFolder ? '' : formatBytes(file.size) }}</span>
       </div>
     </div>
 
     <ContextMenu
-      v-if="isFolder"
       ref="contextMenuRef"
-      :menuItems="recolorMenuItems"
+      :menuItems="contextMenuItems"
       :smallIcon="true"
       style="display: none;"
     />
@@ -83,9 +84,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { getAssetSrc } from '@/common/utils'
 import { useConfigStore } from '@/stores/configStore'
+import { useNavigationStore } from '@/modules/navigation/store'
+import { useGalleryStore } from '@/modules/gallery/store'
+import { invoke } from '@tauri-apps/api/core'
 import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = defineProps({
@@ -97,6 +101,8 @@ const props = defineProps({
 defineEmits(['click', 'dblclick'])
 
 const configStore = useConfigStore()
+const navigationStore = useNavigationStore()
+const galleryStore = useGalleryStore()
 const contextMenuRef = ref(null)
 
 const isFolder = computed(() => {
@@ -113,38 +119,133 @@ const isVideo = computed(() => {
   return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'mpeg', '3gp'].includes(ext)
 })
 
+// Async loading of generated thumbnails for large files to prevent UI freeze
+const thumbnailUrl = ref('')
+async function loadThumbnail() {
+  if (!isImage.value) return
+  if (props.file.size < 200 * 1024) {
+    thumbnailUrl.value = getAssetSrc(props.file.path)
+  } else {
+    try {
+      thumbnailUrl.value = await invoke('get_explorer_thumbnail', { path: props.file.path, size: 256 })
+    } catch (e) {
+      thumbnailUrl.value = getAssetSrc(props.file.path)
+    }
+  }
+}
+watch(() => props.file.path, loadThumbnail, { immediate: true })
+
 const folderIconUrl = computed(() => {
   if (!isFolder.value) return ''
   const customIcon = configStore.folderIcons?.[props.file.path]
   if (customIcon) {
     return getAssetSrc(`D:\\NovaLAP\\Folder\\${customIcon}`)
   }
-  const isDark = configStore.settings.appearance === 1
-  const defaultIcon = isDark ? '14.ico' : '15.ico'
-  return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
+  return getAssetSrc(`D:\\NovaLAP\\Folder\\14.ico`)
 })
 
-const recolorMenuItems = computed(() => [
-  {
-    label: 'Перекрасить папку',
-    children: [
-      { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
-      { label: 'По умолчанию', action: () => setFolderIcon(null) },
-      { label: 'Красный', action: () => setFolderIcon('01.ico') },
-      { label: 'Оранжевый', action: () => setFolderIcon('02.ico') },
-      { label: 'Жёлтый', action: () => setFolderIcon('03.ico') },
-      { label: 'Зелёный', action: () => setFolderIcon('04.ico') },
-      { label: 'Голубой', action: () => setFolderIcon('05.ico') },
-      { label: 'Синий', action: () => setFolderIcon('06.ico') },
-      { label: 'Фиолетовый', action: () => setFolderIcon('07.ico') },
-      { label: 'Розовый', action: () => setFolderIcon('08.ico') },
-      { label: 'Коричневый', action: () => setFolderIcon('09.ico') },
-      { label: 'Серый', action: () => setFolderIcon('10.ico') },
-      { label: 'Тёмно-синий', action: () => setFolderIcon('11.ico') },
-      { label: 'Салатовый', action: () => setFolderIcon('12.ico') },
-    ]
+// Pluralization for Russian/English subfolders and files count
+const folderCountsText = computed(() => {
+  if (!isFolder.value) return ''
+  const dirs = props.file.dir_count || 0
+  const files = props.file.file_count || 0
+
+  const getRussianPlural = (num, one, two, five) => {
+    let n = Math.abs(num)
+    n %= 100
+    if (n >= 5 && n <= 20) return five
+    n %= 10
+    if (n === 1) return one
+    if (n >= 2 && n <= 4) return two
+    return five
   }
-])
+
+  const foldersStr = configStore.settings.language === 'ru'
+    ? `${dirs} ${getRussianPlural(dirs, 'папка', 'папки', 'папок')}`
+    : `${dirs} folder${dirs !== 1 ? 's' : ''}`
+
+  const filesStr = configStore.settings.language === 'ru'
+    ? `${files} ${getRussianPlural(files, 'файл', 'файла', 'файлов')}`
+    : `${files} file${files !== 1 ? 's' : ''}`
+
+  return `${foldersStr}, ${filesStr}`
+})
+
+const contextMenuItems = computed(() => {
+  const items = [
+    { label: 'Переименовать', action: () => renameItem() },
+    { label: 'Копировать', action: () => copyItem() },
+    { label: 'Вырезать', action: () => cutItem() },
+    { label: 'Удалить', action: () => deleteItem() },
+  ]
+  
+  if (galleryStore.clipboard.paths.length > 0 && isFolder.value) {
+    items.push({ label: 'Вставить', action: () => galleryStore.paste(props.file.path) })
+  }
+
+  if (isFolder.value) {
+    items.push({ separator: true })
+    items.push({
+      label: 'Перекрасить папку',
+      children: [
+        { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
+        { label: 'По умолчанию', action: () => setFolderIcon(null) },
+        { label: 'Папка 01', action: () => setFolderIcon('01.ico') },
+        { label: 'Папка 02', action: () => setFolderIcon('02.ico') },
+        { label: 'Папка 03', action: () => setFolderIcon('03.ico') },
+        { label: 'Папка 04', action: () => setFolderIcon('04.ico') },
+        { label: 'Папка 05', action: () => setFolderIcon('05.ico') },
+        { label: 'Папка 06', action: () => setFolderIcon('06.ico') },
+        { label: 'Папка 07', action: () => setFolderIcon('07.ico') },
+        { label: 'Папка 08', action: () => setFolderIcon('08.ico') },
+        { label: 'Папка 09', action: () => setFolderIcon('09.ico') },
+        { label: 'Папка 10', action: () => setFolderIcon('10.ico') },
+        { label: 'Папка 11', action: () => setFolderIcon('11.ico') },
+        { label: 'Папка 12', action: () => setFolderIcon('12.ico') },
+        { label: 'Папка 15', action: () => setFolderIcon('15.ico') },
+      ]
+    })
+  }
+  return items
+})
+
+async function renameItem() {
+  const newName = prompt('Введите новое имя:', props.file.name)
+  if (newName && newName !== props.file.name) {
+    const lastSlash = Math.max(props.file.path.lastIndexOf('\\'), props.file.path.lastIndexOf('/'))
+    const parentPath = lastSlash !== -1 ? props.file.path.substring(0, lastSlash) : ''
+    const separator = props.file.path.includes('/') ? '/' : '\\'
+    const newPath = parentPath ? `${parentPath}${separator}${newName}` : newName
+    try {
+      await invoke('cross_move', { src: props.file.path, dest: newPath })
+      await navigationStore.navigateTo(navigationStore.currentPath)
+      galleryStore.setFiles(navigationStore.folders)
+    } catch (e) {
+      alert('Ошибка переименования: ' + e)
+    }
+  }
+}
+
+async function deleteItem() {
+  const typeStr = isFolder.value ? 'папку' : 'файл'
+  if (confirm(`Удалить ${typeStr} "${props.file.name}"?`)) {
+    try {
+      await invoke('move_to_trash', { paths: [props.file.path] })
+      await navigationStore.navigateTo(navigationStore.currentPath)
+      galleryStore.setFiles(navigationStore.folders)
+    } catch (e) {
+      alert('Ошибка удаления: ' + e)
+    }
+  }
+}
+
+function copyItem() {
+  galleryStore.setClipboard('copy', [props.file.path])
+}
+
+function cutItem() {
+  galleryStore.setClipboard('cut', [props.file.path])
+}
 
 function handleContextMenu(e) {
   contextMenuRef.value?.open(e.clientX, e.clientY)
@@ -152,10 +253,6 @@ function handleContextMenu(e) {
 
 function setFolderIcon(iconName) {
   configStore.setFolderIcon(props.file.path, iconName)
-}
-
-function getThumbnailUrl(filePath) {
-  return getAssetSrc(filePath)
 }
 
 function formatBytes(bytes) {

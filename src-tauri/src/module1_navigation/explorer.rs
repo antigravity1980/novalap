@@ -28,6 +28,8 @@ pub struct FileEntry {
     pub created: Option<String>,
     pub extension: Option<String>,
     pub resolution: Option<Resolution>,
+    pub dir_count: Option<u32>,
+    pub file_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +112,29 @@ pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
             None
         };
 
+        let (dir_count, file_count) = if is_dir {
+            if let Ok(read_subdir) = fs::read_dir(&entry_path) {
+                let mut dc = 0;
+                let mut fc = 0;
+                for sub_entry in read_subdir {
+                    if let Ok(se) = sub_entry {
+                        if let Ok(meta) = se.metadata() {
+                            if meta.is_dir() {
+                                dc += 1;
+                            } else if meta.is_file() {
+                                fc += 1;
+                            }
+                        }
+                    }
+                }
+                (Some(dc), Some(fc))
+            } else {
+                (Some(0), Some(0))
+            }
+        } else {
+            (None, None)
+        };
+
         entries.push(FileEntry {
             name: file_name,
             path: path_str,
@@ -120,6 +145,8 @@ pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
             created,
             extension,
             resolution,
+            dir_count,
+            file_count,
         });
     }
 
@@ -225,6 +252,29 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| file_path.to_string_lossy().to_string());
 
+    let (dir_count, file_count) = if is_dir {
+        if let Ok(read_subdir) = fs::read_dir(file_path) {
+            let mut dc = 0;
+            let mut fc = 0;
+            for sub_entry in read_subdir {
+                if let Ok(se) = sub_entry {
+                    if let Ok(meta) = se.metadata() {
+                        if meta.is_dir() {
+                            dc += 1;
+                        } else if meta.is_file() {
+                            fc += 1;
+                        }
+                    }
+                }
+            }
+            (Some(dc), Some(fc))
+        } else {
+            (Some(0), Some(0))
+        }
+    } else {
+        (None, None)
+    };
+
     Ok(FileEntry {
         name,
         path: file_path.to_string_lossy().to_string(),
@@ -235,7 +285,44 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
         created: None,
         extension,
         resolution,
+        dir_count,
+        file_count,
     })
+}
+
+/// Получить эскиз изображения в base64
+#[command]
+pub async fn get_explorer_thumbnail(path: String, size: u32) -> Result<String, String> {
+    use base64::{Engine, engine::general_purpose};
+    let path_clone = path.clone();
+    tokio::task::spawn_blocking(move || {
+        let p = Path::new(&path_clone);
+        let is_raw = crate::t_libraw::is_tiff_path(&path_clone) || 
+            p.extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .map(|ext| {
+                    matches!(ext.as_str(), "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf")
+                })
+                .unwrap_or(false);
+            
+        let orientation = crate::t_image::get_image_orientation(&path_clone);
+        let thumb_bytes = if is_raw {
+            crate::t_image::get_raw_thumbnail(&path_clone, orientation, size)
+        } else {
+            crate::t_image::get_image_thumbnail(&path_clone, orientation, size)
+        };
+        
+        match thumb_bytes {
+            Ok(Some(bytes)) => {
+                let encoded = general_purpose::STANDARD.encode(&bytes);
+                Ok(format!("data:image/jpeg;base64,{}", encoded))
+            }
+            Ok(None) => Err("No thumbnail found".to_string()),
+            Err(e) => Err(e),
+        }
+    })
+    .await
+    .map_err(|e| format!("Task joined with error: {}", e))?
 }
 
 // --- Вспомогательные функции ---

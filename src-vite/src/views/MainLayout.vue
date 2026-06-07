@@ -73,16 +73,33 @@
         data-tauri-drag-region
       >
         <div class="flex items-center gap-1 overflow-hidden h-full pt-1.5" @mousedown.stop>
-          <!-- Active Tab -->
-          <div class="flex items-center gap-2 px-4 h-full bg-base-100 rounded-t-lg border-t border-x border-neutral/25 text-xs font-semibold text-base-content/85 select-none relative shrink-0">
-            <IconTrash v-if="activeTab === 'trash'" class="w-3.5 h-3.5 text-primary" />
-            <IconFolders v-else-if="navigationStore.currentPath" class="w-3.5 h-3.5 text-primary" />
+          <!-- Loop through tabs -->
+          <div
+            v-for="t in tabs"
+            :key="t.id"
+            class="flex items-center gap-2 px-4 h-full rounded-t-lg border-t border-x border-neutral/25 text-xs font-semibold select-none relative shrink-0 cursor-pointer"
+            :class="t.id === activeTabId ? 'bg-base-100 text-base-content/85' : 'bg-base-300/40 text-base-content/50 hover:bg-base-100/30'"
+            @click="switchTab(t.id)"
+          >
+            <IconTrash v-if="t.activeTab === 'trash'" class="w-3.5 h-3.5 text-primary" />
+            <IconFolders v-else-if="t.currentPath" class="w-3.5 h-3.5 text-primary" />
             <IconHome v-else class="w-3.5 h-3.5 text-primary" />
-            <span>{{ activeTab === 'trash' ? $t('explorer.recycle_bin') : (navigationStore.currentPath ? getFileName(navigationStore.currentPath) : $t('explorer.home')) }}</span>
-            <button class="hover:bg-base-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-60 hover:opacity-100 ml-1">✕</button>
+            <span>{{ t.activeTab === 'trash' ? $t('explorer.recycle_bin') : (t.currentPath ? getFileName(t.currentPath) : $t('explorer.home')) }}</span>
+            <button
+              v-if="tabs.length > 1"
+              class="hover:bg-base-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-60 hover:opacity-100 ml-1"
+              @click.stop="closeTab(t.id, $event)"
+            >
+              ✕
+            </button>
           </div>
           <!-- Add Tab button -->
-          <button class="w-7 h-7 rounded-md hover:bg-base-100/60 flex items-center justify-center text-sm text-base-content/60 hover:text-base-content font-bold shrink-0">+</button>
+          <button
+            class="w-7 h-7 rounded-md hover:bg-base-100/60 flex items-center justify-center text-sm text-base-content/60 hover:text-base-content font-bold shrink-0"
+            @click="addTab"
+          >
+            +
+          </button>
         </div>
 
         <!-- Window Control Buttons (Minimize, Maximize, Close) -->
@@ -197,7 +214,7 @@
       </header>
 
       <!-- Command Bar -->
-      <div class="h-12 border-b border-neutral/25 bg-base-200/50 flex items-center justify-between shrink-0 select-none overflow-x-auto no-scrollbar">
+      <div class="h-12 border-b border-neutral/25 bg-base-200/50 flex items-center justify-between shrink-0 select-none overflow-visible">
         <div class="flex items-center gap-1 px-3 shrink-0">
           <!-- New Folder -->
           <button
@@ -689,6 +706,16 @@ const closeWindow = () => {
 }
 
 const activeTab = ref('explorer') // 'explorer' | 'trash'
+const tabs = ref([
+  {
+    id: '1',
+    activeTab: 'explorer',
+    currentPath: '',
+    selectedIds: [],
+  }
+])
+const activeTabId = ref('1')
+
 const showSidebar = ref(true)
 const inspectorTab = ref('info') // 'info' | 'ai'
 
@@ -701,6 +728,29 @@ const isEditingPath = ref(false)
 const editablePath = ref('')
 const pathInputRef = ref(null)
 const renameInputRef = ref(null)
+
+// Sync tab state on changes
+watch([activeTab, () => navigationStore.currentPath], () => {
+  const currentTab = tabs.value.find(t => t.id === activeTabId.value)
+  if (currentTab) {
+    currentTab.activeTab = activeTab.value
+    currentTab.currentPath = navigationStore.currentPath
+  }
+})
+
+// Automatically switch to explorer mode when navigating to a disk/folder path
+watch(() => navigationStore.currentPath, (newPath) => {
+  if (newPath) {
+    activeTab.value = 'explorer'
+  }
+})
+
+// Automatically record selection changes for Ctrl+Z undo selection
+watch(() => [...galleryStore.selectedIds], (newVal, oldVal) => {
+  if (galleryStore.isUndoing) return
+  if (JSON.stringify(newVal) === JSON.stringify(oldVal)) return
+  galleryStore.recordSelectionState(oldVal)
+})
 
 // Search query
 const searchQuery = ref(galleryStore.filters.search || '')
@@ -798,6 +848,68 @@ const breadcrumbs = computed(() => {
       return acc
     }, [])
 })
+
+function saveActiveTabState() {
+  const currentTab = tabs.value.find(t => t.id === activeTabId.value)
+  if (currentTab) {
+    currentTab.activeTab = activeTab.value
+    currentTab.currentPath = navigationStore.currentPath
+    currentTab.selectedIds = [...galleryStore.selectedIds]
+  }
+}
+
+async function switchTab(tabId) {
+  saveActiveTabState()
+  activeTabId.value = tabId
+  const newTab = tabs.value.find(t => t.id === tabId)
+  if (newTab) {
+    activeTab.value = newTab.activeTab
+    if (newTab.activeTab === 'trash') {
+      await fetchTrash()
+    } else {
+      if (newTab.currentPath) {
+        await navigateTo(newTab.currentPath)
+      } else {
+        await navigateToHome()
+      }
+    }
+    galleryStore.selectedIds = [...newTab.selectedIds]
+  }
+}
+
+async function addTab() {
+  saveActiveTabState()
+  const newId = String(Date.now())
+  const newTab = {
+    id: newId,
+    activeTab: 'explorer',
+    currentPath: '',
+    selectedIds: [],
+  }
+  tabs.value.push(newTab)
+  activeTabId.value = newId
+  
+  activeTab.value = 'explorer'
+  await navigateToHome()
+  galleryStore.selectedIds = []
+}
+
+async function closeTab(tabId, event) {
+  if (event) event.stopPropagation()
+  if (tabs.value.length === 1) return
+  
+  const index = tabs.value.findIndex(t => t.id === tabId)
+  if (index === -1) return
+  
+  const isClosingActive = activeTabId.value === tabId
+  tabs.value.splice(index, 1)
+  
+  if (isClosingActive) {
+    const nextActiveIndex = Math.min(index, tabs.value.length - 1)
+    const nextTab = tabs.value[nextActiveIndex]
+    await switchTab(nextTab.id)
+  }
+}
 
 // Navigation methods
 async function navigateTo(path) {
@@ -911,9 +1023,8 @@ function revealInExplorer(path) {
 async function deleteSingleFile(file) {
   if (confirm(`Переместить файл "${file.name}" в корзину?`)) {
     try {
-      await invoke('move_to_trash', { paths: [file.path] })
+      await galleryStore.deleteFiles([file.path])
       await refreshData()
-      galleryStore.clearSelection()
     } catch (err) {
       alert('Не удалось удалить файл: ' + err)
     }
@@ -924,9 +1035,8 @@ async function deleteSingleFile(file) {
 async function deleteMultipleSelected() {
   if (confirm(`Переместить ${galleryStore.selectedIds.length} файлов в корзину?`)) {
     try {
-      await invoke('move_to_trash', { paths: galleryStore.selectedIds })
+      await galleryStore.deleteSelectedFiles()
       await refreshData()
-      galleryStore.clearSelection()
     } catch (err) {
       alert('Не удалось удалить файлы: ' + err)
     }
@@ -1128,6 +1238,29 @@ function handleKeyDown(e) {
   const activeEl = document.activeElement
   const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
   if (isInput) return
+
+  // Ctrl+Z Undo
+  if (e.ctrlKey && e.key === 'z') {
+    e.preventDefault()
+    if (e.shiftKey) {
+      galleryStore.redo()
+    } else {
+      // Prioritize undoing deleted files, then selection
+      if (galleryStore.deletedHistory.length > 0) {
+        galleryStore.undoDelete()
+      } else {
+        galleryStore.undo()
+      }
+    }
+    return
+  }
+
+  // Ctrl+Y Redo
+  if (e.ctrlKey && e.key === 'y') {
+    e.preventDefault()
+    galleryStore.redo()
+    return
+  }
 
   if (e.key === ' ' || e.code === 'Space') {
     e.preventDefault()

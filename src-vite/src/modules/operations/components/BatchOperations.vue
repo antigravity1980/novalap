@@ -16,12 +16,14 @@
       <!-- Content -->
       <div class="p-5 flex-1 overflow-y-auto space-y-4">
         <!-- Tabs -->
-        <div class="tabs tabs-boxed bg-base-200/40 p-1 flex flex-wrap gap-1 rounded-lg">
+        <div class="flex flex-wrap gap-2 p-1.5 bg-base-200/80 rounded-xl border border-base-200/50 shadow-inner">
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            class="tab tab-sm flex-1 text-xs py-1.5 transition-all duration-200 font-medium"
-            :class="{ 'tab-active bg-primary text-primary-content rounded-md': activeTab === tab.id }"
+            class="flex-1 min-w-[80px] text-[11px] font-bold py-2 px-3 rounded-lg transition-all duration-200 border border-transparent text-center select-none"
+            :class="activeTab === tab.id 
+              ? 'bg-primary text-primary-content shadow-md border-primary-focus/20 scale-105' 
+              : 'bg-base-100/30 text-base-content/65 hover:text-base-content hover:bg-base-100/70 hover:shadow-sm'"
             @click="activeTab = tab.id"
           >
             {{ $t('batch_ops.tabs.' + tab.id) }}
@@ -50,7 +52,36 @@
                   <option value="1024x1024">1024 × 1024 (1:1)</option>
                   <option value="1280x720">1280 × 720 (16:9)</option>
                   <option value="1920x1080">1920 × 1080 (16:9)</option>
+                  <option v-for="p in customPresets" :key="p.name" :value="p.value">
+                    {{ p.name }} ({{ p.value }})
+                  </option>
                 </select>
+              </div>
+            </div>
+
+            <!-- Custom Presets Manager -->
+            <div class="p-3 bg-base-100/40 rounded-lg border border-base-200/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-base-content/70">Мои пресеты</span>
+                <button 
+                  @click="addCurrentAsPreset" 
+                  class="btn btn-xs btn-primary rounded font-semibold"
+                >
+                  + Сохранить текущий
+                </button>
+              </div>
+              <div v-if="customPresets.length === 0" class="text-[10px] text-base-content/40 italic">
+                Нет сохраненных пресетов
+              </div>
+              <div v-else class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                <div 
+                  v-for="(p, idx) in customPresets" 
+                  :key="p.name" 
+                  class="flex items-center gap-1 bg-base-200 px-2 py-1 rounded text-[10px] border border-neutral/15"
+                >
+                  <span class="font-medium cursor-pointer hover:text-primary" @click="selectCustomPreset(p.value)">{{ p.name }} ({{ p.value }})</span>
+                  <button @click="deletePreset(idx)" class="text-error font-bold hover:scale-110 ml-0.5">✕</button>
+                </div>
               </div>
             </div>
 
@@ -229,6 +260,55 @@ const { t } = useI18n()
 const activeTab = ref('resize')
 const processing = ref(false)
 const resultMessage = ref('')
+
+const customPresets = ref([])
+
+function loadCustomPresets() {
+  const stored = localStorage.getItem('batch_size_presets')
+  if (stored) {
+    try {
+      customPresets.value = JSON.parse(stored)
+    } catch (e) {
+      console.error(e)
+    }
+  } else {
+    customPresets.value = []
+  }
+}
+
+function saveCustomPresets() {
+  localStorage.setItem('batch_size_presets', JSON.stringify(customPresets.value))
+}
+
+function addCurrentAsPreset() {
+  const w = resize.width
+  const h = resize.height
+  if (!w || !h) return
+  const name = prompt('Введите название пресета:', `${w}x${h}`)
+  if (!name) return
+  customPresets.value.push({
+    name,
+    value: `${w}x${h}`
+  })
+  saveCustomPresets()
+}
+
+function selectCustomPreset(val) {
+  const [w, h] = val.split('x').map(Number)
+  resize.width = w
+  resize.height = h
+}
+
+function deletePreset(idx) {
+  customPresets.value.splice(idx, 1)
+  saveCustomPresets()
+}
+
+watch(() => props.visible, (val) => {
+  if (val) {
+    loadCustomPresets()
+  }
+}, { immediate: true })
 
 const tabs = [
   { id: 'resize' },
