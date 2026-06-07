@@ -60,6 +60,7 @@ pub fn parse_ai_metadata(path: String) -> Result<AiMetadata, String> {
         "png" => parse_png_metadata(file_path),
         "webp" => parse_webp_metadata(file_path),
         "jpg" | "jpeg" => parse_jpeg_metadata(file_path),
+        "avif" => parse_avif_metadata(file_path),
         "mp4" | "mkv" | "webm" | "mov" => parse_video_metadata(file_path),
         _ => Err(format!("Unsupported file format: {}", ext)),
     }
@@ -526,4 +527,143 @@ fn extract_from_xml(xml: &str, tag: &str) -> Option<String> {
     }
 
     None
+}
+
+/// AVIF metadata parser (XMP, JSON and EXIF scanners)
+fn parse_avif_metadata(path: &Path) -> Result<AiMetadata, String> {
+    let file_data = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let mut metadata = AiMetadata::default();
+    let mut raw_entries = Vec::new();
+
+    // 1. Scan for XMP block in the binary data
+    if let Some(xmp_str) = find_xmp_block(&file_data) {
+        raw_entries.push(RawMetadataEntry {
+            key: "XMP".to_string(),
+            value: xmp_str.clone(),
+        });
+        if let Some(prompt) = extract_from_xml(&xmp_str, "prompt") {
+            metadata.positive_prompt = Some(prompt);
+        }
+        if let Some(negative) = extract_from_xml(&xmp_str, "negative") {
+            metadata.negative_prompt = Some(negative);
+        }
+        if let Some(workflow) = extract_from_xml(&xmp_str, "workflow") {
+            metadata.workflow = Some(workflow);
+        }
+        if let Some(model) = extract_from_xml(&xmp_str, "model") {
+            metadata.model = Some(model);
+        }
+    }
+
+    // 2. Scan for embedded JSON (ComfyUI workflow)
+    if let Some(json_str) = find_json_block(&file_data) {
+        raw_entries.push(RawMetadataEntry {
+            key: "JSON".to_string(),
+            value: json_str.clone(),
+        });
+        try_parse_json_metadata(&mut metadata, &json_str);
+    }
+
+    // 3. Scan for EXIF-like ASCII text strings
+    if let Some(exif_text) = extract_exif_text_fallback(&file_data) {
+        raw_entries.push(RawMetadataEntry {
+            key: "EXIF_Fallback".to_string(),
+            value: exif_text.clone(),
+        });
+        for line in exif_text.lines() {
+            if let Some((k, v)) = line.split_once(':') {
+                parse_metadata_key(&mut metadata, k.trim(), v.trim());
+            }
+        }
+    }
+
+    metadata.raw_metadata = raw_entries;
+    metadata.source_engine = Some(detect_engine(&metadata));
+    Ok(metadata)
+}
+
+fn find_xmp_block(data: &[u8]) -> Option<String> {
+    let start_tag = b"<x:xmpmeta";
+    let end_tag = b"</x:xmpmeta>";
+    
+    let start_pos = data.windows(start_tag.len()).position(|w| w == start_tag)?;
+    let end_pos = data.windows(end_tag.len()).position(|w| w == end_tag)? + end_tag.len();
+    
+    if end_pos > start_pos {
+        Some(String::from_utf8_lossy(&data[start_pos..end_pos]).to_string())
+    } else {
+        None
+    }
+}
+
+fn find_json_block(data: &[u8]) -> Option<String> {
+    let pattern = b"\"prompt\":";
+    let pos = data.windows(pattern.len()).position(|w| w == pattern)?;
+    
+    let mut start = pos;
+    while start > 0 {
+        start -= 1;
+        if data[start] == b'{' {
+            break;
+        }
+    }
+    
+    let mut end = start;
+    let mut open_braces = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+    
+    while end < data.len() {
+        let b = data[end];
+        if escaped {
+            escaped = false;
+        } else if b == b'\\' {
+            escaped = true;
+        } else if b == b'"' {
+            in_string = !in_string;
+        } else if !in_string {
+            if b == b'{' {
+                open_braces += 1;
+            } else if b == b'}' {
+                open_braces -= 1;
+                if open_braces == 0 {
+                    end += 1;
+                    break;
+                }
+            }
+        }
+        end += 1;
+    }
+    
+    if end > start && open_braces == 0 {
+        Some(String::from_utf8_lossy(&data[start..end]).to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_exif_text_fallback(data: &[u8]) -> Option<String> {
+    let mut result = String::new();
+    let mut current = String::new();
+    for &b in data {
+        if b >= 0x20 && b <= 0x7E {
+            current.push(b as char);
+        } else {
+            if current.len() >= 6 && current.contains(':') {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(&current);
+            }
+            current.clear();
+        }
+    }
+    if current.len() >= 6 && current.contains(':') {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&current);
+    }
+    
+    if result.is_empty() { None } else { Some(result) }
 }

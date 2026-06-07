@@ -142,6 +142,17 @@
       <header class="h-12 flex items-center justify-between px-6 border-b border-neutral/25 bg-base-200 shrink-0 z-10 gap-4">
         <!-- Navigation Arrows & Controls -->
         <div class="flex items-center gap-2.5 shrink-0">
+          <!-- Toggle Sidebar -->
+          <button
+            class="btn btn-ghost btn-xs btn-circle text-base-content/75 hover:text-base-content hover:bg-base-100/40 flex items-center justify-center mr-1"
+            @click="showSidebar = !showSidebar"
+            :title="showSidebar ? 'Скрыть боковую панель' : 'Показать боковую панель'"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-12-15h18c.621 0 1.125.504 1.125 1.125v15c0 .621-.504 1.125-1.125 1.125H3.75A1.125 1.125 0 012.625 18V5.625c0-.621.504-1.125 1.125-1.125z" />
+            </svg>
+          </button>
+
           <button
             class="btn btn-ghost btn-xs btn-circle text-base-content/75 hover:text-base-content hover:bg-base-100/40 flex items-center justify-center"
             @click="goBack"
@@ -270,6 +281,19 @@
           >
             <IconAdjustments class="w-4 h-4" />
             <span>{{ $t('explorer.batch') }}</span>
+          </button>
+
+          <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
+
+          <!-- Multi-select Mode -->
+          <button
+            class="win11-btn text-xs font-semibold flex items-center gap-1.5"
+            :class="{ 'bg-primary/15 text-primary font-bold': galleryStore.selectionMode }"
+            @click="galleryStore.selectionMode = !galleryStore.selectionMode"
+            title="Режим выбора нескольких элементов без зажатия Ctrl"
+          >
+            <span class="w-3.5 h-3.5 flex items-center justify-center border rounded border-current text-[9px] font-bold">✓</span>
+            <span>Режим выбора</span>
           </button>
 
           <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
@@ -419,6 +443,20 @@
 
         <GalleryGrid v-else @open-quick-look="openQuickLook" />
       </div>
+
+      <!-- Status Bar -->
+      <footer class="h-7 border-t border-neutral/20 bg-base-200/40 text-[11px] text-base-content/60 flex items-center justify-between px-4 select-none shrink-0">
+        <div class="flex items-center gap-3">
+          <span>Элементов: {{ galleryStore.files.length }}</span>
+          <span class="opacity-40">|</span>
+          <span>Папок: {{ totalFoldersCount }}, файлов: {{ totalFilesCount }}</span>
+        </div>
+        <div v-if="galleryStore.selectedIds.length > 0" class="flex items-center gap-3">
+          <span class="text-primary font-medium">Выбрано элементов: {{ galleryStore.selectedIds.length }}</span>
+          <span class="opacity-40">|</span>
+          <span>Общий размер: {{ formatBytes(selectedSizeSum) }}</span>
+        </div>
+      </footer>
     </main>
 
     <!-- Drag splitter for Right Inspector -->
@@ -738,11 +776,9 @@ watch([activeTab, () => navigationStore.currentPath], () => {
   }
 })
 
-// Automatically switch to explorer mode when navigating to a disk/folder path
-watch(() => navigationStore.currentPath, (newPath) => {
-  if (newPath) {
-    activeTab.value = 'explorer'
-  }
+// Automatically switch to explorer mode when navigating to a disk/folder path or count increments
+watch(() => navigationStore.navigatedCount, () => {
+  activeTab.value = 'explorer'
 })
 
 // Automatically record selection changes for Ctrl+Z undo selection
@@ -773,6 +809,21 @@ const batchOperationsVisible = ref(false)
 const quickLookVisible = ref(false)
 const quickLookIndex = ref(0)
 const filteredFiles = computed(() => galleryStore.displayedFiles)
+
+const totalFilesCount = computed(() => {
+  return galleryStore.files.filter(f => !(f.is_dir === true || f.file_type === 'directory' || f.is_directory === true)).length
+})
+const totalFoldersCount = computed(() => {
+  return galleryStore.files.filter(f => f.is_dir === true || f.file_type === 'directory' || f.is_directory === true).length
+})
+const selectedSizeSum = computed(() => {
+  let sum = 0
+  for (const path of galleryStore.selectedIds) {
+    const file = galleryStore.files.find(f => f.path === path)
+    if (file && file.size) sum += file.size
+  }
+  return sum
+})
 
 // Selected details
 const selectedFile = computed(() => {
@@ -1240,7 +1291,7 @@ function handleKeyDown(e) {
   if (isInput) return
 
   // Ctrl+Z Undo
-  if (e.ctrlKey && e.key === 'z') {
+  if (e.ctrlKey && e.code === 'KeyZ') {
     e.preventDefault()
     if (e.shiftKey) {
       galleryStore.redo()
@@ -1256,13 +1307,58 @@ function handleKeyDown(e) {
   }
 
   // Ctrl+Y Redo
-  if (e.ctrlKey && e.key === 'y') {
+  if (e.ctrlKey && e.code === 'KeyY') {
     e.preventDefault()
     galleryStore.redo()
     return
   }
 
-  if (e.key === ' ' || e.code === 'Space') {
+  // Ctrl+C Copy
+  if (e.ctrlKey && e.code === 'KeyC') {
+    e.preventDefault()
+    if (galleryStore.selectedIds.length > 0) {
+      galleryStore.setClipboard('copy', [...galleryStore.selectedIds])
+    }
+    return
+  }
+
+  // Ctrl+X Cut
+  if (e.ctrlKey && e.code === 'KeyX') {
+    e.preventDefault()
+    if (galleryStore.selectedIds.length > 0) {
+      galleryStore.setClipboard('cut', [...galleryStore.selectedIds])
+    }
+    return
+  }
+
+  // Ctrl+V Paste
+  if (e.ctrlKey && e.code === 'KeyV') {
+    e.preventDefault()
+    if (navigationStore.currentPath) {
+      galleryStore.paste(navigationStore.currentPath)
+    }
+    return
+  }
+
+  // Delete / Backspace (Delete file)
+  if (e.code === 'Delete') {
+    e.preventDefault()
+    if (galleryStore.selectedIds.length > 0) {
+      deleteMultipleSelected()
+    }
+    return
+  }
+
+  // F2 Rename
+  if (e.code === 'F2') {
+    e.preventDefault()
+    if (selectedFile.value) {
+      focusRenameInput()
+    }
+    return
+  }
+
+  if (e.code === 'Space') {
     e.preventDefault()
     const count = galleryStore.selectedIds.length
     if (count === 1) {
@@ -1274,11 +1370,11 @@ function handleKeyDown(e) {
     }
   }
 
-  if (e.key === 'k' && selectedFile.value && isImage(selectedFile.value)) {
+  if (e.code === 'KeyK' && selectedFile.value && isImage(selectedFile.value)) {
     e.preventDefault()
     openCrop(selectedFile.value)
   }
-  if (e.key === 'c' && galleryStore.selectedIds.length >= 2) {
+  if (!e.ctrlKey && e.code === 'KeyC' && galleryStore.selectedIds.length >= 2) {
     e.preventDefault()
     openCompare()
   }

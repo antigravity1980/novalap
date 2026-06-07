@@ -39,6 +39,7 @@ export const useGalleryStore = defineStore('gallery', {
 
     // Масштабирование
     zoomLevel: 1,
+    selectionMode: false,
 
     // Clipboard state
     clipboard: {
@@ -139,7 +140,7 @@ export const useGalleryStore = defineStore('gallery', {
     },
 
     setZoom(level) {
-      this.zoomLevel = Math.max(0.5, Math.min(3, level))
+      this.zoomLevel = Math.max(0.5, Math.min(5.12, level))
       this.thumbnailSize = Math.round(200 * this.zoomLevel)
     },
 

@@ -4,7 +4,7 @@
     <!-- logo -->
     <div class="px-2 flex w-full flex-row items-center justify-start gap-4">
       <div class="shrink-0">
-        <img :src="iconLogo" class="w-20 h-20 select-none [-webkit-app-region:no-drag]" draggable="false" />
+        <img :src="logoSrc" class="w-20 h-20 select-none [-webkit-app-region:no-drag]" draggable="false" />
       </div>
       <div class="flex flex-col text-left">
         <h3 class="text-xl">{{ packageInfo.name }}</h3>
@@ -98,7 +98,12 @@ import { useI18n } from 'vue-i18n';
 import { getPackageInfo, getBuildTime } from '@/common/api';
 import { useAppUpdater } from '@/common/updater';
 import { IconGithub, IconLink, IconLock, IconFocus } from '@/common/icons';
+import { getAssetSrc } from '@/common/utils';
 import iconLogo from '@/assets/images/icon.png';
+
+const logoSrc = computed(() => {
+  return getAssetSrc('D:\\NovaLAP\\icon.png') || iconLogo;
+});
 
 const packageInfo = ref<any>({
   name: '',

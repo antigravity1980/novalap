@@ -16,11 +16,11 @@
       <!-- Content -->
       <div class="p-5 flex-1 overflow-y-auto space-y-4">
         <!-- Tabs -->
-        <div class="flex flex-wrap gap-2 p-1.5 bg-base-200/80 rounded-xl border border-base-200/50 shadow-inner">
+        <div class="grid grid-cols-3 gap-2 p-1.5 bg-base-200/80 rounded-xl border border-base-200/50 shadow-inner">
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            class="flex-1 min-w-[80px] text-[11px] font-bold py-2 px-3 rounded-lg transition-all duration-200 border border-transparent text-center select-none"
+            class="w-full text-[11px] font-bold py-2 px-1 rounded-lg transition-all duration-200 border border-transparent text-center select-none"
             :class="activeTab === tab.id 
               ? 'bg-primary text-primary-content shadow-md border-primary-focus/20 scale-105' 
               : 'bg-base-100/30 text-base-content/65 hover:text-base-content hover:bg-base-100/70 hover:shadow-sm'"
@@ -105,6 +105,7 @@
                 <option value="png">PNG ({{ $t('batch_ops.lossless_label') }})</option>
                 <option value="jpeg">JPEG</option>
                 <option value="webp">WebP</option>
+                <option value="avif">AVIF</option>
                 <option value="bmp">BMP</option>
                 <option value="gif">GIF</option>
               </select>
@@ -209,6 +210,58 @@
             </div>
           </div>
         </div>
+
+        <!-- Save Options Section -->
+        <div v-if="activeTab !== 'rename'" class="p-4 bg-base-100/50 rounded-box border border-base-200/50 space-y-3">
+          <h4 class="text-xs font-bold text-base-content/85 uppercase tracking-wide">Параметры сохранения</h4>
+          
+          <!-- Save Mode selector -->
+          <div>
+            <label class="label text-[11px] text-base-content/60 font-semibold mb-1">Куда сохранить результаты</label>
+            <select v-model="saveOptions.mode" class="select select-bordered select-sm w-full">
+              <option value="replace">Заменить оригиналы</option>
+              <option value="copy">Копии в ту же папку</option>
+              <option value="other">Сохранить в другую папку...</option>
+            </select>
+          </div>
+
+          <!-- Other folder path input and selector -->
+          <div v-if="saveOptions.mode === 'other'" class="space-y-1">
+            <label class="label text-[11px] text-base-content/60 font-semibold mb-1">Папка назначения</label>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                readonly
+                v-model="saveOptions.targetDir"
+                placeholder="Выберите папку..."
+                class="input input-bordered input-sm flex-1 text-xs"
+              />
+              <button @click="selectTargetDir" class="btn btn-sm btn-secondary text-xs rounded-md">Обзор</button>
+            </div>
+          </div>
+
+          <!-- Prefix and Suffix -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="label text-[11px] text-base-content/60 font-semibold mb-1">Префикс к имени</label>
+              <input
+                type="text"
+                v-model="saveOptions.prefix"
+                placeholder="resized_"
+                class="input input-bordered input-sm w-full text-xs"
+              />
+            </div>
+            <div>
+              <label class="label text-[11px] text-base-content/60 font-semibold mb-1">Суффикс к имени</label>
+              <input
+                type="text"
+                v-model="saveOptions.suffix"
+                placeholder="_edited"
+                class="input input-bordered input-sm w-full text-xs"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Progress Overlay -->
@@ -247,6 +300,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -341,6 +395,28 @@ const color = reactive({
   gamma: 1.0,
 })
 
+const saveOptions = reactive({
+  mode: 'replace',
+  targetDir: '',
+  prefix: '',
+  suffix: '',
+})
+
+async function selectTargetDir() {
+  try {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      title: 'Выберите папку сохранения'
+    })
+    if (selected) {
+      saveOptions.targetDir = Array.isArray(selected) ? selected[0] : selected
+    }
+  } catch (err) {
+    console.error('Failed to open folder dialog:', err)
+  }
+}
+
 const optimizers = reactive({
   pngquant: null,
   cjpeg: null,
@@ -388,10 +464,52 @@ async function apply() {
     // Backup originals for Safety Undo
     await invoke('backup_originals', { paths: props.selectedFiles }).catch(() => {})
 
+    let filesToProcess = [...props.selectedFiles]
+    const needCopyToTargets = activeTab.value !== 'rename' && (saveOptions.mode !== 'replace' || saveOptions.prefix || saveOptions.suffix)
+
+    if (needCopyToTargets) {
+      const copiedFiles = []
+      for (const originalPath of props.selectedFiles) {
+        const lastSlash = Math.max(originalPath.lastIndexOf('/'), originalPath.lastIndexOf('\\'))
+        const isWindowsPath = originalPath.includes('\\') || !originalPath.includes('/')
+        const separator = isWindowsPath ? '\\' : '/'
+        
+        let folder = lastSlash !== -1 ? originalPath.substring(0, lastSlash) : ''
+        const filename = lastSlash !== -1 ? originalPath.substring(lastSlash + 1) : originalPath
+        
+        const lastDot = filename.lastIndexOf('.')
+        const name = lastDot !== -1 ? filename.substring(0, lastDot) : filename
+        const ext = lastDot !== -1 ? filename.substring(lastDot + 1) : ''
+        
+        let targetFolder = folder
+        if (saveOptions.mode === 'other') {
+          if (!saveOptions.targetDir) {
+            throw new Error('Пожалуйста, выберите папку назначения')
+          }
+          targetFolder = saveOptions.targetDir
+        }
+        
+        let pfx = saveOptions.prefix || ''
+        let sfx = saveOptions.suffix || ''
+        if (saveOptions.mode === 'copy' && !pfx && !sfx) {
+          pfx = 'copy_'
+        }
+        
+        const newFilename = pfx + name + sfx + (ext ? '.' + ext : '')
+        const targetPath = targetFolder + (targetFolder.endsWith(separator) ? '' : separator) + newFilename
+        
+        if (targetPath.toLowerCase() !== originalPath.toLowerCase()) {
+          await invoke('cross_copy', { src: originalPath, dest: targetPath })
+        }
+        copiedFiles.push(targetPath)
+      }
+      filesToProcess = copiedFiles
+    }
+
     switch (activeTab.value) {
       case 'resize':
         result = await invoke('batch_resize', {
-          files: props.selectedFiles,
+          files: filesToProcess,
           preset: {
             width: resize.width,
             height: resize.height,
@@ -401,7 +519,7 @@ async function apply() {
         break
       case 'convert':
         result = await invoke('batch_convert', {
-          files: props.selectedFiles,
+          files: filesToProcess,
           targetFormat: convert.format,
           quality: convert.quality,
         })
@@ -415,15 +533,15 @@ async function apply() {
         break
       case 'color':
         result = await invoke('batch_color_correct', {
-          files: props.selectedFiles,
+          files: filesToProcess,
           saturation: color.saturation,
           gamma: color.gamma,
         })
         break
       case 'compress':
         // Compress based on formats
-        const pngFiles = props.selectedFiles.filter((f) => f.toLowerCase().endsWith('.png'))
-        const jpgFiles = props.selectedFiles.filter((f) =>
+        const pngFiles = filesToProcess.filter((f) => f.toLowerCase().endsWith('.png'))
+        const jpgFiles = filesToProcess.filter((f) =>
           ['.jpg', '.jpeg'].some((ext) => f.toLowerCase().endsWith(ext))
         )
 
@@ -449,7 +567,7 @@ async function apply() {
         }
         break
       case 'strip':
-        result = await invoke('strip_metadata', { files: props.selectedFiles })
+        result = await invoke('strip_metadata', { files: filesToProcess })
         break
     }
 

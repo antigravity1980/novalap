@@ -152,6 +152,10 @@ pub fn batch_convert(
                 img.save(&new_path)
                     .map_err(|e| format!("Failed to save WebP: {}", e))
             }
+            "avif" => {
+                img.save(&new_path)
+                    .map_err(|e| format!("Failed to save AVIF: {}", e))
+            }
             "bmp" => {
                 img.save(&new_path)
                     .map_err(|e| format!("Failed to save BMP: {}", e))

@@ -15,6 +15,7 @@ export const useNavigationStore = defineStore('navigation', {
     treeFolders: {},     // кеш поддерева папок { path: TreeFolder[] }
     isLoading: false,
     selectedFiles: [],   // выбранные файлы в текущей директории
+    navigatedCount: 0,
   }),
 
   getters: {
@@ -33,6 +34,7 @@ export const useNavigationStore = defineStore('navigation', {
 
   actions: {
     async navigateTo(path) {
+      this.navigatedCount++
       this.isLoading = true
       try {
         // Добавляем в историю

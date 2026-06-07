@@ -24,7 +24,7 @@
       <input
         type="range"
         min="0.5"
-        max="3"
+        max="5.12"
         step="0.1"
         :value="galleryStore.zoomLevel"
         @input="onZoomChange"

@@ -52,113 +52,117 @@ pub struct DriveInfo {
 
 /// Список файлов и директорий по пути
 #[command]
-pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
-    let dir_path = Path::new(&path);
+pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+    tokio::task::spawn_blocking(move || {
+        let dir_path = Path::new(&path);
 
-    if !dir_path.exists() {
-        return Err(format!("Path does not exist: {}", path));
-    }
-    if !dir_path.is_dir() {
-        return Err(format!("Path is not a directory: {}", path));
-    }
+        if !dir_path.exists() {
+            return Err(format!("Path does not exist: {}", path));
+        }
+        if !dir_path.is_dir() {
+            return Err(format!("Path is not a directory: {}", path));
+        }
 
-    let mut entries: Vec<FileEntry> = Vec::new();
-    let read_dir = fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
+        let mut entries: Vec<FileEntry> = Vec::new();
+        let read_dir = fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in read_dir {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
+        for entry in read_dir {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
 
-        let metadata = match entry.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
+            let metadata = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
 
-        let file_name = entry.file_name().to_string_lossy().to_string();
-        let entry_path = entry.path();
-        let path_str = entry_path.to_string_lossy().to_string();
-        let is_dir = metadata.is_dir();
-        let is_file = metadata.is_file();
-        let size = metadata.len();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            let entry_path = entry.path();
+            let path_str = entry_path.to_string_lossy().to_string();
+            let is_dir = metadata.is_dir();
+            let is_file = metadata.is_file();
+            let size = metadata.len();
 
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|t| {
-                let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
-                chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
-                    .map(|dt| dt.to_rfc3339())
-            })
-            .unwrap_or_default();
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| {
+                    let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
+                    chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
+                        .map(|dt| dt.to_rfc3339())
+                })
+                .unwrap_or_default();
 
-        let created = metadata
-            .created()
-            .ok()
-            .and_then(|t| {
-                let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
-                chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
-                    .map(|dt| dt.to_rfc3339())
-            });
+            let created = metadata
+                .created()
+                .ok()
+                .and_then(|t| {
+                    let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
+                    chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
+                        .map(|dt| dt.to_rfc3339())
+                });
 
-        let extension = entry_path
-            .extension()
-            .map(|ext| ext.to_string_lossy().to_lowercase());
+            let extension = entry_path
+                .extension()
+                .map(|ext| ext.to_string_lossy().to_lowercase());
 
-        let resolution = if is_file {
-            get_file_resolution(&entry_path, extension.as_deref())
-        } else {
-            None
-        };
+            let resolution = if is_file {
+                get_file_resolution(&entry_path, extension.as_deref())
+            } else {
+                None
+            };
 
-        let (dir_count, file_count) = if is_dir {
-            if let Ok(read_subdir) = fs::read_dir(&entry_path) {
-                let mut dc = 0;
-                let mut fc = 0;
-                for sub_entry in read_subdir {
-                    if let Ok(se) = sub_entry {
-                        if let Ok(meta) = se.metadata() {
-                            if meta.is_dir() {
-                                dc += 1;
-                            } else if meta.is_file() {
-                                fc += 1;
+            let (dir_count, file_count) = if is_dir {
+                if let Ok(read_subdir) = fs::read_dir(&entry_path) {
+                    let mut dc = 0;
+                    let mut fc = 0;
+                    for sub_entry in read_subdir {
+                        if let Ok(se) = sub_entry {
+                            if let Ok(meta) = se.metadata() {
+                                if meta.is_dir() {
+                                    dc += 1;
+                                } else if meta.is_file() {
+                                    fc += 1;
+                                }
                             }
                         }
                     }
+                    (Some(dc), Some(fc))
+                } else {
+                    (Some(0), Some(0))
                 }
-                (Some(dc), Some(fc))
             } else {
-                (Some(0), Some(0))
-            }
-        } else {
-            (None, None)
-        };
+                (None, None)
+            };
 
-        entries.push(FileEntry {
-            name: file_name,
-            path: path_str,
-            is_dir,
-            is_file,
-            size,
-            modified,
-            created,
-            extension,
-            resolution,
-            dir_count,
-            file_count,
-        });
-    }
-
-    entries.sort_by(|a, b| {
-        if a.is_dir != b.is_dir {
-            b.is_dir.cmp(&a.is_dir)
-        } else {
-            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+            entries.push(FileEntry {
+                name: file_name,
+                path: path_str,
+                is_dir,
+                is_file,
+                size,
+                modified,
+                created,
+                extension,
+                resolution,
+                dir_count,
+                file_count,
+            });
         }
-    });
 
-    Ok(entries)
+        entries.sort_by(|a, b| {
+            if a.is_dir != b.is_dir {
+                b.is_dir.cmp(&a.is_dir)
+            } else {
+                a.name.to_lowercase().cmp(&b.name.to_lowercase())
+            }
+        });
+
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| format!("Task joined with error: {}", e))?
 }
 
 /// Получить список дисков (Windows)

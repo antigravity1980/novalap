@@ -770,6 +770,7 @@ pub async fn edit_image(params: EditParams) -> bool {
         let format = match params.output_format.as_str() {
             "png" => image::ImageFormat::Png,
             "webp" => image::ImageFormat::WebP,
+            "avif" => image::ImageFormat::Avif,
             _ => image::ImageFormat::Jpeg,
         };
 

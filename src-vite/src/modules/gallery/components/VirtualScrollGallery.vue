@@ -9,6 +9,7 @@
     @mouseup="onMouseUp"
     @mouseleave="onMouseLeave"
     @keydown="onKeyDown"
+    @contextmenu.prevent.stop="handleContextMenu"
     style="user-select: none;"
   >
     <div class="virtual-scroll-spacer" :style="{ height: totalHeight + 'px' }">
@@ -32,7 +33,7 @@
           :size="thumbnailSize"
           :selected="galleryStore.selectedIds.includes(file.path)"
           @click.stop="onCardClick($event, file)"
-          @dblclick.stop="openQuickLook(file)"
+          @dblclick.stop="onCardDblClick(file)"
           class="flex-shrink-0"
           :style="{ width: thumbnailSize + 'px' }"
           :data-path="file.path"
@@ -46,13 +47,24 @@
       class="rubber-band"
       :style="rubberBandStyle"
     />
+
+    <!-- Context menu on empty space -->
+    <ContextMenu
+      ref="contextMenuRef"
+      :menuItems="contextMenuItems"
+      :smallIcon="true"
+      style="display: none;"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useGalleryStore } from '../store'
+import { useNavigationStore } from '../../navigation/store'
+import { invoke } from '@tauri-apps/api/core'
 import ThumbnailCard from './ThumbnailCard.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = defineProps({
   files: { type: Array, default: () => [] },
@@ -63,14 +75,16 @@ const props = defineProps({
 const emit = defineEmits(['openQuickLook'])
 
 const galleryStore = useGalleryStore()
+const navigationStore = useNavigationStore()
 const containerRef = ref(null)
+const contextMenuRef = ref(null)
 const scrollTop = ref(0)
 const containerHeight = ref(800)
 const containerWidth = ref(1200)
 const gap = 8
 
 // Row dimensions
-const rowHeight = computed(() => props.thumbnailSize * 0.75 + 40 + gap)
+const rowHeight = computed(() => props.thumbnailSize * 0.75 + 64 + gap)
 const colsPerRow = computed(() => {
   const width = containerWidth.value || 1200
   return Math.max(1, Math.floor((width + gap) / (props.thumbnailSize + gap)))
@@ -112,7 +126,7 @@ let selectionBeforeDrag = []
 
 const rubberBandStyle = computed(() => {
   const left = Math.min(dragStart.x, dragCurrent.x)
-  const top = Math.min(dragStart.y, dragCurrent.y) - scrollTop.value
+  const top = Math.min(dragStart.y, dragCurrent.y)
   const width = Math.abs(dragCurrent.x - dragStart.x)
   const height = Math.abs(dragCurrent.y - dragStart.y)
   return {
@@ -134,7 +148,7 @@ function getCardRect(fileIndex) {
     left: px,
     top: py,
     right: px + props.thumbnailSize,
-    bottom: py + (props.thumbnailSize * 0.75 + 40),
+    bottom: py + (props.thumbnailSize * 0.75 + 64),
   }
 }
 
@@ -204,10 +218,9 @@ const anchorIndex = ref(-1)
 
 function onCardClick(e, file) {
   const clickedIndex = props.files.findIndex(f => f.path === file.path)
-  // Auto-focus container when clicking cards so keyboard navigation works immediately
   containerRef.value?.focus()
 
-  if (e.ctrlKey || e.metaKey) {
+  if (galleryStore.selectionMode || e.ctrlKey || e.metaKey) {
     // Toggle single item
     galleryStore.toggleSelection(file.path)
     anchorIndex.value = clickedIndex
@@ -227,6 +240,59 @@ function onCardClick(e, file) {
     // Single select (clear others)
     galleryStore.selectedIds = [file.path]
     anchorIndex.value = clickedIndex
+  }
+}
+
+async function onCardDblClick(file) {
+  const isFolder = file.is_dir === true || file.file_type === 'directory' || file.is_directory === true
+  if (isFolder) {
+    await navigationStore.navigateTo(file.path)
+    galleryStore.setFiles(navigationStore.folders)
+  } else {
+    emit('openQuickLook', file)
+  }
+}
+
+// ─── Context Menu for empty space ──────────────────────────────────────────
+const contextMenuItems = computed(() => {
+  const items = []
+  if (galleryStore.clipboard.paths.length > 0) {
+    items.push({
+      label: 'Вставить',
+      action: () => galleryStore.paste(navigationStore.currentPath)
+    })
+  }
+  items.push({
+    label: 'Создать папку',
+    action: () => createFolderInCurrentDir()
+  })
+  items.push({
+    label: 'Выделить всё',
+    action: () => galleryStore.selectAll()
+  })
+  return items
+})
+
+function handleContextMenu(e) {
+  // Only open empty space menu if not clicking inside a card
+  if (e.target.closest('.thumbnail-card')) return
+  contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+async function createFolderInCurrentDir() {
+  const name = prompt('Введите имя папки:')
+  if (name && navigationStore.currentPath) {
+    const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
+    const newPath = navigationStore.currentPath.endsWith(separator)
+      ? navigationStore.currentPath + name
+      : navigationStore.currentPath + separator + name
+    try {
+      await invoke('mkdir_folder', { path: newPath })
+      await navigationStore.refresh()
+      galleryStore.setFiles(navigationStore.folders)
+    } catch (e) {
+      alert('Не удалось создать папку: ' + e)
+    }
   }
 }
 
@@ -298,7 +364,7 @@ function onKeyDown(e) {
       const lastSelectedPath = galleryStore.selectedIds[galleryStore.selectedIds.length - 1]
       const file = props.files.find(f => f.path === lastSelectedPath)
       if (file) {
-        openQuickLook(file)
+        onCardDblClick(file)
       }
     }
   }

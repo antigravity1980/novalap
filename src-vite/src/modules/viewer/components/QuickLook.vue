@@ -52,6 +52,18 @@
             <span class="text-white/80 font-mono text-xs w-8 text-right">{{ Math.round(gamma * 100) }}%</span>
           </div>
 
+          <!-- Flip Horizontally -->
+          <button
+            class="btn btn-ghost btn-xs text-white/75 hover:text-white hover:bg-white/10 flex items-center gap-1 px-2 py-1 rounded border border-white/10"
+            @click="toggleFlipHorizontal"
+            :title="$t('viewer.flip_horizontal') || 'Отразить по горизонтали'"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span>{{ $t('viewer.flip_horizontal_btn') || 'Отразить' }}</span>
+          </button>
+
           <!-- Undo Button Indicator -->
           <button
             v-if="undoStack.length > 0"
@@ -72,17 +84,23 @@
       <!-- Navigation arrows -->
       <button
         v-if="currentIndex > 0"
-        class="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white text-4xl z-10 bg-black/40 hover:bg-black/60 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-150"
+        class="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white z-10 bg-black/40 hover:bg-black/60 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-150 animate-fade-in"
         @click="prev"
+        title="Предыдущее изображение"
       >
-        ‹
+        <svg class="w-6 h-6 stroke-current" fill="none" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        </svg>
       </button>
       <button
         v-if="currentIndex < files.length - 1"
-        class="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white text-4xl z-10 bg-black/40 hover:bg-black/60 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-150"
+        class="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white z-10 bg-black/40 hover:bg-black/60 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-150 animate-fade-in"
         @click="next"
+        title="Следующее изображение"
       >
-        ›
+        <svg class="w-6 h-6 stroke-current" fill="none" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
       </button>
 
       <!-- Main workspace -->
@@ -95,13 +113,20 @@
           @mousemove="onMouseMove"
           @mouseup="onMouseUp"
           @mouseleave="onMouseUp"
+          @mousedown="handleMouseDownContainer"
+          @wheel="handleWheel"
+          :style="{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+            transformOrigin: 'center center'
+          }"
         >
           <img
             ref="imageRef"
             :src="currentFileUrl"
-            class="max-w-[85vw] max-h-[72vh] rounded select-none pointer-events-none"
+            class="max-w-[85vw] max-h-[72vh] rounded select-none pointer-events-none transition-transform duration-100"
             :style="{
-              filter: `url(#gamma-filter-ql) saturate(${saturation})`
+              filter: `url(#gamma-filter-ql) saturate(${saturation})`,
+              transform: flipHorizontal ? 'scaleX(-1)' : ''
             }"
             @load="onImageLoad"
             @error="onImageError"
@@ -134,7 +159,7 @@
                 width: crop.width + 'px',
                 height: crop.height + 'px',
               }"
-              @mousedown.self="startCropDrag"
+              @mousedown="handleMouseDownContainer"
             >
               <!-- Drag handles -->
               <div v-for="handle in handles" :key="handle.name"
@@ -257,12 +282,24 @@ const isCurrentVideo = computed(() => {
   return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'mpeg', '3gp'].includes(ext)
 })
 
+const flipHorizontal = ref(false)
+const zoomScale = ref(1.0)
+const panOffset = reactive({ x: 0, y: 0 })
+const isPanning = ref(false)
+const panStart = reactive({ x: 0, y: 0 })
+let hasPendingSave = false
+
 watch(() => props.visible, (val) => {
   if (val) {
     currentIndex.value = props.initialIndex
     resetEditState()
     nextTick(() => overlayRef.value?.focus())
-    document.addEventListener('keydown', handleGlobalKeyDown)
+    // Add keydown listener with a small delay so we do not catch the Space bar keydown that opened us
+    setTimeout(() => {
+      if (props.visible) {
+        document.addEventListener('keydown', handleGlobalKeyDown)
+      }
+    }, 50)
   } else {
     document.removeEventListener('keydown', handleGlobalKeyDown)
   }
@@ -277,8 +314,13 @@ function resetEditState() {
   undoStack.value = []
   saturation.value = 1.0
   gamma.value = 1.0
+  flipHorizontal.value = false
+  zoomScale.value = 1.0
+  panOffset.x = 0
+  panOffset.y = 0
   imageLoaded.value = false
   cacheBuster.value = 0
+  hasPendingSave = false
 }
 
 function onImageLoad() {
@@ -293,7 +335,7 @@ function onImageLoad() {
   }
 }
 
-// Mouse dragging handlers for crop box
+// Mouse dragging handlers for crop box and panning
 function startCropDrag(event) {
   isDragging.value = true
   isResizing.value = false
@@ -311,11 +353,52 @@ function startHandleDrag(handleName, event) {
   event.preventDefault()
 }
 
+function handleMouseDownContainer(event) {
+  if (event.button !== 0) return
+  if (event.target.closest('.crop-handle')) return
+
+  const isClickingCropBox = event.target.closest('.border-primary')
+  if (isClickingCropBox && zoomScale.value === 1.0) {
+    startCropDrag(event)
+  } else {
+    isPanning.value = true
+    panStart.x = event.clientX - panOffset.x
+    panStart.y = event.clientY - panOffset.y
+    event.preventDefault()
+  }
+}
+
+function handleWheel(event) {
+  event.preventDefault()
+  const delta = event.deltaY < 0 ? 0.1 : -0.1
+  const prevScale = zoomScale.value
+  let newScale = prevScale + delta * prevScale
+  newScale = Math.max(1.0, Math.min(10.0, newScale))
+
+  if (newScale === 1.0) {
+    panOffset.x = 0
+    panOffset.y = 0
+  }
+
+  zoomScale.value = newScale
+}
+
+function toggleFlipHorizontal() {
+  flipHorizontal.value = !flipHorizontal.value
+  triggerAutoSave()
+}
+
 function onMouseMove(event) {
   if (!imageLoaded.value || !imageRef.value) return
 
   const width = imageRef.value.clientWidth
   const height = imageRef.value.clientHeight
+
+  if (isPanning.value) {
+    panOffset.x = event.clientX - panStart.x
+    panOffset.y = event.clientY - panStart.y
+    return
+  }
 
   if (isDragging.value && !isResizing.value) {
     const dx = event.clientX - dragStart.x
@@ -381,6 +464,9 @@ function resizeCrop(handle, dx, dy, width, height) {
 }
 
 function onMouseUp() {
+  if (isPanning.value) {
+    isPanning.value = false
+  }
   if (isDragging.value || isResizing.value) {
     isDragging.value = false
     isResizing.value = false
@@ -391,8 +477,13 @@ function onMouseUp() {
 
 // Auto Save mechanism
 async function triggerAutoSave() {
-  if (!currentFile.value || currentSaving) return
+  if (!currentFile.value) return
+  if (currentSaving) {
+    hasPendingSave = true
+    return
+  }
   currentSaving = true
+  hasPendingSave = false
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -405,11 +496,11 @@ async function triggerAutoSave() {
         bytes: new Uint8Array(),
         crop: { ...crop },
         saturation: saturation.value,
-        gamma: gamma.value
+        gamma: gamma.value,
+        flipHorizontal: flipHorizontal.value,
       })
       cacheBuster.value = Date.now()
       emit('saved')
-      currentSaving = false
       return
     }
 
@@ -424,7 +515,8 @@ async function triggerAutoSave() {
       bytes: currentBytes,
       crop: { ...crop },
       saturation: saturation.value,
-      gamma: gamma.value
+      gamma: gamma.value,
+      flipHorizontal: flipHorizontal.value,
     })
 
     if (undoStack.value.length > 25) {
@@ -469,7 +561,7 @@ async function triggerAutoSave() {
       destFilePath: path, // Overwrite original
       outputFormat: currentFile.value.extension?.toLowerCase() || 'jpg',
       orientation: 1,
-      flipHorizontal: false,
+      flipHorizontal: flipHorizontal.value,
       flipVertical: false,
       rotate: 0,
       crop: cropData,
@@ -492,6 +584,10 @@ async function triggerAutoSave() {
     console.error('Auto save failed:', err)
   } finally {
     currentSaving = false
+    if (hasPendingSave) {
+      hasPendingSave = false
+      triggerAutoSave()
+    }
   }
 }
 
@@ -507,6 +603,7 @@ async function handleUndo() {
       // Browser mode fallback
       saturation.value = prevState.saturation
       gamma.value = prevState.gamma
+      flipHorizontal.value = prevState.flipHorizontal || false
       Object.assign(crop, prevState.crop)
       cacheBuster.value = Date.now()
       emit('saved')
@@ -519,6 +616,7 @@ async function handleUndo() {
     // Restore UI variables
     saturation.value = prevState.saturation
     gamma.value = prevState.gamma
+    flipHorizontal.value = prevState.flipHorizontal || false
     Object.assign(crop, prevState.crop)
 
     // Update screen

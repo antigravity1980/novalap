@@ -48,7 +48,7 @@ walkdir = "2.5.0"
 trash = "3.3.1"
 base64 = "0.22.1"
 http = "1"
-image = "0.25.10"
+image = { version = "0.25.10", features = ["avif"] }
 kamadak-exif = "0.6.1"
 little_exif = "0.6.23"
 fast_image_resize = "5.1.0"
