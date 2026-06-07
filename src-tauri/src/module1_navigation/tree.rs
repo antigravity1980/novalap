@@ -13,7 +13,7 @@ use std::path::Path;
 use tauri::command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct TreeFolder {
     pub name: String,
     pub path: String,

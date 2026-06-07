@@ -7,6 +7,7 @@
  * - get_file_info(path) — детальная информация о файле
  */
 
+extern crate imagesize;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -16,7 +17,7 @@ use crate::t_common;
 
 /// Тип записи в файловой системе
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct FileEntry {
     pub name: String,
     pub path: String,
@@ -38,7 +39,7 @@ pub struct Resolution {
 
 /// Информация о диске / mount point
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct DriveInfo {
     pub name: String,
     pub path: String,

@@ -11,8 +11,16 @@
           }"
           @click="navigateTo(drive.path)"
         >
-          <div class="flex items-center gap-2 truncate">
-            <span class="text-sm">💾</span>
+          <div class="flex items-center gap-1.5 truncate">
+            <!-- Expand chevron arrow for drive -->
+            <span
+              class="chevron flex items-center justify-center text-[10px] w-4 h-4 rounded-md hover:bg-base-100/40 text-base-content/40 hover:text-base-content/80 transition-transform duration-200"
+              :class="{ 'rotate-90': expandedNodes[drive.path] }"
+              @click.stop="toggleDrive(drive.path)"
+            >
+              ▸
+            </span>
+            <span class="text-sm shrink-0">💾</span>
             <span class="truncate font-semibold">{{ drive.name }}</span>
           </div>
           <span v-if="drive.is_removable" class="text-[9px] uppercase tracking-wider bg-base-300 text-base-content/50 px-1 py-0.5 rounded shrink-0">
@@ -47,10 +55,19 @@ const expandedNodes = reactive({})
 
 async function navigateTo(path) {
   if (path) {
-    expandedNodes[path] = true
-    await navigationStore.expandTreeFolder(path)
+    if (!expandedNodes[path]) {
+      expandedNodes[path] = true
+      await navigationStore.expandTreeFolder(path)
+    }
     await navigationStore.navigateTo(path)
     galleryStore.setFiles(navigationStore.folders)
+  }
+}
+
+async function toggleDrive(path) {
+  expandedNodes[path] = !expandedNodes[path]
+  if (expandedNodes[path]) {
+    await navigationStore.expandTreeFolder(path)
   }
 }
 
@@ -83,5 +100,8 @@ watch(() => navigationStore.currentPath, (newPath) => {
 <style scoped>
 .explorer-tree {
   height: 100%;
+}
+.chevron {
+  font-family: monospace;
 }
 </style>

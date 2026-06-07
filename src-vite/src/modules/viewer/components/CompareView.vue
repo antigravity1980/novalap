@@ -152,6 +152,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getAssetSrc } from '@/common/utils'
 
 const props = defineProps({
   files: { type: Array, default: () => [] },
@@ -206,7 +207,7 @@ const gridClass = computed(() => {
 })
 
 function getFileUrl(path) {
-  return `asset://localhost/${encodeURI(path)}`
+  return getAssetSrc(path)
 }
 
 function onSliderMove(event) {

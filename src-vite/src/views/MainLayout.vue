@@ -609,12 +609,11 @@ import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 
-const router = useRouter()
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useNavigationStore } from '@/modules/navigation/store'
 import { useGalleryStore } from '@/modules/gallery/store'
 import { useConfigStore } from '@/stores/configStore'
-import { setTheme } from '@/common/utils'
+import { setTheme, getAssetSrc } from '@/common/utils'
 
 // SVG Icons
 import {
@@ -644,6 +643,7 @@ import CompareView from '@/modules/viewer/components/CompareView.vue'
 import QuickCrop from '@/modules/viewer/components/QuickCrop.vue'
 import BatchOperations from '@/modules/operations/components/BatchOperations.vue'
 
+const router = useRouter()
 const navigationStore = useNavigationStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
@@ -1054,7 +1054,7 @@ function getFileName(path) {
 }
 
 function getFileAssetUrl(path) {
-  return `asset://localhost/${encodeURI(path)}`
+  return getAssetSrc(path)
 }
 
 function isImage(file) {

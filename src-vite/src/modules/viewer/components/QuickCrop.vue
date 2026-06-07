@@ -97,6 +97,7 @@ import { ref, reactive, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
+import { getAssetSrc } from '@/common/utils'
 
 const props = defineProps({
   file: { type: Object, default: null },
@@ -106,7 +107,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const imageRef = ref(null)
 const cropContainer = ref(null)
-const imageUrl = computed(() => props.file ? `asset://localhost/${encodeURI(props.file.path)}` : '')
+const imageUrl = computed(() => props.file ? getAssetSrc(props.file.path) : '')
 const imageLoaded = ref(false)
 const saving = ref(false)
 

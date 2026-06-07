@@ -180,6 +180,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, reactive } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
+import { getAssetSrc } from '@/common/utils'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -232,7 +233,7 @@ const handles = computed(() => [
 const currentFile = computed(() => props.files[currentIndex.value] || null)
 const currentFileUrl = computed(() => {
   if (!currentFile.value) return ''
-  const base = `asset://localhost/${encodeURI(currentFile.value.path)}`
+  const base = getAssetSrc(currentFile.value.path)
   return cacheBuster.value ? `${base}?t=${cacheBuster.value}` : base
 })
 
@@ -435,7 +436,7 @@ async function triggerAutoSave() {
     await new Promise((resolve, reject) => {
       img.onload = resolve
       img.onerror = reject
-      img.src = `asset://localhost/${encodeURI(tempPath)}`
+      img.src = getAssetSrc(tempPath)
     })
 
     const scaleX = img.naturalWidth / displayWidth

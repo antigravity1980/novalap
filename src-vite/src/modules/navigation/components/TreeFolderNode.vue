@@ -7,6 +7,7 @@
         'text-base-content/70 hover:bg-base-100/30 hover:text-base-content': !isActive,
       }"
       @click="navigate"
+      @contextmenu.prevent.stop="handleContextMenu"
     >
       <!-- Expand chevron arrow -->
       <span
@@ -19,8 +20,8 @@
       </span>
 
       <!-- Folder icon -->
-      <span class="text-sm shrink-0">
-        {{ isExpanded ? '📂' : '📁' }}
+      <span class="text-sm shrink-0 flex items-center justify-center w-4 h-4">
+        <img :src="folderIconUrl" class="w-4 h-4 object-contain select-none pointer-events-none" />
       </span>
 
       <span class="truncate flex-1">{{ folder.name }}</span>
@@ -37,12 +38,22 @@
         @expand="(p) => $emit('expand', p)"
       />
     </div>
+
+    <ContextMenu
+      ref="contextMenuRef"
+      :menuItems="recolorMenuItems"
+      :smallIcon="true"
+      style="display: none;"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useNavigationStore } from '../store'
+import { useConfigStore } from '@/stores/configStore'
+import { getAssetSrc } from '@/common/utils'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = defineProps({
   folder: { type: Object, required: true },
@@ -52,10 +63,52 @@ const props = defineProps({
 const emit = defineEmits(['navigate', 'expand'])
 
 const navigationStore = useNavigationStore()
+const configStore = useConfigStore()
 const isExpanded = ref(false)
 const children = ref(props.folder.children || [])
 const hasChildren = computed(() => props.folder.has_subfolders)
 const isActive = computed(() => props.folder.path === navigationStore.currentPath)
+const contextMenuRef = ref(null)
+
+const folderIconUrl = computed(() => {
+  const customIcon = configStore.folderIcons?.[props.folder.path]
+  if (customIcon) {
+    return getAssetSrc(`D:\\NovaLAP\\Folder\\${customIcon}`)
+  }
+  const isDark = configStore.settings.appearance === 1
+  const defaultIcon = isDark ? '14.ico' : '15.ico'
+  return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
+})
+
+const recolorMenuItems = computed(() => [
+  {
+    label: 'Перекрасить папку',
+    children: [
+      { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
+      { label: 'По умолчанию', action: () => setFolderIcon(null) },
+      { label: 'Красный', action: () => setFolderIcon('01.ico') },
+      { label: 'Оранжевый', action: () => setFolderIcon('02.ico') },
+      { label: 'Жёлтый', action: () => setFolderIcon('03.ico') },
+      { label: 'Зелёный', action: () => setFolderIcon('04.ico') },
+      { label: 'Голубой', action: () => setFolderIcon('05.ico') },
+      { label: 'Синий', action: () => setFolderIcon('06.ico') },
+      { label: 'Фиолетовый', action: () => setFolderIcon('07.ico') },
+      { label: 'Розовый', action: () => setFolderIcon('08.ico') },
+      { label: 'Коричневый', action: () => setFolderIcon('09.ico') },
+      { label: 'Серый', action: () => setFolderIcon('10.ico') },
+      { label: 'Тёмно-синий', action: () => setFolderIcon('11.ico') },
+      { label: 'Салатовый', action: () => setFolderIcon('12.ico') },
+    ]
+  }
+])
+
+function handleContextMenu(e) {
+  contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+function setFolderIcon(iconName) {
+  configStore.setFolderIcon(props.folder.path, iconName)
+}
 
 watch(() => props.folder.has_subfolders, (val) => {
   if (!val) isExpanded.value = false

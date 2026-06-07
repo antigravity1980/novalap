@@ -1,7 +1,7 @@
 {
   "productName": "LapAI",
   "version": "0.1.0",
-  "identifier": "com.novalap.lapai",
+  "identifier": "com.lapai.lapai",
   "build": {
     "beforeBuildCommand": "pnpm --dir ../src-vite build",
     "beforeDevCommand": "pnpm --dir ../src-vite dev",

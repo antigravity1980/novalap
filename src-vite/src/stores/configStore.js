@@ -5,6 +5,7 @@ import { defineStore } from 'pinia';
 
 export const useConfigStore = defineStore('configStore', {
   state: () => ({
+    folderIcons: {},              // custom folder icons mapping
     main: {
       sidebarIndex: 0,            // toolbar index
       maxLibraryCount: 20,        // max library count
@@ -298,6 +299,16 @@ export const useConfigStore = defineStore('configStore', {
 
     notifyLibrariesChanged() {
       this.libraryChangedVersion++;
+    },
+    setFolderIcon(folderPath, iconName) {
+      if (!this.folderIcons) {
+        this.folderIcons = {};
+      }
+      if (iconName) {
+        this.folderIcons[folderPath] = iconName;
+      } else {
+        delete this.folderIcons[folderPath];
+      }
     },
 
   },

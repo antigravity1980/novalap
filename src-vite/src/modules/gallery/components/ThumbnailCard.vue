@@ -8,6 +8,7 @@
     :style="{ width: size + 'px' }"
     @click="$emit('click')"
     @dblclick="$emit('dblclick')"
+    @contextmenu.prevent.stop="isFolder ? handleContextMenu($event) : null"
   >
     <!-- Thumbnail Image Container -->
     <div
@@ -32,7 +33,7 @@
       </div>
       <!-- Папка -->
       <div v-else-if="isFolder" class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/50">
-        <span class="text-4xl">📁</span>
+        <img :src="folderIconUrl" class="w-16 h-16 object-contain select-none pointer-events-none" />
         <span class="text-[10px] uppercase font-bold tracking-wider">{{ $t('gallery.folder_label').toUpperCase() }}</span>
       </div>
       <!-- Other files generic -->
@@ -70,11 +71,22 @@
         <span>{{ formatBytes(file.size) }}</span>
       </div>
     </div>
+
+    <ContextMenu
+      v-if="isFolder"
+      ref="contextMenuRef"
+      :menuItems="recolorMenuItems"
+      :smallIcon="true"
+      style="display: none;"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
+import { getAssetSrc } from '@/common/utils'
+import { useConfigStore } from '@/stores/configStore'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = defineProps({
   file: { type: Object, required: true },
@@ -83,6 +95,9 @@ const props = defineProps({
 })
 
 defineEmits(['click', 'dblclick'])
+
+const configStore = useConfigStore()
+const contextMenuRef = ref(null)
 
 const isFolder = computed(() => {
   return props.file.is_dir === true || props.file.file_type === 'directory' || props.file.is_directory === true
@@ -98,8 +113,49 @@ const isVideo = computed(() => {
   return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'mpeg', '3gp'].includes(ext)
 })
 
+const folderIconUrl = computed(() => {
+  if (!isFolder.value) return ''
+  const customIcon = configStore.folderIcons?.[props.file.path]
+  if (customIcon) {
+    return getAssetSrc(`D:\\NovaLAP\\Folder\\${customIcon}`)
+  }
+  const isDark = configStore.settings.appearance === 1
+  const defaultIcon = isDark ? '14.ico' : '15.ico'
+  return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
+})
+
+const recolorMenuItems = computed(() => [
+  {
+    label: 'Перекрасить папку',
+    children: [
+      { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
+      { label: 'По умолчанию', action: () => setFolderIcon(null) },
+      { label: 'Красный', action: () => setFolderIcon('01.ico') },
+      { label: 'Оранжевый', action: () => setFolderIcon('02.ico') },
+      { label: 'Жёлтый', action: () => setFolderIcon('03.ico') },
+      { label: 'Зелёный', action: () => setFolderIcon('04.ico') },
+      { label: 'Голубой', action: () => setFolderIcon('05.ico') },
+      { label: 'Синий', action: () => setFolderIcon('06.ico') },
+      { label: 'Фиолетовый', action: () => setFolderIcon('07.ico') },
+      { label: 'Розовый', action: () => setFolderIcon('08.ico') },
+      { label: 'Коричневый', action: () => setFolderIcon('09.ico') },
+      { label: 'Серый', action: () => setFolderIcon('10.ico') },
+      { label: 'Тёмно-синий', action: () => setFolderIcon('11.ico') },
+      { label: 'Салатовый', action: () => setFolderIcon('12.ico') },
+    ]
+  }
+])
+
+function handleContextMenu(e) {
+  contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+function setFolderIcon(iconName) {
+  configStore.setFolderIcon(props.file.path, iconName)
+}
+
 function getThumbnailUrl(filePath) {
-  return `asset://localhost/${encodeURI(filePath)}`
+  return getAssetSrc(filePath)
 }
 
 function formatBytes(bytes) {
