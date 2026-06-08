@@ -1218,6 +1218,12 @@ pub async fn copy_file_to_clipboard(file_path: &str) -> Result<bool, String> {
         let img = image::load_from_memory(&preview)
             .map_err(|e| format!("Failed to decode preview image: {}", e))?;
         return Ok(copy_image_to_clipboard(img));
+    } else if is_avif_path(file_path) {
+        let preview = get_image_thumbnail(file_path, 1, 4096)?
+            .ok_or_else(|| "Failed to decode AVIF image for clipboard".to_string())?;
+        let img = image::load_from_memory(&preview)
+            .map_err(|e| format!("Failed to decode AVIF bytes for clipboard: {}", e))?;
+        return Ok(copy_image_to_clipboard(img));
     }
 
     let img = image::open(Path::new(file_path))
@@ -1255,6 +1261,12 @@ async fn get_edited_image(params: &EditParams) -> Result<DynamicImage, String> {
         {
             img
         }
+    } else if is_avif_path(&params.source_file_path) {
+        let preview = get_image_thumbnail(&params.source_file_path, 1, 4096)?
+            .ok_or_else(|| "Failed to decode AVIF image".to_string())?;
+        let img = image::load_from_memory(&preview)
+            .map_err(|e| format!("Failed to decode AVIF preview bytes: {}", e))?;
+        apply_orientation(img, params.orientation)
     } else {
         let path = Path::new(&params.source_file_path);
         let mut img = image::open(path).map_err(|e| e.to_string())?;

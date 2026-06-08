@@ -1,6 +1,146 @@
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
 
+// Helper function to group files/folders Win11-style
+export function groupFilesHelper(files, groupBy) {
+  if (groupBy === 'type') {
+    const folders = []
+    const images = []
+    const videos = []
+    const others = []
+    for (const f of files) {
+      const isDir = f.is_dir === true || f.file_type === 'directory' || f.is_directory === true
+      if (isDir) {
+        folders.push(f)
+      } else if (f.file_type === 1 || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tif', 'tiff', 'heic', 'heif', 'avif', 'jxl'].includes(f.extension?.toLowerCase())) {
+        images.push(f)
+      } else if (f.file_type === 2 || ['mp4', 'mkv', 'webm', 'mov', 'avi', 'flv', 'wmv'].includes(f.extension?.toLowerCase())) {
+        videos.push(f)
+      } else {
+        others.push(f)
+      }
+    }
+    return [
+      { title: 'Папки', files: folders },
+      { title: 'Изображения', files: images },
+      { title: 'Видео', files: videos },
+      { title: 'Другие файлы', files: others }
+    ].filter(g => g.files.length > 0)
+  }
+
+  if (groupBy === 'extension') {
+    const groupsMap = {}
+    for (const f of files) {
+      const isDir = f.is_dir === true || f.file_type === 'directory' || f.is_directory === true
+      const ext = isDir ? 'Папка' : (f.extension ? f.extension.toUpperCase() : 'Без расширения')
+      if (!groupsMap[ext]) {
+        groupsMap[ext] = []
+      }
+      groupsMap[ext].push(f)
+    }
+    const keys = Object.keys(groupsMap).sort((a, b) => {
+      if (a === 'Папка') return -1
+      if (b === 'Папка') return 1
+      return a.localeCompare(b)
+    })
+    return keys.map(k => ({
+      title: k === 'Папка' ? 'Папки' : `Файлы ${k}`,
+      files: groupsMap[k]
+    }))
+  }
+
+  if (groupBy === 'size') {
+    const huge = []    // > 128 MB
+    const large = []   // 1 MB - 128 MB
+    const medium = []  // 100 KB - 1 MB
+    const small = []   // < 100 KB
+    const folders = []
+    
+    for (const f of files) {
+      const isDir = f.is_dir === true || f.file_type === 'directory' || f.is_directory === true
+      if (isDir) {
+        folders.push(f)
+      } else {
+        const size = f.size || 0
+        if (size >= 128 * 1024 * 1024) {
+          huge.push(f)
+        } else if (size >= 1 * 1024 * 1024) {
+          large.push(f)
+        } else if (size >= 100 * 1024) {
+          medium.push(f)
+        } else {
+          small.push(f)
+        }
+      }
+    }
+    return [
+      { title: 'Папки', files: folders },
+      { title: 'Огромные (> 128 МБ)', files: huge },
+      { title: 'Крупные (1 МБ - 128 МБ)', files: large },
+      { title: 'Средние (100 КБ - 1 МБ)', files: medium },
+      { title: 'Маленькие (< 100 КБ)', files: small }
+    ].filter(g => g.files.length > 0)
+  }
+
+  if (groupBy === 'date') {
+    const today = []
+    const yesterday = []
+    const thisWeek = []
+    const thisMonth = []
+    const lastMonth = []
+    const thisYear = []
+    const older = []
+    const folders = []
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000
+    const dayOfWeek = now.getDay()
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    const startOfThisWeek = startOfToday - daysToMonday * 24 * 60 * 60 * 1000
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+    const startOfThisYear = new Date(now.getFullYear(), 0, 1).getTime()
+
+    for (const f of files) {
+      const isDir = f.is_dir === true || f.file_type === 'directory' || f.is_directory === true
+      if (isDir) {
+        folders.push(f)
+      } else {
+        const time = f._modifiedTime || 0
+        if (time >= startOfToday) {
+          today.push(f)
+        } else if (time >= startOfYesterday) {
+          yesterday.push(f)
+        } else if (time >= startOfThisWeek) {
+          thisWeek.push(f)
+        } else if (time >= startOfThisMonth) {
+          thisMonth.push(f)
+        } else if (time >= startOfLastMonth) {
+          lastMonth.push(f)
+        } else if (time >= startOfThisYear) {
+          thisYear.push(f)
+        } else {
+          older.push(f)
+        }
+      }
+    }
+
+    return [
+      { title: 'Папки', files: folders },
+      { title: 'Сегодня', files: today },
+      { title: 'Вчера', files: yesterday },
+      { title: 'Ранее на этой неделе', files: thisWeek },
+      { title: 'Ранее в этом месяце', files: thisMonth },
+      { title: 'В прошлом месяце', files: lastMonth },
+      { title: 'Ранее в этом году', files: thisYear },
+      { title: 'Давно', files: older }
+    ].filter(g => g.files.length > 0)
+  }
+
+  return [{ title: 'Все файлы', files }]
+}
+
 /**
  * Store для галереи (Модуль 2)
  * Управляет отображением миниатюр, выделением, сортировками, историей действий
@@ -11,6 +151,9 @@ export const useGalleryStore = defineStore('gallery', {
     thumbnailSize: 200,
     files: [],             // текущий список файлов для отображения
     filteredFiles: [],     // после применения фильтров/сортировки
+
+    // Группировка
+    groupBy: 'none',       // none, type, date, size, extension
 
     // Сортировка
     sortBy: 'name',        // name, size, date, resolution, ai_source, model, loras
@@ -49,6 +192,13 @@ export const useGalleryStore = defineStore('gallery', {
     },
     deletedHistory: [], // stack of arrays of TrashEntry
     isUndoing: false,
+    // Initialize with cached count so the badge is correct before first fetch
+    trashItems: (() => {
+      try {
+        const cached = localStorage.getItem('lapai_trash_cache')
+        return cached ? JSON.parse(cached) : []
+      } catch { return [] }
+    })(),
   }),
 
   getters: {
@@ -112,6 +262,16 @@ export const useGalleryStore = defineStore('gallery', {
         return state.sortOrder === 'asc' ? cmp : -cmp
       })
 
+      // Группировка
+      if (state.groupBy && state.groupBy !== 'none') {
+        const groups = groupFilesHelper(files, state.groupBy)
+        const flat = []
+        for (const g of groups) {
+          flat.push(...g.files)
+        }
+        return flat
+      }
+
       return files
     },
 
@@ -120,6 +280,18 @@ export const useGalleryStore = defineStore('gallery', {
   },
 
   actions: {
+    async fetchTrash() {
+      try {
+        this.trashItems = await invoke('get_trash_contents')
+        // Cache in localStorage so badge is instant on next startup
+        try {
+          localStorage.setItem('lapai_trash_cache', JSON.stringify(this.trashItems))
+        } catch {}
+      } catch (err) {
+        console.error('Failed to load trash:', err)
+      }
+    },
+
     setFiles(files) {
       const normalized = files.map(f => ({
         ...f,
@@ -237,6 +409,7 @@ export const useGalleryStore = defineStore('gallery', {
         // Remove from currently loaded files
         this.files = this.files.filter(f => !paths.includes(f.path))
         this.selectedIds = this.selectedIds.filter(id => !paths.includes(id))
+        await this.fetchTrash()
         return result
       } catch (error) {
         console.error('Failed to delete files:', error)
@@ -263,6 +436,7 @@ export const useGalleryStore = defineStore('gallery', {
         const navigationStore = useNavigationStore()
         await navigationStore.navigateTo(navigationStore.currentPath)
         this.setFiles(navigationStore.folders)
+        await this.fetchTrash()
       } catch (error) {
         console.error('Failed to undo delete:', error)
         alert('Не удалось отменить удаление: ' + error)

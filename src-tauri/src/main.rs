@@ -94,13 +94,6 @@ async fn main() {
             t_config::set_app_identifier(&_app.config().identifier);
             t_menu::install_app_menu(&_app.handle())?;
 
-            #[cfg(not(target_os = "macos"))]
-            if let Some(window) = _app.get_webview_window("main") {
-                if let Err(e) = window.set_decorations(false) {
-                    eprintln!("Failed to disable main window decorations: {}", e);
-                }
-            }
-
             // tauri.windows.conf.json sets zoomHotkeysEnabled=true so wry sets
             // both IsZoomControlEnabled and IsPinchZoomEnabled to true at WebView
             // creation. That combination is what allows Chromium to synthesize
@@ -382,6 +375,23 @@ async fn main() {
                 tauri::RunEvent::Ready => {
                     if aptabase_enabled {
                         let _ = app_handle.track_event("app_started", None);
+                    }
+
+                    // Set taskbar + window icon after app is fully ready
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            if let Err(e) = window.set_decorations(false) {
+                                eprintln!("Failed to disable decorations: {}", e);
+                            }
+                            let icon_bytes = include_bytes!("../icons/icon.png");
+                            if let Ok(dyn_img) = image::load_from_memory(icon_bytes) {
+                                let rgba = dyn_img.into_rgba8();
+                                let (w, h) = (rgba.width(), rgba.height());
+                                let icon = tauri::image::Image::new_owned(rgba.into_raw(), w, h);
+                                let _ = window.set_icon(icon);
+                            }
+                        }
                     }
                 }
                 tauri::RunEvent::Exit { .. } => {

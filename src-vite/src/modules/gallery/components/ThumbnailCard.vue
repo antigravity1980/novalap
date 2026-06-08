@@ -5,6 +5,7 @@
       'border-primary ring-2 ring-primary/45 shadow-lg shadow-primary/10 translate-y-[-2px] bg-base-100': selected && !dragOverCard,
       'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30': !selected && !dragOverCard,
       'bg-secondary/20 border-secondary ring-2 ring-secondary/45 border-dashed': dragOverCard,
+      'opacity-50 grayscale-[35%]': isCut,
     }"
     :style="{ width: size + 'px' }"
     @click="$emit('click', $event)"
@@ -152,6 +153,10 @@ const isRenaming = ref(false)
 const renameText = ref('')
 const dragOverCard = ref(false)
 const renameInputRef = ref(null)
+
+const isCut = computed(() => {
+  return galleryStore.clipboard.action === 'cut' && galleryStore.clipboard.paths.includes(props.file.path)
+})
 
 const isFolder = computed(() => {
   return props.file.is_dir === true || props.file.file_type === 'directory' || props.file.is_directory === true
@@ -458,7 +463,7 @@ function getAiSourceClass(source) {
 
 <style scoped>
 .thumbnail-card {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s, border-color 0.2s, background-color 0.2s;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s, border-color 0.2s, background-color 0.2s, opacity 0.2s, filter 0.2s;
 }
 .thumbnail-image img {
   pointer-events: none;

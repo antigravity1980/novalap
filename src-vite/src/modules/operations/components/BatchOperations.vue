@@ -172,42 +172,46 @@
 
           <!-- 5. Compress -->
           <div v-if="activeTab === 'compress'" class="space-y-4">
-            <div v-if="downloadingOptimizers" class="p-4 bg-base-300/50 rounded-lg border border-primary/20 flex flex-col items-center justify-center text-center gap-2">
-              <span class="loading loading-spinner loading-md text-primary"></span>
-              <div class="text-xs font-bold text-primary">Автоматическая установка утилит сжатия...</div>
-              <div class="text-[10px] text-base-content/50">Скачиваем pngquant и cjpeg для сжатия изображений без потери качества. Пожалуйста, подождите...</div>
+            <!-- JPEG: always built-in -->
+            <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
+              <div>
+                <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossless_jpeg') }}</h4>
+                <p class="text-[10px] text-base-content/50">Встроенное сжатие JPEG (качество 85%) — работает без внешних утилит</p>
+              </div>
+              <span class="badge badge-success badge-sm font-semibold">✓ Встроено</span>
             </div>
 
-            <div v-else-if="downloadError" class="alert alert-error py-2 px-3 text-xs leading-normal flex flex-col items-start gap-1">
-              <span class="font-bold">⚠️ Ошибка установки</span>
-              <span>{{ downloadError }}</span>
-              <button class="btn btn-xs btn-outline mt-1 font-semibold" @click="checkAndInstallOptimizers">Повторить попытку</button>
-            </div>
-
-            <div v-else class="space-y-4">
-              <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
-                <div>
-                  <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossy_png') }}</h4>
-                  <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossy_png_hint') }}</p>
-                </div>
+            <!-- PNG: needs pngquant -->
+            <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
+              <div>
+                <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossy_png') }}</h4>
+                <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossy_png_hint') }}</p>
+              </div>
+              <div class="flex items-center gap-2">
                 <span v-if="optimizers.pngquant === null" class="loading loading-spinner loading-xs"></span>
                 <span v-else-if="optimizers.pngquant" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
-                <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+                <template v-else>
+                  <span class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+                  <button
+                    v-if="!downloadingOptimizers"
+                    class="btn btn-xs btn-primary rounded font-semibold"
+                    @click="downloadPngquant"
+                  >Установить</button>
+                  <span v-else class="loading loading-spinner loading-xs text-primary"></span>
+                </template>
               </div>
+            </div>
 
-              <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
-                <div>
-                  <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossless_jpeg') }}</h4>
-                  <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossless_jpeg_hint') }}</p>
-                </div>
-                <span v-if="optimizers.cjpeg === null" class="loading loading-spinner loading-xs"></span>
-                <span v-else-if="optimizers.cjpeg" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
-                <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
-              </div>
+            <!-- PNG notice when pngquant is missing -->
+            <div v-if="optimizers.pngquant === false" class="alert alert-info py-2 px-3 text-xs leading-normal">
+              <span>Для сжатия PNG требуется утилита <b>pngquant</b>. Нажмите «Установить» — программа скачает её автоматически.</span>
+            </div>
 
-              <div class="alert alert-info py-2 px-3 text-xs leading-normal">
-                <span>{{ $t('batch_ops.compress_notice') }}</span>
-              </div>
+            <!-- Download error -->
+            <div v-if="downloadError" class="alert alert-error py-2 px-3 text-xs leading-normal flex flex-col items-start gap-1">
+              <span class="font-bold">⚠️ Ошибка установки pngquant</span>
+              <span>{{ downloadError }}</span>
+              <button class="btn btn-xs btn-outline mt-1 font-semibold" @click="downloadPngquant">Повторить попытку</button>
             </div>
           </div>
 
@@ -280,10 +284,25 @@
 
       <!-- Progress Overlay -->
       <div v-if="processing" class="absolute inset-0 bg-base-300/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center">
-        <span class="loading loading-spinner loading-lg text-primary mb-4"></span>
+        <div class="relative w-16 h-16 mb-4">
+          <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" class="text-base-200" stroke-width="5"/>
+            <circle
+              cx="32" cy="32" r="28" fill="none"
+              stroke="currentColor" class="text-primary transition-all duration-300"
+              stroke-width="5"
+              stroke-dasharray="175.9"
+              :stroke-dashoffset="175.9 * (1 - progressFraction)"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span class="absolute inset-0 flex items-center justify-center text-xs font-bold text-primary">
+            {{ Math.round(progressFraction * 100) }}%
+          </span>
+        </div>
         <h4 class="font-bold text-base-content">{{ $t('batch_ops.processing_files') }}</h4>
         <p class="text-xs text-base-content/50 mt-1">
-          {{ $t('batch_ops.processing_hint', { tab: $t('batch_ops.tabs.' + activeTab), count: selectedFiles.length }) }}
+          {{ progressCurrent }} / {{ progressTotal }} {{ $t('batch_ops.tabs.' + activeTab) }}
         </p>
       </div>
 
@@ -291,7 +310,7 @@
       <div v-if="resultMessage" class="absolute inset-0 bg-base-300/95 z-30 flex flex-col items-center justify-center p-6 text-center">
         <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success text-2xl mb-3">✓</div>
         <h4 class="font-bold text-base-content text-lg">{{ $t('batch_ops.batch_complete') }}</h4>
-        <p class="text-sm text-base-content/70 mt-1 max-w-sm">{{ resultMessage }}</p>
+        <p class="text-sm text-base-content/70 mt-1 max-w-sm whitespace-pre-wrap">{{ resultMessage }}</p>
         <button class="btn btn-primary btn-sm mt-6 px-6" @click="closeResult">{{ $t('batch_ops.done') }}</button>
       </div>
 
@@ -432,63 +451,60 @@ async function selectTargetDir() {
 }
 
 const optimizers = reactive({
-  pngquant: null,
-  cjpeg: null,
+  pngquant: null, // null=checking, true=available, false=not available
 })
 
 const downloadingOptimizers = ref(false)
 const downloadError = ref('')
 
-async function checkAndInstallOptimizers() {
+async function checkPngquant() {
   optimizers.pngquant = null
-  optimizers.cjpeg = null
-  downloadError.value = ''
-  
-  let pngquantOk = false
-  let cjpegOk = false
-  
   try {
-    pngquantOk = await invoke('check_optimizer', { name: 'pngquant' })
+    optimizers.pngquant = await invoke('check_optimizer', { name: 'pngquant' })
   } catch {
-    pngquantOk = false
-  }
-  
-  try {
-    cjpegOk = await invoke('check_optimizer', { name: 'cjpeg' })
-  } catch {
-    cjpegOk = false
-  }
-  
-  optimizers.pngquant = pngquantOk
-  optimizers.cjpeg = cjpegOk
-  
-  // If not installed, trigger automatic download
-  if (!pngquantOk || !cjpegOk) {
-    downloadingOptimizers.value = true
-    try {
-      await invoke('download_optimizers')
-      // Recheck
-      optimizers.pngquant = await invoke('check_optimizer', { name: 'pngquant' })
-      optimizers.cjpeg = await invoke('check_optimizer', { name: 'cjpeg' })
-    } catch (err) {
-      console.error('Failed to download optimizers:', err)
-      downloadError.value = typeof err === 'string' ? err : 'Ошибка сети при скачивании утилит сжатия.'
-    } finally {
-      downloadingOptimizers.value = false
-    }
+    optimizers.pngquant = false
   }
 }
 
-// Check external optimizer binaries when tab is selected
+async function downloadPngquant() {
+  downloadError.value = ''
+  downloadingOptimizers.value = true
+  try {
+    await invoke('download_optimizers')
+    optimizers.pngquant = await invoke('check_optimizer', { name: 'pngquant' })
+    if (!optimizers.pngquant) {
+      downloadError.value = 'Утилита pngquant не была найдена после скачивания. Попробуйте ещё раз.'
+    }
+  } catch (err) {
+    console.error('Failed to download pngquant:', err)
+    downloadError.value = typeof err === 'string' ? err : 'Ошибка сети при скачивании утилиты pngquant.'
+  } finally {
+    downloadingOptimizers.value = false
+  }
+}
+
+// Check pngquant when compress tab is opened
 watch(activeTab, async (tab) => {
   if (tab === 'compress') {
-    await checkAndInstallOptimizers()
+    downloadError.value = ''
+    await checkPngquant()
   }
 })
 
+// Also reset result state when switching tabs so old reports don't persist
+watch(activeTab, () => {
+  resultMessage.value = ''
+})
+
 const isCompressUnavailable = computed(() => {
+  // JPEG is always available (native Rust). PNG needs pngquant.
+  // Only block if ALL selected files are PNG and pngquant is not yet available
   if (activeTab.value !== 'compress') return false
-  return !optimizers.pngquant && !optimizers.cjpeg
+  const hasPng = props.selectedFiles.some(f => f.toLowerCase().endsWith('.png'))
+  const hasJpeg = props.selectedFiles.some(f => ['.jpg', '.jpeg'].some(ext => f.toLowerCase().endsWith(ext)))
+  if (hasJpeg) return false // JPEG is always compressible
+  if (hasPng && !optimizers.pngquant) return true // only PNG and no pngquant
+  return false
 })
 
 function applyPreset(event) {
@@ -499,10 +515,19 @@ function applyPreset(event) {
   resize.height = h
 }
 
+const progressCurrent = ref(0)
+const progressTotal = ref(0)
+const progressFraction = computed(() => {
+  if (progressTotal.value === 0) return 0
+  return Math.min(1, progressCurrent.value / progressTotal.value)
+})
+
 async function apply() {
   if (props.selectedFiles.length === 0) return
   processing.value = true
   resultMessage.value = ''
+  progressCurrent.value = 0
+  progressTotal.value = props.selectedFiles.length
 
   try {
     let result = null
@@ -562,6 +587,7 @@ async function apply() {
             fit: resize.fit,
           },
         })
+        progressCurrent.value = progressTotal.value
         break
       case 'convert':
         result = await invoke('batch_convert', {
@@ -569,6 +595,7 @@ async function apply() {
           targetFormat: convert.format,
           quality: convert.quality,
         })
+        progressCurrent.value = progressTotal.value
         break
       case 'rename':
         result = await invoke('batch_rename', {
@@ -576,6 +603,7 @@ async function apply() {
           mask: rename.mask,
           counterStart: rename.counterStart,
         })
+        progressCurrent.value = progressTotal.value
         break
       case 'color':
         result = await invoke('batch_color_correct', {
@@ -583,9 +611,11 @@ async function apply() {
           saturation: color.saturation,
           gamma: color.gamma,
         })
+        progressCurrent.value = progressTotal.value
         break
-      case 'compress':
-        // Compress based on formats
+      case 'compress': {
+        // JPEG: native Rust (always available)
+        // PNG: external pngquant
         const pngFiles = filesToProcess.filter((f) => f.toLowerCase().endsWith('.png'))
         const jpgFiles = filesToProcess.filter((f) =>
           ['.jpg', '.jpeg'].some((ext) => f.toLowerCase().endsWith(ext))
@@ -593,16 +623,31 @@ async function apply() {
 
         let succ = 0
         let errs = []
+        progressTotal.value = pngFiles.length + jpgFiles.length
+        progressCurrent.value = 0
 
-        if (pngFiles.length > 0 && optimizers.pngquant) {
-          const res = await invoke('optimize_with_pngquant', { files: pngFiles })
-          succ += res.succeeded
-          errs = [...errs, ...res.errors]
+        if (jpgFiles.length > 0) {
+          // Process JPEGs one by one so we can update progress
+          for (const jpgFile of jpgFiles) {
+            const res = await invoke('optimize_with_mozjpeg', { files: [jpgFile] })
+            succ += res.succeeded
+            errs = [...errs, ...res.errors]
+            progressCurrent.value++
+          }
         }
-        if (jpgFiles.length > 0 && optimizers.cjpeg) {
-          const res = await invoke('optimize_with_mozjpeg', { files: jpgFiles })
-          succ += res.succeeded
-          errs = [...errs, ...res.errors]
+        if (pngFiles.length > 0 && optimizers.pngquant) {
+          for (const pngFile of pngFiles) {
+            const res = await invoke('optimize_with_pngquant', { files: [pngFile] })
+            succ += res.succeeded
+            errs = [...errs, ...res.errors]
+            progressCurrent.value++
+          }
+        } else if (pngFiles.length > 0) {
+          // pngquant not available, skip with error
+          for (const f of pngFiles) {
+            errs.push(`${f}: pngquant не установлен`)
+            progressCurrent.value++
+          }
         }
 
         result = {
@@ -612,8 +657,10 @@ async function apply() {
           errors: errs,
         }
         break
+      }
       case 'strip':
         result = await invoke('strip_metadata', { files: filesToProcess })
+        progressCurrent.value = progressTotal.value
         break
     }
 

@@ -364,11 +364,11 @@
                 <span>{{ $t('calendar.title') }}</span>
                 <span v-if="galleryStore.sortBy === 'date'">✓</span>
               </a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'resolution' }" @click="galleryStore.sortBy = 'resolution'; onSortChange()" class="flex justify-between items-center">
+              <li><a :class="{ 'active': galleryStore.sortBy === 'resolution' }" @click="galleryStore.sortBy === 'resolution'; onSortChange()" class="flex justify-between items-center">
                 <span>{{ $t('explorer.resolution') }}</span>
                 <span v-if="galleryStore.sortBy === 'resolution'">✓</span>
               </a></li>
-              <li><a :class="{ 'active': galleryStore.sortBy === 'ai_source' }" @click="galleryStore.sortBy = 'ai_source'; onSortChange()" class="flex justify-between items-center">
+              <li><a :class="{ 'active': galleryStore.sortBy === 'ai_source' }" @click="galleryStore.sortBy === 'ai_source'; onSortChange()" class="flex justify-between items-center">
                 <span>{{ $t('explorer.ai_source') }}</span>
                 <span v-if="galleryStore.sortBy === 'ai_source'">✓</span>
               </a></li>
@@ -384,6 +384,37 @@
             </ul>
           </div>
 
+          <!-- Group Dropdown -->
+          <div class="dropdown">
+            <label tabindex="0" class="win11-btn flex items-center gap-1.5">
+              <IconStack class="w-4 h-4 text-primary" />
+              <span>Группировка</span>
+              <span class="opacity-50">▾</span>
+            </label>
+            <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-52 z-30 text-xs mt-1">
+              <li><a :class="{ 'active': galleryStore.groupBy === 'none' }" @click="galleryStore.groupBy = 'none'; onGroupChange()" class="flex justify-between items-center">
+                <span>(Нет)</span>
+                <span v-if="galleryStore.groupBy === 'none'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.groupBy === 'type' }" @click="galleryStore.groupBy = 'type'; onGroupChange()" class="flex justify-between items-center">
+                <span>Тип</span>
+                <span v-if="galleryStore.groupBy === 'type'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.groupBy === 'date' }" @click="galleryStore.groupBy = 'date'; onGroupChange()" class="flex justify-between items-center">
+                <span>Дата изменения</span>
+                <span v-if="galleryStore.groupBy === 'date'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.groupBy === 'size' }" @click="galleryStore.groupBy = 'size'; onGroupChange()" class="flex justify-between items-center">
+                <span>Размер</span>
+                <span v-if="galleryStore.groupBy === 'size'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.groupBy === 'extension' }" @click="galleryStore.groupBy = 'extension'; onGroupChange()" class="flex justify-between items-center">
+                <span>Расширение</span>
+                <span v-if="galleryStore.groupBy === 'extension'">✓</span>
+              </a></li>
+            </ul>
+          </div>
+
           <!-- Filter Dropdown -->
           <div class="dropdown">
             <label tabindex="0" class="win11-btn flex items-center gap-1.5">
@@ -393,28 +424,85 @@
             </label>
             <ul tabindex="0" class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-56 overflow-x-hidden z-30 text-xs mt-1 max-h-96 overflow-y-auto custom-scrollbar">
               <div class="px-2 py-1 text-[9px] font-bold text-base-content/40 uppercase">{{ $t('explorer.format') }}</div>
-              <li><a :class="{ 'active': galleryStore.filters.format === '' }" @click="galleryStore.filters.format = ''; onFilterChange()">{{ $t('explorer.all_formats') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'png' }" @click="galleryStore.filters.format = 'png'; onFilterChange()">PNG</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'jpg' || galleryStore.filters.format === 'jpeg' }" @click="galleryStore.filters.format = 'jpg'; onFilterChange()">JPEG</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'webp' }" @click="galleryStore.filters.format = 'webp'; onFilterChange()">WebP</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'gif' }" @click="galleryStore.filters.format = 'gif'; onFilterChange()">GIF</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'mp4' }" @click="galleryStore.filters.format = 'mp4'; onFilterChange()">MP4</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'mkv' }" @click="galleryStore.filters.format = 'mkv'; onFilterChange()">MKV</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'webm' }" @click="galleryStore.filters.format = 'webm'; onFilterChange()">WebM</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.format === 'mov' }" @click="galleryStore.filters.format = 'mov'; onFilterChange()">MOV</a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === '' }" @click="galleryStore.filters.format = ''; onFilterChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.all_formats') }}</span>
+                <span v-if="galleryStore.filters.format === ''">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'png' }" @click="galleryStore.filters.format = 'png'; onFilterChange()" class="flex justify-between items-center">
+                <span>PNG</span>
+                <span v-if="galleryStore.filters.format === 'png'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'jpg' || galleryStore.filters.format === 'jpeg' }" @click="galleryStore.filters.format = 'jpg'; onFilterChange()" class="flex justify-between items-center">
+                <span>JPEG</span>
+                <span v-if="galleryStore.filters.format === 'jpg' || galleryStore.filters.format === 'jpeg'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'webp' }" @click="galleryStore.filters.format = 'webp'; onFilterChange()" class="flex justify-between items-center">
+                <span>WebP</span>
+                <span v-if="galleryStore.filters.format === 'webp'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'gif' }" @click="galleryStore.filters.format = 'gif'; onFilterChange()" class="flex justify-between items-center">
+                <span>GIF</span>
+                <span v-if="galleryStore.filters.format === 'gif'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'mp4' }" @click="galleryStore.filters.format = 'mp4'; onFilterChange()" class="flex justify-between items-center">
+                <span>MP4</span>
+                <span v-if="galleryStore.filters.format === 'mp4'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'mkv' }" @click="galleryStore.filters.format = 'mkv'; onFilterChange()" class="flex justify-between items-center">
+                <span>MKV</span>
+                <span v-if="galleryStore.filters.format === 'mkv'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'webm' }" @click="galleryStore.filters.format = 'webm'; onFilterChange()" class="flex justify-between items-center">
+                <span>WebM</span>
+                <span v-if="galleryStore.filters.format === 'webm'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.format === 'mov' }" @click="galleryStore.filters.format = 'mov'; onFilterChange()" class="flex justify-between items-center">
+                <span>MOV</span>
+                <span v-if="galleryStore.filters.format === 'mov'">✓</span>
+              </a></li>
 
               <div class="divider my-1"></div>
               <div class="px-2 py-1 text-[9px] font-bold text-base-content/40 uppercase">{{ $t('explorer.ai_source') }}</div>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === '' }" @click="galleryStore.filters.aiSource = ''; onFilterChange()">{{ $t('explorer.all_sources') }}</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'ComfyUI' }" @click="galleryStore.filters.aiSource = 'ComfyUI'; onFilterChange()">ComfyUI</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Midjourney' }" @click="galleryStore.filters.aiSource = 'Midjourney'; onFilterChange()">Midjourney</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Stable Diffusion' }" @click="galleryStore.filters.aiSource = 'Stable Diffusion'; onFilterChange()">Stable Diffusion</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Nano Banana' }" @click="galleryStore.filters.aiSource = 'Nano Banana'; onFilterChange()">Nano Banana</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'GPT Images' }" @click="galleryStore.filters.aiSource = 'GPT Images'; onFilterChange()">GPT Images</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Grok Image' }" @click="galleryStore.filters.aiSource = 'Grok Image'; onFilterChange()">Grok Image</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'DALL-E' }" @click="galleryStore.filters.aiSource = 'DALL-E'; onFilterChange()">DALL-E</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Krita AI' }" @click="galleryStore.filters.aiSource = 'Krita AI'; onFilterChange()">Krita AI</a></li>
-              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Unknown' }" @click="galleryStore.filters.aiSource = 'Unknown'; onFilterChange()">{{ $t('explorer.unknown_source') }}</a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === '' }" @click="galleryStore.filters.aiSource = ''; onFilterChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.all_sources') }}</span>
+                <span v-if="galleryStore.filters.aiSource === ''">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'ComfyUI' }" @click="galleryStore.filters.aiSource = 'ComfyUI'; onFilterChange()" class="flex justify-between items-center">
+                <span>ComfyUI</span>
+                <span v-if="galleryStore.filters.aiSource === 'ComfyUI'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Midjourney' }" @click="galleryStore.filters.aiSource = 'Midjourney'; onFilterChange()" class="flex justify-between items-center">
+                <span>Midjourney</span>
+                <span v-if="galleryStore.filters.aiSource === 'Midjourney'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Stable Diffusion' }" @click="galleryStore.filters.aiSource = 'Stable Diffusion'; onFilterChange()" class="flex justify-between items-center">
+                <span>Stable Diffusion</span>
+                <span v-if="galleryStore.filters.aiSource === 'Stable Diffusion'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Nano Banana' }" @click="galleryStore.filters.aiSource = 'Nano Banana'; onFilterChange()" class="flex justify-between items-center">
+                <span>Nano Banana</span>
+                <span v-if="galleryStore.filters.aiSource === 'Nano Banana'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'GPT Images' }" @click="galleryStore.filters.aiSource = 'GPT Images'; onFilterChange()" class="flex justify-between items-center">
+                <span>GPT Images</span>
+                <span v-if="galleryStore.filters.aiSource === 'GPT Images'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Grok Image' }" @click="galleryStore.filters.aiSource = 'Grok Image'; onFilterChange()" class="flex justify-between items-center">
+                <span>Grok Image</span>
+                <span v-if="galleryStore.filters.aiSource === 'Grok Image'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'DALL-E' }" @click="galleryStore.filters.aiSource = 'DALL-E'; onFilterChange()" class="flex justify-between items-center">
+                <span>DALL-E</span>
+                <span v-if="galleryStore.filters.aiSource === 'DALL-E'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Krita AI' }" @click="galleryStore.filters.aiSource = 'Krita AI'; onFilterChange()" class="flex justify-between items-center">
+                <span>Krita AI</span>
+                <span v-if="galleryStore.filters.aiSource === 'Krita AI'">✓</span>
+              </a></li>
+              <li><a :class="{ 'active': galleryStore.filters.aiSource === 'Unknown' }" @click="galleryStore.filters.aiSource = 'Unknown'; onFilterChange()" class="flex justify-between items-center">
+                <span>{{ $t('explorer.unknown_source') }}</span>
+                <span v-if="galleryStore.filters.aiSource === 'Unknown'">✓</span>
+              </a></li>
             </ul>
           </div>
         </div>
@@ -770,7 +858,8 @@ import {
   IconLeft,
   IconRight,
   IconArrowUp,
-  IconMore
+  IconMore,
+  IconStack
 } from '@/common/icons'
 
 // Overlays and modules
@@ -934,8 +1023,8 @@ watch(searchQuery, (newVal) => {
 })
 
 // Trash list state
-const trashItems = ref([])
-const trashCount = computed(() => trashItems.value.length)
+const trashItems = computed(() => galleryStore.trashItems)
+const trashCount = computed(() => galleryStore.trashItems.length)
 
 // Action visibility
 const compareVisible = ref(false)
@@ -1013,11 +1102,7 @@ const totalSelectedSize = computed(() => {
 
 // Fetch trash items
 async function fetchTrash() {
-  try {
-    trashItems.value = await invoke('get_trash_contents')
-  } catch (err) {
-    console.error('Failed to load trash:', err)
-  }
+  await galleryStore.fetchTrash()
 }
 
 watch(activeTab, (val) => {
@@ -1145,9 +1230,7 @@ async function goUp() {
 async function refreshData() {
   await navigationStore.refresh()
   galleryStore.setFiles(navigationStore.folders)
-  if (activeTab.value === 'trash') {
-    fetchTrash()
-  }
+  fetchTrash()
 }
 
 function toggleInspector() {
@@ -1160,6 +1243,10 @@ function onSortChange() {
 }
 
 function onFilterChange() {
+  // Реактивность Pinia автоматически обновит displayedFiles
+}
+
+function onGroupChange() {
   // Реактивность Pinia автоматически обновит displayedFiles
 }
 
@@ -1269,7 +1356,6 @@ function onCropSaved() {
 
 function onBatchComplete() {
   refreshData()
-  batchOperationsVisible.value = false
 }
 
 // Trash Bin actions

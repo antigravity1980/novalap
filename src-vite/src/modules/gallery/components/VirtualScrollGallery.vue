@@ -13,32 +13,51 @@
     style="user-select: none;"
   >
     <div class="virtual-scroll-spacer" :style="{ height: (totalHeight + topPadding * 2) + 'px' }">
-      <!-- Visible rows -->
-      <div
-        v-for="row in visibleRows"
-        :key="row.index"
-        class="gallery-row flex gap-2 px-2"
-        :style="{
-          position: 'absolute',
-          top: (row.top + topPadding) + 'px',
-          left: 0,
-          right: 0,
-          height: rowHeight + 'px',
-        }"
-      >
-        <ThumbnailCard
-          v-for="file in row.files"
-          :key="file.path"
-          :file="file"
-          :size="thumbnailSize"
-          :selected="galleryStore.selectedIds.includes(file.path)"
-          @click.stop="onCardClick($event, file)"
-          @dblclick.stop="onCardDblClick(file)"
-          class="flex-shrink-0"
-          :style="{ width: thumbnailSize + 'px' }"
-          :data-path="file.path"
-        />
-      </div>
+      <!-- Visible items -->
+      <template v-for="row in visibleRows" :key="row.index">
+        <!-- Group Header -->
+        <div
+          v-if="row.type === 'header'"
+          class="group-header flex items-center justify-between px-4 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
+          @click="onGroupHeaderClick($event, row)"
+          :style="{
+            position: 'absolute',
+            top: (row.top + topPadding) + 'px',
+            left: '8px',
+            right: '8px',
+            height: row.height + 'px',
+          }"
+        >
+          <span>{{ row.title }} ({{ row.filePaths.length }})</span>
+          <span class="text-[9px] opacity-40 font-normal">выбрать группу</span>
+        </div>
+
+        <!-- Row of thumbnails -->
+        <div
+          v-else-if="row.type === 'row'"
+          class="gallery-row flex gap-2 px-2"
+          :style="{
+            position: 'absolute',
+            top: (row.top + topPadding) + 'px',
+            left: 0,
+            right: 0,
+            height: row.height + 'px',
+          }"
+        >
+          <ThumbnailCard
+            v-for="file in row.files"
+            :key="file.path"
+            :file="file"
+            :size="thumbnailSize"
+            :selected="galleryStore.selectedIds.includes(file.path)"
+            @click.stop="onCardClick($event, file)"
+            @dblclick.stop="onCardDblClick(file)"
+            class="flex-shrink-0"
+            :style="{ width: thumbnailSize + 'px' }"
+            :data-path="file.path"
+          />
+        </div>
+      </template>
     </div>
 
     <!-- Rubber-band selection rectangle -->
@@ -60,7 +79,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
-import { useGalleryStore } from '../store'
+import { useGalleryStore, groupFilesHelper } from '../store'
 import { useNavigationStore } from '../../navigation/store'
 import { invoke } from '@tauri-apps/api/core'
 import ThumbnailCard from './ThumbnailCard.vue'
@@ -91,32 +110,75 @@ const colsPerRow = computed(() => {
   return Math.max(1, Math.floor((width + gap) / (props.thumbnailSize + gap)))
 })
 
-// Group files into rows
+// Group files into rows/headers
 const rows = computed(() => {
   const cols = colsPerRow.value
   const result = []
-  for (let i = 0; i < props.files.length; i += cols) {
+
+  if (!galleryStore.groupBy || galleryStore.groupBy === 'none') {
+    for (let i = 0; i < props.files.length; i += cols) {
+      result.push({
+        type: 'row',
+        index: result.length,
+        files: props.files.slice(i, i + cols),
+        height: rowHeight.value,
+      })
+    }
+    return result
+  }
+
+  // Grouping is active
+  const groups = groupFilesHelper(props.files, galleryStore.groupBy)
+  for (const group of groups) {
+    if (group.files.length === 0) continue
+
     result.push({
+      type: 'header',
       index: result.length,
-      files: props.files.slice(i, i + cols),
+      title: group.title,
+      filePaths: group.files.map(f => f.path),
+      height: 48,
     })
+
+    for (let i = 0; i < group.files.length; i += cols) {
+      result.push({
+        type: 'row',
+        index: result.length,
+        files: group.files.slice(i, i + cols),
+        height: rowHeight.value,
+      })
+    }
   }
   return result
 })
 
-const totalHeight = computed(() => rows.value.length * rowHeight.value)
+const rowsWithTop = computed(() => {
+  let currentTop = 0
+  return rows.value.map(row => {
+    const top = currentTop
+    currentTop += row.height
+    return {
+      ...row,
+      top,
+    }
+  })
+})
+
+const totalHeight = computed(() => {
+  if (rowsWithTop.value.length === 0) return 0
+  const last = rowsWithTop.value[rowsWithTop.value.length - 1]
+  return last.top + last.height
+})
 
 // Visible rows based on scroll position
 const visibleRows = computed(() => {
-  const startRow = Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - props.overscan)
-  const endRow = Math.min(
-    rows.value.length,
-    Math.ceil((scrollTop.value + containerHeight.value) / rowHeight.value) + props.overscan
-  )
-  return rows.value.slice(startRow, endRow).map(row => ({
-    ...row,
-    top: row.index * rowHeight.value,
-  }))
+  const start = scrollTop.value - props.overscan * rowHeight.value
+  const end = scrollTop.value + containerHeight.value + props.overscan * rowHeight.value
+
+  return rowsWithTop.value.filter(row => {
+    const rowBottom = row.top + row.height
+    return rowBottom >= start && row.top <= end
+  })
 })
 
 // ─── Rubber-band selection ───────────────────────────────────────────────────
@@ -138,18 +200,30 @@ const rubberBandStyle = computed(() => {
   }
 })
 
-function getCardRect(fileIndex) {
-  // Calculate the card bounds in document-scroll space
+let cardRects = []
+
+function cacheCardRects() {
+  cardRects = []
   const cols = colsPerRow.value
-  const rowIndex = Math.floor(fileIndex / cols)
-  const colIndex = fileIndex % cols
-  const px = 8 + colIndex * (props.thumbnailSize + gap) // px-2 = 8px padding
-  const py = rowIndex * rowHeight.value + topPadding
-  return {
-    left: px,
-    top: py,
-    right: px + props.thumbnailSize,
-    bottom: py + (props.thumbnailSize * 0.75 + 64),
+  let currentTop = 0
+
+  for (const row of rows.value) {
+    if (row.type === 'header') {
+      currentTop += row.height
+    } else if (row.type === 'row') {
+      const rowTop = currentTop + topPadding
+      row.files.forEach((file, colIndex) => {
+        const px = 8 + colIndex * (props.thumbnailSize + gap)
+        cardRects.push({
+          path: file.path,
+          left: px,
+          top: rowTop,
+          right: px + props.thumbnailSize,
+          bottom: rowTop + (props.thumbnailSize * 0.75 + 64),
+        })
+      })
+      currentTop += row.height
+    }
   }
 }
 
@@ -159,21 +233,22 @@ function getFilesInRect(rx1, ry1, rx2, ry2) {
   const top = Math.min(ry1, ry2)
   const bottom = Math.max(ry1, ry2)
 
-  return props.files.filter((_, i) => {
-    const r = getCardRect(i)
+  return cardRects.filter(r => {
     return r.right > left && r.left < right && r.bottom > top && r.top < bottom
-  }).map(f => f.path)
+  }).map(r => r.path)
 }
 
 function onMouseDown(e) {
-  // Only start rubber-band on the background (not on a card)
+  // Only start rubber-band on the background (not on a card or group header)
   if (e.button !== 0) return
   const target = e.target
-  if (target.closest('.thumbnail-card')) return
+  if (target.closest('.thumbnail-card') || target.closest('.group-header')) return
 
   const rect = containerRef.value.getBoundingClientRect()
   const x = e.clientX - rect.left
   const y = e.clientY - rect.top + scrollTop.value
+
+  cacheCardRects()
 
   isDragging.value = true
   dragStart.x = x
@@ -312,11 +387,30 @@ async function createFolderInCurrentDir() {
 }
 
 // ─── Keyboard Navigation ─────────────────────────────────────────────────────
+function onGroupHeaderClick(e, row) {
+  if (e.ctrlKey || e.metaKey) {
+    // Toggle selection for group files
+    const allSelected = row.filePaths.every(path => galleryStore.selectedIds.includes(path))
+    if (allSelected) {
+      galleryStore.selectedIds = galleryStore.selectedIds.filter(path => !row.filePaths.includes(path))
+    } else {
+      galleryStore.selectedIds = [...new Set([...galleryStore.selectedIds, ...row.filePaths])]
+    }
+  } else {
+    // Set selection to only group files
+    galleryStore.selectedIds = [...row.filePaths]
+  }
+}
+
 function scrollToIndex(index) {
-  const cols = colsPerRow.value
-  const rowIndex = Math.floor(index / cols)
-  const rowTop = rowIndex * rowHeight.value + topPadding
-  const rowBottom = rowTop + rowHeight.value
+  if (props.files.length === 0 || index < 0 || index >= props.files.length) return
+  const file = props.files[index]
+
+  const row = rowsWithTop.value.find(r => r.type === 'row' && r.files.some(f => f.path === file.path))
+  if (!row) return
+
+  const rowTop = row.top + topPadding
+  const rowBottom = rowTop + row.height
 
   const container = containerRef.value
   if (!container) return

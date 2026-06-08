@@ -203,13 +203,9 @@ pub async fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, S
 /// Сжать JPEG через mozjpeg (cjpeg)
 #[command]
 pub async fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> {
-    let tool_path = find_tool_path("cjpeg")
-        .ok_or_else(|| "mozjpeg (cjpeg) not found. Install it first.".to_string())?;
-
     let mut join_set = tokio::task::JoinSet::new();
 
     for file_path in files {
-        let tool_path = tool_path.clone();
         join_set.spawn_blocking(move || {
             let path = Path::new(&file_path);
             if !path.exists() {
@@ -226,31 +222,37 @@ pub async fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, St
             }
 
             let output_path = path.with_extension("mozjpeg.jpg");
-            let status = Command::new(&tool_path)
-                .args([
-                    "-quality",
-                    "85",
-                    "-optimize",
-                    "-outfile",
-                    &output_path.to_string_lossy(),
-                    &file_path,
-                ])
-                .output();
 
-            match status {
-                Ok(out) => {
-                    if out.status.success() {
-                        if let Err(e) = std::fs::rename(&output_path, path) {
-                            Err((file_path, format!("Failed to replace with optimized: {}", e)))
-                        } else {
-                            Ok(file_path)
-                        }
+            // Native Rust JPEG compression
+            let encode_res = (|| -> Result<(), String> {
+                let img = image::ImageReader::open(path)
+                    .map_err(|e| format!("Failed to open image: {}", e))?
+                    .decode()
+                    .map_err(|e| format!("Failed to decode image: {}", e))?;
+
+                let out_file = std::fs::File::create(&output_path)
+                    .map_err(|e| format!("Failed to create temp output file: {}", e))?;
+
+                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(out_file, 85);
+                encoder.encode_image(&img)
+                    .map_err(|e| format!("Failed to encode JPEG: {}", e))?;
+                
+                Ok(())
+            })();
+
+            match encode_res {
+                Ok(()) => {
+                    if let Err(e) = std::fs::rename(&output_path, path) {
+                        let _ = std::fs::remove_file(&output_path);
+                        Err((file_path, format!("Failed to replace with optimized: {}", e)))
                     } else {
-                        let stderr = String::from_utf8_lossy(&out.stderr);
-                        Err((file_path, format!("cjpeg failed: {}", stderr.trim())))
+                        Ok(file_path)
                     }
                 }
-                Err(e) => Err((file_path, format!("Failed to run cjpeg: {}", e))),
+                Err(e) => {
+                    let _ = std::fs::remove_file(&output_path);
+                    Err((file_path, e))
+                }
             }
         });
     }
@@ -285,8 +287,10 @@ pub async fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, St
 /// Проверить доступность внешнего инструмента
 #[command]
 pub fn check_optimizer(name: String) -> Result<bool, String> {
-    let resolved_name = if name == "pngquant" { "pngquant" } else { "cjpeg" };
-    Ok(is_tool_available(resolved_name))
+    if name == "cjpeg" {
+        return Ok(true); // Built-in native JPEG compression
+    }
+    Ok(is_tool_available("pngquant"))
 }
 
 /// Автоматически скачать оптимизаторы cjpeg и pngquant для Windows
@@ -297,7 +301,6 @@ pub async fn download_optimizers() -> Result<(), String> {
         let dest_dir = get_writable_optimizers_dir();
         std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Failed to create optimizers directory: {}", e))?;
 
-        let cjpeg_url = "https://raw.githubusercontent.com/imagemin/mozjpeg-bin/main/vendor/win/x64/cjpeg.exe";
         let pngquant_url = "https://raw.githubusercontent.com/imagemin/pngquant-bin/main/vendor/win/pngquant.exe";
 
         let client = reqwest::Client::new();
@@ -313,12 +316,6 @@ pub async fn download_optimizers() -> Result<(), String> {
             Ok(())
         }
 
-        // Download cjpeg.exe
-        let cjpeg_path = dest_dir.join("cjpeg.exe");
-        if !cjpeg_path.exists() {
-            download_file(&client, cjpeg_url, &cjpeg_path).await.map_err(|e| format!("Failed to download cjpeg: {}", e))?;
-        }
-
         // Download pngquant.exe
         let pngquant_path = dest_dir.join("pngquant.exe");
         if !pngquant_path.exists() {
@@ -329,6 +326,6 @@ pub async fn download_optimizers() -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        Err("Automatic installation is only supported on Windows. Please install pngquant and mozjpeg via your package manager.".to_string())
+        Ok(())
     }
 }
