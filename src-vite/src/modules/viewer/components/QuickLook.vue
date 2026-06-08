@@ -239,6 +239,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick, reactive } from
 import { invoke } from '@tauri-apps/api/core'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { getAssetSrc } from '@/common/utils'
+import { useUIStore } from '@/stores/uiStore'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -247,6 +248,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'update:visible', 'saved'])
+
+const uiStore = useUIStore()
 
 const overlayRef = ref(null)
 const workspaceRef = ref(null)
@@ -590,7 +593,8 @@ async function saveAndClose() {
 
     const success = await invoke('edit_image', { params })
 
-    if (success) {
+     if (success) {
+      uiStore.updateFileVersion(params.destFilePath)
       cacheBuster.value = Date.now()
       emit('saved')
       close()

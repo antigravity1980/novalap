@@ -394,7 +394,9 @@ pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
     let _guard = config_io_lock()
         .lock()
         .map_err(|_| "Config lock poisoned".to_string())?;
-    save_app_config_locked(config)
+    let res = save_app_config_locked(config);
+    crate::t_storage::invalidate_db_path_cache();
+    res
 }
 
 fn save_app_config_locked(config: &AppConfig) -> Result<(), String> {

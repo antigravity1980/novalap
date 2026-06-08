@@ -2,8 +2,9 @@
   <div
     class="thumbnail-card rounded-xl overflow-hidden border cursor-pointer transition-all duration-200 bg-base-200/40 relative flex flex-col justify-between"
     :class="{
-      'border-primary ring-2 ring-primary/45 shadow-lg shadow-primary/10 translate-y-[-2px] bg-base-100': selected,
-      'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30': !selected,
+      'border-primary ring-2 ring-primary/45 shadow-lg shadow-primary/10 translate-y-[-2px] bg-base-100': selected && !dragOverCard,
+      'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30': !selected && !dragOverCard,
+      'bg-secondary/20 border-secondary ring-2 ring-secondary/45 border-dashed': dragOverCard,
     }"
     :style="{ width: size + 'px' }"
     @click="$emit('click', $event)"
@@ -11,6 +12,10 @@
     @contextmenu.prevent.stop="handleContextMenu($event)"
     draggable="true"
     @dragstart="handleDragStart"
+    @dragover.prevent="isFolder ? dragOverCard = true : null"
+    @dragenter.prevent="isFolder ? dragOverCard = true : null"
+    @dragleave="dragOverCard = false"
+    @drop.prevent="handleDrop"
   >
     <!-- Thumbnail Image Container -->
     <div
@@ -124,6 +129,7 @@ import { getAssetSrc } from '@/common/utils'
 import { useConfigStore } from '@/stores/configStore'
 import { useNavigationStore } from '@/modules/navigation/store'
 import { useGalleryStore } from '@/modules/gallery/store'
+import { useUIStore } from '@/stores/uiStore'
 import { invoke } from '@tauri-apps/api/core'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MessageBox from '@/components/MessageBox.vue'
@@ -139,10 +145,12 @@ defineEmits(['click', 'dblclick'])
 const configStore = useConfigStore()
 const navigationStore = useNavigationStore()
 const galleryStore = useGalleryStore()
+const uiStore = useUIStore()
 const contextMenuRef = ref(null)
 
 const isRenaming = ref(false)
 const renameText = ref('')
+const dragOverCard = ref(false)
 const renameInputRef = ref(null)
 
 const isFolder = computed(() => {
@@ -181,7 +189,7 @@ async function loadThumbnail() {
     }
   }, 150)
 }
-watch([() => props.file.path, () => props.size], loadThumbnail, { immediate: true })
+watch([() => props.file.path, () => props.size, () => uiStore.fileVersions[props.file.path]], loadThumbnail, { immediate: true })
 
 const folderIconUrl = computed(() => {
   if (!isFolder.value) return ''
@@ -325,6 +333,34 @@ function handleDragStart(e) {
   }
   e.dataTransfer.setData('text/plain', JSON.stringify(paths))
   e.dataTransfer.effectAllowed = 'move'
+}
+
+async function handleDrop(e) {
+  dragOverCard.value = false
+  if (!isFolder.value) return
+
+  try {
+    const data = e.dataTransfer.getData('text/plain')
+    if (!data) return
+    const paths = JSON.parse(data)
+    if (!Array.isArray(paths) || paths.length === 0) return
+
+    const destPath = props.file.path
+    for (const src of paths) {
+      if (src === destPath) continue
+      const lastSlash = Math.max(src.lastIndexOf('\\'), src.lastIndexOf('/'))
+      const fileName = lastSlash !== -1 ? src.substring(lastSlash + 1) : src
+      const dest = `${destPath}${destPath.endsWith('\\') || destPath.endsWith('/') ? '' : '\\'}${fileName}`
+      if (src.toLowerCase() === dest.toLowerCase()) continue
+
+      await invoke('cross_move', { src, dest })
+    }
+
+    await navigationStore.navigateTo(navigationStore.currentPath)
+    galleryStore.setFiles(navigationStore.folders)
+  } catch (err) {
+    console.error('Card drop failed:', err)
+  }
 }
 
 const showConfirm = ref(false)

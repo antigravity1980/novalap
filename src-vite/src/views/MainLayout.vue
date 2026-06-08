@@ -334,7 +334,7 @@
           <!-- Multi-select Mode -->
           <button
             class="win11-btn text-xs flex items-center gap-1.5 transition-all duration-150"
-            :class="galleryStore.selectionMode ? 'bg-green-600 border-green-600 text-white font-bold shadow shadow-green-600/30' : 'font-semibold'"
+            :class="galleryStore.selectionMode ? 'win11-btn-active-selection' : 'font-semibold'"
             @click="galleryStore.selectionMode = !galleryStore.selectionMode"
             title="Режим выбора нескольких элементов без зажатия Ctrl"
           >

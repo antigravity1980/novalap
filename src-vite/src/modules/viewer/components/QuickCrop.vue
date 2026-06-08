@@ -98,12 +98,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { getAssetSrc } from '@/common/utils'
+import { useUIStore } from '@/stores/uiStore'
 
 const props = defineProps({
   file: { type: Object, default: null },
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+const uiStore = useUIStore()
 
 const imageRef = ref(null)
 const cropContainer = ref(null)
@@ -298,6 +301,8 @@ async function saveCrop() {
     if (!success) {
       throw new Error('Backend failed to crop and save the image.')
     }
+
+    uiStore.updateFileVersion(editParams.destFilePath)
 
     emit('saved', savePath)
     emit('close')

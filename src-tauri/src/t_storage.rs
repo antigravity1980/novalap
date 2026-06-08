@@ -79,13 +79,43 @@ pub fn get_library_db_path(library_id: &str) -> Result<String, String> {
     get_library_db_path_from_config(&config, library_id)
 }
 
+use std::sync::OnceLock;
+use std::sync::RwLock;
+
+static CURRENT_DB_PATH_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+
+fn get_db_path_cache() -> &'static RwLock<Option<String>> {
+    CURRENT_DB_PATH_CACHE.get_or_init(|| RwLock::new(None))
+}
+
+pub fn invalidate_db_path_cache() {
+    if let Ok(mut cache) = get_db_path_cache().write() {
+        *cache = None;
+    }
+}
+
 /// Get the current library's database file path
 pub fn get_current_db_path() -> Result<String, String> {
     if is_db_migration_in_progress() {
         return Err("Database storage migration is in progress.".to_string());
     }
+    
+    // Check cache first
+    if let Ok(cache) = get_db_path_cache().read() {
+        if let Some(ref path) = *cache {
+            return Ok(path.clone());
+        }
+    }
+
     let config = t_config::load_app_config()?;
-    get_library_db_path_from_config(&config, &config.current_library_id)
+    let path = get_library_db_path_from_config(&config, &config.current_library_id)?;
+    
+    // Update cache
+    if let Ok(mut cache) = get_db_path_cache().write() {
+        *cache = Some(path.clone());
+    }
+
+    Ok(path)
 }
 
 fn checkpoint_db(path: &Path) -> Result<(), String> {

@@ -796,18 +796,43 @@ pub async fn edit_image(params: EditParams) -> bool {
             .unwrap_or_else(|| Path::new(&params.source_file_path));
 
         let quality = params.quality.unwrap_or(80);
-        let save_ok = if format == image::ImageFormat::Jpeg {
-            if let Ok(file) = std::fs::File::create(path) {
+        // Save to a temporary file in the same directory first to bypass WebView2 file locks.
+        let temp_path = path.with_extension("tmp_save");
+        let encode_ok = if format == image::ImageFormat::Jpeg {
+            if let Ok(file) = std::fs::File::create(&temp_path) {
                 let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, quality);
                 encoder.encode_image(&img).is_ok()
             } else {
                 false
             }
         } else {
-            img.save_with_format(path, format).is_ok()
+            img.save_with_format(&temp_path, format).is_ok()
         };
 
+        if !encode_ok {
+            let _ = std::fs::remove_file(&temp_path);
+            cleanup_metadata_backup(&metadata_backup_path);
+            return false;
+        }
+
+        let mut save_ok = false;
+        for _attempt in 1..=5 {
+            if std::fs::rename(&temp_path, path).is_ok() {
+                save_ok = true;
+                break;
+            } else {
+                // If rename fails, try copying and then deleting
+                if std::fs::copy(&temp_path, path).is_ok() {
+                    let _ = std::fs::remove_file(&temp_path);
+                    save_ok = true;
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+
         if !save_ok {
+            let _ = std::fs::remove_file(&temp_path);
             cleanup_metadata_backup(&metadata_backup_path);
             return false;
         }
@@ -876,8 +901,16 @@ fn copy_metadata_to_output(source_path: &Path, dest_path: &Path) -> Result<(), S
         match result {
             Ok(Ok(mut metadata)) => {
                 sanitize_edit_output_metadata(&mut metadata);
-                if let Err(e) = metadata.write_to_file(dest_path) {
-                    little_exif_error = format!("little_exif write failed: {}", e);
+                let mut write_success = false;
+                for _attempt in 1..=5 {
+                    if metadata.write_to_file(dest_path).is_ok() {
+                        write_success = true;
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                }
+                if !write_success {
+                    little_exif_error = "little_exif write failed after 5 retries".to_string();
                 } else {
                     little_exif_worked = true;
                 }
@@ -1047,7 +1080,26 @@ fn write_jpeg_exif_block(dest_path: &Path, exif_tiff_data: &[u8]) -> Result<(), 
     output.extend_from_slice(&app1_segment);
     output.extend_from_slice(&file_buffer[2..]);
 
-    fs::write(dest_path, output).map_err(|e| format!("Failed to write destination JPEG: {}", e))
+    let mut write_success = false;
+    let mut last_err = String::new();
+    for _attempt in 1..=5 {
+        match fs::write(dest_path, &output) {
+            Ok(_) => {
+                write_success = true;
+                break;
+            }
+            Err(e) => {
+                last_err = e.to_string();
+                std::thread::sleep(std::time::Duration::from_millis(150));
+            }
+        }
+    }
+
+    if write_success {
+        Ok(())
+    } else {
+        Err(format!("Failed to write destination JPEG after 5 retries: {}", last_err))
+    }
 }
 
 /// copy an image to clipboard

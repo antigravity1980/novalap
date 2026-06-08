@@ -230,3 +230,19 @@ html, body {
   background-color: var(--color-primary);
   border-radius: 2px;
 }
+
+.win11-btn-active-selection {
+  background-color: #22c55e !important;
+  color: #ffffff !important;
+  font-weight: bold !important;
+  border: 1px solid #16a34a !important;
+  box-shadow: 0 2px 5px rgba(34, 197, 94, 0.3) !important;
+}
+.win11-btn-active-selection:hover {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+}
+.win11-btn-active-selection:active {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+}
