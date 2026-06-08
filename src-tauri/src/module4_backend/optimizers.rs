@@ -14,6 +14,32 @@ use tauri::command;
 
 use super::batch::BatchResult;
 
+fn get_writable_optimizers_dir() -> PathBuf {
+    // Try current_exe dir/optimizers first
+    if let Ok(mut current_exe) = env::current_exe() {
+        if current_exe.pop() {
+            let exe_opt_dir = current_exe.join("optimizers");
+            if std::fs::create_dir_all(&exe_opt_dir).is_ok() {
+                let test_file = exe_opt_dir.join(".write_test");
+                if std::fs::write(&test_file, "").is_ok() {
+                    let _ = std::fs::remove_file(test_file);
+                    return exe_opt_dir;
+                }
+            }
+        }
+    }
+
+    // Fallback to local appdata: AppData/Local/LapAI/optimizers
+    if let Some(local_data) = dirs::data_local_dir() {
+        let app_data_dir = local_data.join("LapAI").join("optimizers");
+        let _ = std::fs::create_dir_all(&app_data_dir);
+        return app_data_dir;
+    }
+
+    // Last resort: temp directory
+    std::env::temp_dir().join("LapAI").join("optimizers")
+}
+
 /// Поиск пути к исполняемому файлу утилиты
 fn find_tool_path(name: &str) -> Option<PathBuf> {
     // 1. Проверяем в системном PATH
@@ -51,6 +77,19 @@ fn find_tool_path(name: &str) -> Option<PathBuf> {
                     return Some(sub_path);
                 }
             }
+        }
+    }
+
+    // 2b. Проверяем в AppData/Local/LapAI/optimizers (Windows fallback)
+    if let Some(local_data) = dirs::data_local_dir() {
+        let exe_name = if cfg!(target_os = "windows") {
+            format!("{}.exe", name)
+        } else {
+            name.to_string()
+        };
+        let app_data_path = local_data.join("LapAI").join("optimizers").join(&exe_name);
+        if app_data_path.exists() && app_data_path.is_file() {
+            return Some(app_data_path);
         }
     }
 
@@ -223,4 +262,48 @@ pub fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> 
 pub fn check_optimizer(name: String) -> Result<bool, String> {
     let resolved_name = if name == "pngquant" { "pngquant" } else { "cjpeg" };
     Ok(is_tool_available(resolved_name))
+}
+
+/// Автоматически скачать оптимизаторы cjpeg и pngquant для Windows
+#[command]
+pub async fn download_optimizers() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let dest_dir = get_writable_optimizers_dir();
+        std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Failed to create optimizers directory: {}", e))?;
+
+        let cjpeg_url = "https://raw.githubusercontent.com/imagemin/mozjpeg-bin/main/vendor/win/cjpeg.exe";
+        let pngquant_url = "https://raw.githubusercontent.com/imagemin/pngquant-bin/main/vendor/win/pngquant.exe";
+
+        let client = reqwest::Client::new();
+
+        // Helper to download a file
+        async fn download_file(client: &reqwest::Client, url: &str, dest_path: &Path) -> Result<(), String> {
+            let response = client.get(url).send().await.map_err(|e| format!("Request failed: {}", e))?;
+            if !response.status().is_success() {
+                return Err(format!("Server returned error: {}", response.status()));
+            }
+            let bytes = response.bytes().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+            std::fs::write(dest_path, bytes).map_err(|e| format!("Failed to write file to disk: {}", e))?;
+            Ok(())
+        }
+
+        // Download cjpeg.exe
+        let cjpeg_path = dest_dir.join("cjpeg.exe");
+        if !cjpeg_path.exists() {
+            download_file(&client, cjpeg_url, &cjpeg_path).await.map_err(|e| format!("Failed to download cjpeg: {}", e))?;
+        }
+
+        // Download pngquant.exe
+        let pngquant_path = dest_dir.join("pngquant.exe");
+        if !pngquant_path.exists() {
+            download_file(&client, pngquant_url, &pngquant_path).await.map_err(|e| format!("Failed to download pngquant: {}", e))?;
+        }
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Automatic installation is only supported on Windows. Please install pngquant and mozjpeg via your package manager.".to_string())
+    }
 }

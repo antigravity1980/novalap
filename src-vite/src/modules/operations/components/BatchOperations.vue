@@ -172,28 +172,42 @@
 
           <!-- 5. Compress -->
           <div v-if="activeTab === 'compress'" class="space-y-4">
-            <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
-              <div>
-                <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossy_png') }}</h4>
-                <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossy_png_hint') }}</p>
-              </div>
-              <span v-if="optimizers.pngquant === null" class="loading loading-spinner loading-xs"></span>
-              <span v-else-if="optimizers.pngquant" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
-              <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+            <div v-if="downloadingOptimizers" class="p-4 bg-base-300/50 rounded-lg border border-primary/20 flex flex-col items-center justify-center text-center gap-2">
+              <span class="loading loading-spinner loading-md text-primary"></span>
+              <div class="text-xs font-bold text-primary">Автоматическая установка утилит сжатия...</div>
+              <div class="text-[10px] text-base-content/50">Скачиваем pngquant и cjpeg для сжатия изображений без потери качества. Пожалуйста, подождите...</div>
             </div>
 
-            <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
-              <div>
-                <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossless_jpeg') }}</h4>
-                <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossless_jpeg_hint') }}</p>
-              </div>
-              <span v-if="optimizers.cjpeg === null" class="loading loading-spinner loading-xs"></span>
-              <span v-else-if="optimizers.cjpeg" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
-              <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+            <div v-else-if="downloadError" class="alert alert-error py-2 px-3 text-xs leading-normal flex flex-col items-start gap-1">
+              <span class="font-bold">⚠️ Ошибка установки</span>
+              <span>{{ downloadError }}</span>
+              <button class="btn btn-xs btn-outline mt-1 font-semibold" @click="checkAndInstallOptimizers">Повторить попытку</button>
             </div>
 
-            <div class="alert alert-info py-2 px-3 text-xs leading-normal">
-              <span>{{ $t('batch_ops.compress_notice') }}</span>
+            <div v-else class="space-y-4">
+              <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
+                <div>
+                  <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossy_png') }}</h4>
+                  <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossy_png_hint') }}</p>
+                </div>
+                <span v-if="optimizers.pngquant === null" class="loading loading-spinner loading-xs"></span>
+                <span v-else-if="optimizers.pngquant" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
+                <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+              </div>
+
+              <div class="p-3 bg-base-300/50 rounded-lg flex items-center justify-between border border-base-200/30">
+                <div>
+                  <h4 class="text-xs font-semibold text-base-content">{{ $t('batch_ops.lossless_jpeg') }}</h4>
+                  <p class="text-[10px] text-base-content/50">{{ $t('batch_ops.lossless_jpeg_hint') }}</p>
+                </div>
+                <span v-if="optimizers.cjpeg === null" class="loading loading-spinner loading-xs"></span>
+                <span v-else-if="optimizers.cjpeg" class="badge badge-success badge-sm font-semibold">{{ $t('batch_ops.available') }}</span>
+                <span v-else class="badge badge-neutral badge-sm font-semibold">{{ $t('batch_ops.not_installed') }}</span>
+              </div>
+
+              <div class="alert alert-info py-2 px-3 text-xs leading-normal">
+                <span>{{ $t('batch_ops.compress_notice') }}</span>
+              </div>
             </div>
           </div>
 
@@ -422,21 +436,53 @@ const optimizers = reactive({
   cjpeg: null,
 })
 
+const downloadingOptimizers = ref(false)
+const downloadError = ref('')
+
+async function checkAndInstallOptimizers() {
+  optimizers.pngquant = null
+  optimizers.cjpeg = null
+  downloadError.value = ''
+  
+  let pngquantOk = false
+  let cjpegOk = false
+  
+  try {
+    pngquantOk = await invoke('check_optimizer', { name: 'pngquant' })
+  } catch {
+    pngquantOk = false
+  }
+  
+  try {
+    cjpegOk = await invoke('check_optimizer', { name: 'cjpeg' })
+  } catch {
+    cjpegOk = false
+  }
+  
+  optimizers.pngquant = pngquantOk
+  optimizers.cjpeg = cjpegOk
+  
+  // If not installed, trigger automatic download
+  if (!pngquantOk || !cjpegOk) {
+    downloadingOptimizers.value = true
+    try {
+      await invoke('download_optimizers')
+      // Recheck
+      optimizers.pngquant = await invoke('check_optimizer', { name: 'pngquant' })
+      optimizers.cjpeg = await invoke('check_optimizer', { name: 'cjpeg' })
+    } catch (err) {
+      console.error('Failed to download optimizers:', err)
+      downloadError.value = typeof err === 'string' ? err : 'Ошибка сети при скачивании утилит сжатия.'
+    } finally {
+      downloadingOptimizers.value = false
+    }
+  }
+}
+
 // Check external optimizer binaries when tab is selected
 watch(activeTab, async (tab) => {
   if (tab === 'compress') {
-    optimizers.pngquant = null
-    optimizers.cjpeg = null
-    try {
-      optimizers.pngquant = await invoke('check_optimizer', { name: 'pngquant' })
-    } catch {
-      optimizers.pngquant = false
-    }
-    try {
-      optimizers.cjpeg = await invoke('check_optimizer', { name: 'cjpeg' })
-    } catch {
-      optimizers.cjpeg = false
-    }
+    await checkAndInstallOptimizers()
   }
 })
 

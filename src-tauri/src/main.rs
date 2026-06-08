@@ -231,6 +231,7 @@ async fn main() {
             module4_backend::optimize_with_pngquant,
             module4_backend::optimize_with_mozjpeg,
             module4_backend::check_optimizer,
+            module4_backend::download_optimizers,
             // library
             t_cmds::get_app_config,
             t_cmds::set_last_selected_item_index,

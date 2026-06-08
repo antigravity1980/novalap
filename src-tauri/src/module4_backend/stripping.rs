@@ -42,7 +42,11 @@ pub fn strip_metadata(files: Vec<String>) -> Result<BatchResult, String> {
         };
 
         match strip_result {
-            Ok(_) => result.succeeded += 1,
+            Ok(_) => {
+                // Синхронизируем базу данных
+                super::batch::sync_file_metadata_in_db(file_path);
+                result.succeeded += 1;
+            }
             Err(e) => {
                 result.failed += 1;
                 result.errors.push(format!("Failed to strip {}: {}", file_path, e));

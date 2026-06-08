@@ -63,11 +63,11 @@
           <div class="px-3 py-1 text-[10px] font-bold text-base-content/40 uppercase tracking-widest flex items-center justify-between">
             <span>{{ $t('explorer.this_pc') }}</span>
             <button
-              class="hover:text-base-content hover:bg-base-100/40 rounded p-0.5"
+              class="hover:text-base-content hover:bg-base-100/40 rounded p-0.5 flex items-center justify-center"
               title="Показать/скрыть диски"
               @click.stop="showDrivesDropdown = !showDrivesDropdown"
             >
-              👁️
+              <IconMore class="w-3.5 h-3.5" />
             </button>
           </div>
           <!-- Dropdown container -->
@@ -334,12 +334,12 @@
           <!-- Multi-select Mode -->
           <button
             class="win11-btn text-xs flex items-center gap-1.5 transition-all duration-150"
-            :class="galleryStore.selectionMode ? 'bg-primary text-primary-content font-bold border border-primary shadow shadow-primary/30' : 'font-semibold'"
+            :class="galleryStore.selectionMode ? 'bg-green-600 border-green-600 text-white font-bold shadow shadow-green-600/30' : 'font-semibold'"
             @click="galleryStore.selectionMode = !galleryStore.selectionMode"
             title="Режим выбора нескольких элементов без зажатия Ctrl"
           >
             <span class="w-3.5 h-3.5 flex items-center justify-center border rounded border-current text-[9px] font-bold">✓</span>
-            <span>Режим выбора: {{ galleryStore.selectionMode ? 'ВКЛ' : 'ВЫКЛ' }}</span>
+            <span>Режим выбора</span>
           </button>
 
           <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
@@ -769,7 +769,8 @@ import {
   IconHome,
   IconLeft,
   IconRight,
-  IconArrowUp
+  IconArrowUp,
+  IconMore
 } from '@/common/icons'
 
 // Overlays and modules

@@ -62,6 +62,9 @@ pub fn batch_color_correct(
             continue;
         }
 
+        // Синхронизируем базу данных
+        super::batch::sync_file_metadata_in_db(file_path);
+
         result.succeeded += 1;
     }
 

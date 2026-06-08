@@ -245,11 +245,8 @@ async function saveCrop() {
       return
     }
 
-    const canvas = document.createElement('canvas')
     // Get natural image dimensions and calculate crop ratio
     const img = new Image()
-    img.crossOrigin = 'anonymous'
-
     await new Promise((resolve, reject) => {
       img.onload = resolve
       img.onerror = reject
@@ -267,24 +264,46 @@ async function saveCrop() {
     const cropW = crop.width * scaleX
     const cropH = crop.height * scaleY
 
-    canvas.width = cropW
-    canvas.height = cropH
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
-
-    // Convert to blob and save via Tauri plugin-fs
     const ext = savePath.split('.').pop().toLowerCase()
-    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg'
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, 0.95))
-    const arrayBuffer = await blob.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
+    
+    const editParams = {
+      sourceFilePath: props.file.path,
+      destFilePath: savePath,
+      outputFormat: ext,
+      orientation: props.file.orientation || 1,
+      flipHorizontal: false,
+      flipVertical: false,
+      rotate: 0,
+      crop: {
+        x: Math.max(0, Math.round(cropX)),
+        y: Math.max(0, Math.round(cropY)),
+        width: Math.max(1, Math.round(cropW)),
+        height: Math.max(1, Math.round(cropH)),
+      },
+      resize: {
+        width: null,
+        height: null,
+      },
+      quality: 95,
+      filter: null,
+      brightness: null,
+      contrast: null,
+      blur: null,
+      hueRotate: null,
+      saturation: null,
+      gamma: null,
+    }
 
-    await writeFile(savePath, uint8Array)
+    const success = await invoke('edit_image', { params: editParams })
+    if (!success) {
+      throw new Error('Backend failed to crop and save the image.')
+    }
 
     emit('saved', savePath)
     emit('close')
   } catch (error) {
     console.error('Crop save failed:', error)
+    alert('Ошибка при сохранении: ' + error)
   } finally {
     saving.value = false
   }

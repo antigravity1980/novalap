@@ -83,6 +83,12 @@ export const useGalleryStore = defineStore('gallery', {
 
       // Сортировка
       files.sort((a, b) => {
+        // Папки всегда первыми
+        const aIsDir = a.is_dir === true || a.file_type === 'directory' || a.is_directory === true
+        const bIsDir = b.is_dir === true || b.file_type === 'directory' || b.is_directory === true
+        if (aIsDir && !bIsDir) return -1
+        if (!aIsDir && bIsDir) return 1
+
         let cmp = 0
         switch (state.sortBy) {
           case 'name':

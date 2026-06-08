@@ -65,7 +65,25 @@
           @mouseenter="cancelSubmenuClose"
           @mouseleave="scheduleSubmenuClose(activeSubmenuIndex)"
         >
-          <template v-for="(child, childIndex) in activeSubmenuItem.children">
+          <!-- Grid Mode for Folder Recoloring -->
+          <div v-if="activeSubmenuItem.grid" class="grid grid-cols-5 gap-1.5 p-2 max-w-[210px] justify-items-center">
+            <button
+              v-for="(child, childIndex) in activeSubmenuItem.children"
+              :key="childIndex"
+              :class="[
+                'p-1 flex items-center justify-center rounded-lg hover:bg-base-100/50 transition-all cursor-pointer border border-transparent hover:border-base-content/10',
+                child.disabled ? 'opacity-30 pointer-events-none' : ''
+              ]"
+              :title="child.tooltip"
+              @click="handleLeafClick(child)"
+            >
+              <img v-if="child.iconUrl" :src="child.iconUrl" class="w-7 h-7 object-contain select-none pointer-events-none" />
+              <div v-else class="w-7 h-7 rounded bg-primary"></div>
+            </button>
+          </div>
+
+          <!-- Default List Mode -->
+          <template v-else v-for="(child, childIndex) in activeSubmenuItem.children">
             <div
               v-if="!child.hidden"
               :key="childIndex"

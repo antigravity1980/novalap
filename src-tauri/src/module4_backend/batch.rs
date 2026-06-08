@@ -91,6 +91,9 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
             continue;
         }
 
+        // Синхронизируем базу данных
+        sync_file_metadata_in_db(file_path);
+
         println!("[BatchResize] Successfully resized and saved {}", file_path);
         result.succeeded += 1;
     }
@@ -303,5 +306,41 @@ fn calculate_dimensions(
         }
         "fill" => (target_width, target_height),
         _ => (orig_width, orig_height),
+    }
+}
+
+/// Синхронизировать метаданные файла в базе данных после изменения на диске
+pub fn sync_file_metadata_in_db(file_path: &str) {
+    let path = Path::new(file_path);
+    let parent_path = match path.parent() {
+        Some(p) => p.to_string_lossy().to_string(),
+        None => return,
+    };
+
+    if let Ok(Some(folder)) = crate::t_sqlite::AFolder::fetch(&parent_path) {
+        if let Some(folder_id) = folder.id {
+            if let Ok(Some(mut file_rec)) = crate::t_sqlite::AFile::fetch(folder_id, file_path) {
+                // Считываем новый размер и время модификации
+                if let Ok(meta) = std::fs::metadata(file_path) {
+                    file_rec.size = meta.len() as i64;
+                    if let Ok(modified) = meta.modified() {
+                        if let Ok(dur) = modified.duration_since(std::time::UNIX_EPOCH) {
+                            file_rec.modified_at = Some(dur.as_secs() as i64);
+                        }
+                    }
+                }
+
+                // Считываем новые размеры изображения
+                if let Ok((w, h)) = crate::t_image::get_image_dimensions(file_path) {
+                    file_rec.width = Some(w);
+                    file_rec.height = Some(h);
+                }
+
+                if let Some(fid) = file_rec.id {
+                    let _ = crate::t_sqlite::AFile::update(fid, &file_rec);
+                    let _ = crate::t_sqlite::AThumb::delete(fid);
+                }
+            }
+        }
     }
 }

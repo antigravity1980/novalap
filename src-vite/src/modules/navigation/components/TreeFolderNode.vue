@@ -122,24 +122,25 @@ const recolorMenuItems = computed(() => {
     },
     {
       label: 'Перекрасить папку',
+      grid: true,
       children: [
-        { label: '⭐ Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
-        { label: 'По умолчанию', action: () => setFolderIcon(null) },
-      { label: 'Папка 01', action: () => setFolderIcon('01.ico') },
-      { label: 'Папка 02', action: () => setFolderIcon('02.ico') },
-      { label: 'Папка 03', action: () => setFolderIcon('03.ico') },
-      { label: 'Папка 04', action: () => setFolderIcon('04.ico') },
-      { label: 'Папка 05', action: () => setFolderIcon('05.ico') },
-      { label: 'Папка 06', action: () => setFolderIcon('06.ico') },
-      { label: 'Папка 07', action: () => setFolderIcon('07.ico') },
-      { label: 'Папка 08', action: () => setFolderIcon('08.ico') },
-      { label: 'Папка 09', action: () => setFolderIcon('09.ico') },
-      { label: 'Папка 10', action: () => setFolderIcon('10.ico') },
-      { label: 'Папка 11', action: () => setFolderIcon('11.ico') },
-      { label: 'Папка 12', action: () => setFolderIcon('12.ico') },
-      { label: 'Папка 15', action: () => setFolderIcon('15.ico') },
-    ]
-  }
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\14.ico'), tooltip: 'По умолчанию', action: () => setFolderIcon(null) },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\I1.ico'), tooltip: 'Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\01.ico'), tooltip: 'Папка 01', action: () => setFolderIcon('01.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\02.ico'), tooltip: 'Папка 02', action: () => setFolderIcon('02.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\03.ico'), tooltip: 'Папка 03', action: () => setFolderIcon('03.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\04.ico'), tooltip: 'Папка 04', action: () => setFolderIcon('04.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\05.ico'), tooltip: 'Папка 05', action: () => setFolderIcon('05.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\06.ico'), tooltip: 'Папка 06', action: () => setFolderIcon('06.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\07.ico'), tooltip: 'Папка 07', action: () => setFolderIcon('07.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\08.ico'), tooltip: 'Папка 08', action: () => setFolderIcon('08.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\09.ico'), tooltip: 'Папка 09', action: () => setFolderIcon('09.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\10.ico'), tooltip: 'Папка 10', action: () => setFolderIcon('10.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\11.ico'), tooltip: 'Папка 11', action: () => setFolderIcon('11.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\12.ico'), tooltip: 'Папка 12', action: () => setFolderIcon('12.ico') },
+        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\15.ico'), tooltip: 'Папка 15', action: () => setFolderIcon('15.ico') },
+      ]
+    }
 ]
 })
 
