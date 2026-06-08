@@ -203,6 +203,7 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             // Module 1: Navigation & File Manager
             module1_navigation::list_directory,
+            module1_navigation::watch_directory,
             module1_navigation::get_drives,
             module1_navigation::get_file_entry,
             module1_navigation::get_explorer_thumbnail,

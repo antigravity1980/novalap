@@ -14,27 +14,8 @@ pub const FFMPEG_BACKED_IMGS: &[&str] = &[
 ];
 
 // RAW support
-pub const RAW_IMGS: &[&str] = &[
-    "cr2", "cr3", "crw", // Canon
-    "nef", "nrw", // Nikon
-    "arw", "srf", "sr2", // Sony
-    "raf", // Fujifilm
-    "rw2", // Panasonic
-    "orf", // Olympus / OM System
-    "pef", // Pentax
-    "dng", // Adobe / generic RAW
-    "srw", // Samsung
-    "rwl", // Leica
-    "mrw", // Minolta / Konica Minolta
-    "3fr", // Hasselblad
-    "mos", // Leaf / Phase One
-    // "x3f", // Sigma / Foveon - temporarily disabled: current LibRaw path reports FileUnsupported for sampled X3F files, so indexing fails at RAW dimensions.
-    "dcr", "kdc", // Kodak
-    "erf", // Epson
-    "mef", // Mamiya
-    "raw", // Generic vendor RAW extension
-    "mdc", // Legacy RAW variant in sample set
-];
+#[allow(dead_code)]
+pub const RAW_IMGS: &[&str] = &[];
 
 // Video support
 pub const VIDEOS: &[&str] = &[

@@ -42,26 +42,27 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
     };
 
     for file_path in &files {
-        let path = Path::new(file_path);
+        let normalized_path = file_path.replace("\\", "/");
+        let path = Path::new(&normalized_path);
 
         // Проверяем существование
         if !path.exists() {
-            println!("[BatchResize] Error: File not found - {}", file_path);
+            println!("[BatchResize] Error: File not found - {}", normalized_path);
             result.failed += 1;
-            result.errors.push(format!("File not found: {}", file_path));
+            result.errors.push(format!("File not found: {}", normalized_path));
             continue;
         }
 
         // Загружаем изображение
         let img = match image::open(path) {
             Ok(img) => {
-                println!("[BatchResize] Opened: {} ({}x{})", file_path, img.width(), img.height());
+                println!("[BatchResize] Opened: {} ({}x{})", normalized_path, img.width(), img.height());
                 img
             }
             Err(e) => {
-                println!("[BatchResize] Error: Failed to open {} - {}", file_path, e);
+                println!("[BatchResize] Error: Failed to open {} - {}", normalized_path, e);
                 result.failed += 1;
-                result.errors.push(format!("Failed to open {}: {}", file_path, e));
+                result.errors.push(format!("Failed to open {}: {}", normalized_path, e));
                 continue;
             }
         };
@@ -74,7 +75,7 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
             preset.height,
             &preset.fit,
         );
-        println!("[BatchResize] Resizing {} from {}x{} to {}x{}", file_path, img.width(), img.height(), new_width, new_height);
+        println!("[BatchResize] Resizing {} from {}x{} to {}x{}", normalized_path, img.width(), img.height(), new_width, new_height);
 
         // Ресайзим
         let resized = img.resize_exact(
@@ -85,16 +86,16 @@ pub fn batch_resize(files: Vec<String>, preset: ResizePreset) -> Result<BatchRes
 
         // Сохраняем (перезаписываем)
         if let Err(e) = resized.save(path) {
-            println!("[BatchResize] Error: Failed to save {} - {}", file_path, e);
+            println!("[BatchResize] Error: Failed to save {} - {}", normalized_path, e);
             result.failed += 1;
-            result.errors.push(format!("Failed to save {}: {}", file_path, e));
+            result.errors.push(format!("Failed to save {}: {}", normalized_path, e));
             continue;
         }
 
         // Синхронизируем базу данных
-        sync_file_metadata_in_db(file_path);
+        sync_file_metadata_in_db(&normalized_path);
 
-        println!("[BatchResize] Successfully resized and saved {}", file_path);
+        println!("[BatchResize] Successfully resized and saved {}", normalized_path);
         result.succeeded += 1;
     }
 
@@ -311,34 +312,46 @@ fn calculate_dimensions(
 
 /// Синхронизировать метаданные файла в базе данных после изменения на диске
 pub fn sync_file_metadata_in_db(file_path: &str) {
-    let path = Path::new(file_path);
+    let normalized_path = file_path.replace("\\", "/");
+    let path = Path::new(&normalized_path);
     let parent_path = match path.parent() {
-        Some(p) => p.to_string_lossy().to_string(),
+        Some(p) => p.to_string_lossy().to_string().replace("\\", "/"),
         None => return,
     };
 
     if let Ok(Some(folder)) = crate::t_sqlite::AFolder::fetch(&parent_path) {
         if let Some(folder_id) = folder.id {
-            if let Ok(Some(mut file_rec)) = crate::t_sqlite::AFile::fetch(folder_id, file_path) {
-                // Считываем новый размер и время модификации
-                if let Ok(meta) = std::fs::metadata(file_path) {
-                    file_rec.size = meta.len() as i64;
-                    if let Ok(modified) = meta.modified() {
-                        if let Ok(dur) = modified.duration_since(std::time::UNIX_EPOCH) {
-                            file_rec.modified_at = Some(dur.as_secs() as i64);
+            match crate::t_sqlite::AFile::fetch(folder_id, &normalized_path) {
+                Ok(Some(mut file_rec)) => {
+                    // Считываем новый размер и время модификации
+                    if let Ok(meta) = std::fs::metadata(&normalized_path) {
+                        file_rec.size = meta.len() as i64;
+                        if let Ok(modified) = meta.modified() {
+                            if let Ok(dur) = modified.duration_since(std::time::UNIX_EPOCH) {
+                                file_rec.modified_at = Some(dur.as_secs() as i64);
+                            }
                         }
                     }
-                }
 
-                // Считываем новые размеры изображения
-                if let Ok((w, h)) = crate::t_image::get_image_dimensions(file_path) {
-                    file_rec.width = Some(w);
-                    file_rec.height = Some(h);
-                }
+                    // Считываем новые размеры изображения
+                    if let Ok((w, h)) = crate::t_image::get_image_dimensions(&normalized_path) {
+                        file_rec.width = Some(w);
+                        file_rec.height = Some(h);
+                    }
 
-                if let Some(fid) = file_rec.id {
-                    let _ = crate::t_sqlite::AFile::update(fid, &file_rec);
-                    let _ = crate::t_sqlite::AThumb::delete(fid);
+                    if let Some(fid) = file_rec.id {
+                        let _ = crate::t_sqlite::AFile::update(fid, &file_rec);
+                        let _ = crate::t_sqlite::AThumb::delete(fid);
+                    }
+                }
+                Ok(None) => {
+                    // Файла нет в БД (например, при копировании). Добавим его!
+                    let file_type = crate::t_utils::get_file_type(&normalized_path).unwrap_or(1);
+                    let now = chrono::Utc::now().timestamp();
+                    let _ = crate::t_sqlite::AFile::add_to_db(folder_id, &normalized_path, file_type, now);
+                }
+                Err(e) => {
+                    println!("[sync_file_metadata_in_db] Error fetching file: {}", e);
                 }
             }
         }

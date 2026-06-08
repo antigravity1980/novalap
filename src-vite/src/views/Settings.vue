@@ -287,123 +287,8 @@
 
         </div>
 
-        <!-- Library Tab -->
-        <div v-else-if="config.settings.tabIndex === 2" class="flex flex-col space-y-2">
-
-          <!-- album -->
-          <div class="rounded-box p-2 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-            <div class="flex items-center gap-2 text-base-content/70">
-              <span class="font-bold uppercase text-[10px] tracking-widest">{{ $t('settings.library.section_album') }}</span>
-            </div>
-            <div class="flex items-center justify-between px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.library.show_subfolder_files') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.library.show_subfolder_files_hint') }}</div>
-              </div>
-              <input type="checkbox" class="toggle toggle-primary toggle-sm" v-model="config.settings.showSubfolderFiles" />
-            </div>
-          </div>
-
-          <!-- sorting -->
-          <div class="rounded-box p-2 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-            <div class="flex items-center gap-2 text-base-content/70">
-              <span class="font-bold uppercase text-[10px] tracking-widest">{{ $t('settings.library.section_sorting') }}</span>
-            </div>
-            <div class="flex items-center justify-between px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.library.folder_sort') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.library.folder_sort_hint') }}</div>
-              </div>
-              <select class="select select-bordered select-sm min-w-40" v-model="config.settings.folderSort">
-                <option v-for="option in folderSortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-            </div>
-            <div class="flex items-center justify-between px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.library.calendar_sort') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.library.calendar_sort_hint') }}</div>
-              </div>
-              <select class="select select-bordered select-sm min-w-40" v-model="config.settings.calendarSort">
-                <option v-for="option in calendarSortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-            </div>
-            <div class="flex items-center justify-between px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.library.category_sort') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.library.category_sort_hint') }}</div>
-              </div>
-              <select class="select select-bordered select-sm min-w-40" v-model="config.settings.categorySort">
-                <option v-for="option in categorySortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- storage -->
-          <div class="rounded-box p-2 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-            <div class="flex items-center gap-2 text-base-content/70">
-              <span class="font-bold uppercase text-[10px] tracking-widest">{{ $t('settings.database.section_storage') }}</span>
-            </div>
-
-            <!-- current location -->
-            <div class="flex items-center justify-between gap-4 px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="min-w-0 flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.database.current_location') }}</div>
-                <div class="text-xs text-base-content/30 truncate" :title="dbStorageDir || ''">
-                  {{ hasCustomDbStorage ? (dbStorageDir || '-') : $t('settings.database.system_default') }}
-                </div>
-              </div>
-              <div class="shrink-0 flex items-center">
-                <button
-                  class="btn btn-sm btn-ghost rounded-box bg-base-100 border border-base-content/30 text-base-content/70 hover:text-base-content"
-                  :disabled="isChangingDbStorage"
-                  @click="selectDbStorageDir"
-                >
-                  {{ isChangingDbStorage ? $t('tooltip.loading') : $t('settings.database.change_location') }}
-                </button>
-                <button
-                  v-if="hasCustomDbStorage"
-                  class="btn btn-sm btn-ghost"
-                  :disabled="isChangingDbStorage"
-                  :title="$t('settings.database.restore_default_location')"
-                  :aria-label="$t('settings.database.restore_default_location')"
-                  @click="restoreDefaultDbStorageDir"
-                >
-                  <IconRestore class="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <!-- backup / restore buttons -->
-            <div class="flex items-center justify-between gap-4 px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.database.backup_title') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.database.backup_hint') }}</div>
-              </div>
-              <button
-                class="btn btn-sm btn-ghost rounded-box bg-base-100 border border-base-content/30 text-base-content/70 hover:text-base-content"
-                @click="showBackupDialog = true"
-              >
-                {{ $t('settings.database.backup') }}
-              </button>
-            </div>
-
-            <div class="flex items-center justify-between gap-4 px-1 rounded-box hover:bg-base-100/10 transition-colors duration-200">
-              <div class="flex flex-col gap-0.5 text-sm leading-5">
-                <div>{{ $t('settings.database.restore_title') }}</div>
-                <div class="text-xs text-base-content/30">{{ $t('settings.database.restore_hint') }}</div>
-              </div>
-              <button
-                class="btn btn-sm btn-ghost rounded-box bg-base-100 border border-base-content/30 text-base-content/70 hover:text-base-content"
-                @click="showRestoreDialog = true"
-              >
-                {{ $t('settings.database.restore') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
         <!-- Image Search Tab -->
-        <div v-else-if="config.settings.tabIndex === 3" class="flex flex-col overflow-hidden space-y-2">
+        <div v-else-if="config.settings.tabIndex === 2" class="flex flex-col overflow-hidden space-y-2">
 
           <!-- image search -->
           <div class="rounded-box p-2 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
@@ -506,7 +391,7 @@
         </div>
 
         <!-- Shortcuts Tab -->
-        <div v-else-if="config.settings.tabIndex === 4" class="flex flex-col space-y-2">
+        <div v-else-if="config.settings.tabIndex === 3" class="flex flex-col space-y-2">
           <div
             v-for="section in shortcutSections"
             :key="section.key"
@@ -537,7 +422,7 @@
         </div>
 
         <!-- About Tab -->
-        <div v-else-if="config.settings.tabIndex === 5" class="py-2">
+        <div v-else-if="config.settings.tabIndex === 4" class="py-2">
             <SettingsAbout />
         </div>
 
@@ -619,7 +504,6 @@ const shortcutPlatform: ShortcutPlatform = isMac ? 'mac' : (isLinux ? 'linux' : 
 const settingsTabs = [
   'settings.general.title',
   'settings.view.title',
-  'settings.library.title',
   'settings.image_search.title',
   'settings.shortcuts.title',
   'settings.about.title',
@@ -1154,7 +1038,7 @@ const cancelMultilingualModelDownload = async () => {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown);
-  if (typeof config.settings.tabIndex !== 'number' || config.settings.tabIndex < 0 || config.settings.tabIndex > 5) {
+  if (typeof config.settings.tabIndex !== 'number' || config.settings.tabIndex < 0 || config.settings.tabIndex > 4) {
     config.settings.tabIndex = 0;
   }
   if (typeof config.settings.imageSearch.model !== 'number') {

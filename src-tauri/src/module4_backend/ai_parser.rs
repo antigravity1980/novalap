@@ -15,6 +15,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::command;
+use exif::{In, Tag, Value};
 
 /// AI-метаданные
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -118,32 +119,11 @@ fn parse_png_metadata(path: &Path) -> Result<AiMetadata, String> {
 // --- WebP парсер ---
 
 fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
-    // Для WebP используем существующий EXIF парсер
-    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut file_data = vec![0u8; 256 * 1024];
-    let n = std::io::Read::read(&mut file, &mut file_data).map_err(|e| format!("Failed to read file: {}", e))?;
-    file_data.truncate(n);
+    let file_data = std::fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
-    // Ищем EXIF блок в WebP
-    if let Ok(exif_data) = extract_webp_exif(&file_data) {
-        // Парсим EXIF как строку
-        let exif_str = String::from_utf8_lossy(&exif_data);
-        for line in exif_str.lines() {
-            if let Some((key, value)) = line.split_once(':') {
-                let key = key.trim().to_string();
-                let value = value.trim().to_string();
-                raw_entries.push(RawMetadataEntry {
-                    key: key.clone(),
-                    value: value.clone(),
-                });
-                parse_metadata_key(&mut metadata, &key, &value);
-            }
-        }
-    }
-
-    // Также ищем XMP данные
+    // 1. Ищем XMP данные в WebP
     if let Ok(xmp_data) = extract_webp_xmp(&file_data) {
         let xmp_str = String::from_utf8_lossy(&xmp_data);
         raw_entries.push(RawMetadataEntry {
@@ -151,18 +131,40 @@ fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
             value: xmp_str.to_string(),
         });
 
-        // Парсим XMP на предмет prompt
-        if let Some(prompt) = extract_from_xml(&xmp_str, "prompt") {
-            metadata.positive_prompt = Some(prompt);
+        // Ищем ИИ-метаданные в XMP
+        if let Some(workflow) = find_xml_value(&xmp_str, "workflow") {
+            metadata.workflow = Some(workflow.clone());
+            try_parse_json_metadata(&mut metadata, &workflow);
         }
-        if let Some(negative) = extract_from_xml(&xmp_str, "negative") {
-            metadata.negative_prompt = Some(negative);
+        if let Some(prompt) = find_xml_value(&xmp_str, "prompt") {
+            try_parse_json_metadata(&mut metadata, &prompt);
+            if metadata.positive_prompt.is_none() {
+                metadata.positive_prompt = Some(prompt);
+            }
         }
-        if let Some(workflow) = extract_from_xml(&xmp_str, "workflow") {
-            metadata.workflow = Some(workflow);
+        if let Some(negative) = find_xml_value(&xmp_str, "negative") {
+            if metadata.negative_prompt.is_none() {
+                metadata.negative_prompt = Some(negative);
+            }
         }
-        if let Some(model) = extract_from_xml(&xmp_str, "model") {
-            metadata.model = Some(model);
+        if let Some(model) = find_xml_value(&xmp_str, "model") {
+            if metadata.model.is_none() {
+                metadata.model = Some(model);
+            }
+        }
+    }
+
+    // 2. Ищем EXIF блок в WebP
+    if let Ok(exif_data) = extract_webp_exif(&file_data) {
+        if let Ok(exif) = exif::Reader::new().read_raw(exif_data) {
+            if let Some(comment) = get_user_comment(&exif) {
+                raw_entries.push(RawMetadataEntry {
+                    key: "UserComment".to_string(),
+                    value: comment.clone(),
+                });
+                try_parse_json_metadata(&mut metadata, &comment);
+                parse_a1111_metadata(&mut metadata, &comment);
+            }
         }
     }
 
@@ -175,10 +177,7 @@ fn parse_webp_metadata(path: &Path) -> Result<AiMetadata, String> {
 // --- JPEG парсер (binary EXIF reader, no external crate) ---
 
 fn parse_jpeg_metadata(path: &Path) -> Result<AiMetadata, String> {
-    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut data = vec![0u8; 256 * 1024];
-    let n = std::io::Read::read(&mut file, &mut data).map_err(|e| format!("Failed to read file: {}", e))?;
-    data.truncate(n);
+    let data = std::fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
@@ -216,22 +215,54 @@ fn parse_jpeg_metadata(path: &Path) -> Result<AiMetadata, String> {
             break;
         }
 
-        let seg_start = pos + 2;
+        let seg_start = pos + 4; // Пропускаем маркер (2) и длину (2)
         let seg_end = pos + 2 + seg_len;
+        if seg_end > data.len() {
+            break;
+        }
         let seg_data = &data[seg_start..seg_end];
 
-        // APP1 — EXIF data
+        // APP1 — EXIF / XMP data
         if marker == 0xE1 {
-            if let Some(exif_text) = extract_jpeg_exif_text(seg_data) {
-                raw_entries.push(RawMetadataEntry {
-                    key: "EXIF".to_string(),
-                    value: exif_text.clone(),
-                });
-                try_parse_json_metadata(&mut metadata, &exif_text);
-                // Also try key:value parsing
-                for line in exif_text.lines() {
-                    if let Some((k, v)) = line.split_once(':') {
-                        parse_metadata_key(&mut metadata, k.trim(), v.trim());
+            if seg_data.starts_with(b"Exif\0\0") {
+                if seg_data.len() > 6 {
+                    if let Ok(exif) = exif::Reader::new().read_raw(seg_data[6..].to_vec()) {
+                        if let Some(comment) = get_user_comment(&exif) {
+                            raw_entries.push(RawMetadataEntry {
+                                key: "UserComment".to_string(),
+                                value: comment.clone(),
+                            });
+                            try_parse_json_metadata(&mut metadata, &comment);
+                            parse_a1111_metadata(&mut metadata, &comment);
+                        }
+                    }
+                }
+            } else if seg_data.starts_with(b"http://ns.adobe.com/xap/1.0/\0") {
+                if seg_data.len() > 29 {
+                    let xmp_str = String::from_utf8_lossy(&seg_data[29..]);
+                    raw_entries.push(RawMetadataEntry {
+                        key: "XMP".to_string(),
+                        value: xmp_str.to_string(),
+                    });
+                    if let Some(workflow) = find_xml_value(&xmp_str, "workflow") {
+                        metadata.workflow = Some(workflow.clone());
+                        try_parse_json_metadata(&mut metadata, &workflow);
+                    }
+                    if let Some(prompt) = find_xml_value(&xmp_str, "prompt") {
+                        try_parse_json_metadata(&mut metadata, &prompt);
+                        if metadata.positive_prompt.is_none() {
+                            metadata.positive_prompt = Some(prompt);
+                        }
+                    }
+                    if let Some(negative) = find_xml_value(&xmp_str, "negative") {
+                        if metadata.negative_prompt.is_none() {
+                            metadata.negative_prompt = Some(negative);
+                        }
+                    }
+                    if let Some(model) = find_xml_value(&xmp_str, "model") {
+                        if metadata.model.is_none() {
+                            metadata.model = Some(model);
+                        }
                     }
                 }
             }
@@ -243,40 +274,6 @@ fn parse_jpeg_metadata(path: &Path) -> Result<AiMetadata, String> {
     metadata.raw_metadata = raw_entries;
     metadata.source_engine = Some(detect_engine(&metadata));
     Ok(metadata)
-}
-
-/// Extract readable text from JPEG EXIF block
-fn extract_jpeg_exif_text(data: &[u8]) -> Option<String> {
-    if data.len() < 6 {
-        return None;
-    }
-    // Skip EXIF header
-    let exif_data = &data[4..]; // skip "Exif\0\0" prefix
-
-    // Simple scan for readable ASCII text sequences
-    let mut result = String::new();
-    let mut current = String::new();
-    for &b in exif_data {
-        if b >= 0x20 && b <= 0x7E {
-            current.push(b as char);
-        } else {
-            if current.len() >= 4 {
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.push_str(&current);
-            }
-            current.clear();
-        }
-    }
-    if current.len() >= 4 {
-        if !result.is_empty() {
-            result.push('\n');
-        }
-        result.push_str(&current);
-    }
-
-    if result.is_empty() { None } else { Some(result) }
 }
 
 // --- Видео парсер ---
@@ -497,27 +494,160 @@ fn extract_ffprobe_tag(json_str: &str, tag_name: &str) -> Option<String> {
     None
 }
 
-/// Извлечение значения из XML/XMP
-fn extract_from_xml(xml: &str, tag: &str) -> Option<String> {
-    let open_tag = format!("<{}>", tag);
-    let close_tag = format!("</{}>", tag);
+fn decode_xml_entities(s: &str) -> String {
+    s.replace("&amp;", "&")
+     .replace("&quot;", "\"")
+     .replace("&apos;", "'")
+     .replace("&lt;", "<")
+     .replace("&gt;", ">")
+}
 
-    if let Some(start) = xml.find(&open_tag) {
-        let value_start = start + open_tag.len();
-        if let Some(end) = xml[value_start..].find(&close_tag) {
-            return Some(xml[value_start..value_start + end].to_string());
+fn find_xml_value(xml: &str, key: &str) -> Option<String> {
+    let mut current_idx = 0;
+    while let Some(idx) = xml[current_idx..].find(key) {
+        let absolute_idx = current_idx + idx;
+        let after_key = &xml[absolute_idx + key.len()..];
+        
+        // Проверяем, является ли это атрибутом: =" ... " или =' ... '
+        if after_key.starts_with("=\"") {
+            if let Some(end_quote) = after_key[2..].find('"') {
+                let val = &after_key[2..2 + end_quote];
+                return Some(decode_xml_entities(val));
+            }
+        } else if after_key.starts_with("='") {
+            if let Some(end_quote) = after_key[2..].find('\'') {
+                let val = &after_key[2..2 + end_quote];
+                return Some(decode_xml_entities(val));
+            }
+        }
+        
+        // Проверяем, является ли это тегом: > ... </...key>
+        if after_key.starts_with('>') {
+            if let Some(end_tag_start) = after_key.find("</") {
+                let val = &after_key[1..end_tag_start];
+                let after_end_tag = &after_key[end_tag_start + 2..];
+                if after_end_tag.starts_with(key) {
+                    return Some(decode_xml_entities(val));
+                }
+            }
+        }
+        
+        current_idx = absolute_idx + key.len() + 1;
+        if current_idx >= xml.len() {
+            break;
+        }
+    }
+    None
+}
+
+fn get_user_comment(exif: &exif::Exif) -> Option<String> {
+    let field = exif.get_field(Tag::UserComment, In::PRIMARY)
+        .or_else(|| exif.fields().find(|f| f.tag == Tag::UserComment))?;
+    
+    match &field.value {
+        Value::Undefined(bytes, _) => {
+            if bytes.len() > 8 {
+                let text_bytes = &bytes[8..];
+                if bytes.starts_with(b"UNICODE\0") {
+                    let mut words = Vec::new();
+                    for chunk in text_bytes.chunks_exact(2) {
+                        words.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+                    }
+                    if let Ok(s) = String::from_utf16(&words) {
+                        return Some(s.trim().trim_matches('\0').to_string());
+                    }
+                }
+                let s = String::from_utf8_lossy(text_bytes);
+                return Some(s.trim().trim_matches('\0').to_string());
+            }
+        }
+        Value::Ascii(vec) => {
+            let mut bytes = Vec::new();
+            for line in vec {
+                let cleaned: Vec<u8> = line.iter().cloned().take_while(|&b| b != 0).collect();
+                bytes.extend(cleaned);
+            }
+            let s = String::from_utf8_lossy(&bytes).into_owned();
+            return Some(s.trim().to_string());
+        }
+        _ => {}
+    }
+    
+    let val_str = field.display_value().to_string();
+    if !val_str.is_empty() {
+        return Some(val_str);
+    }
+    None
+}
+
+fn parse_a1111_metadata(metadata: &mut AiMetadata, text: &str) {
+    let text = text.trim();
+    if text.is_empty() {
+        return;
+    }
+
+    let lines = text.lines().map(|l| l.trim()).collect::<Vec<_>>();
+    let mut neg_idx = None;
+    let mut params_idx = None;
+
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("Negative prompt:") {
+            neg_idx = Some(i);
+        } else if line.contains("Steps:") && line.contains("Seed:") {
+            params_idx = Some(i);
         }
     }
 
-    None
+    let pos_end = neg_idx.or(params_idx).unwrap_or(lines.len());
+    let positive_prompt = lines[0..pos_end].join("\n").trim().to_string();
+    if !positive_prompt.is_empty() {
+        metadata.positive_prompt = Some(positive_prompt);
+    }
+
+    if let Some(n_idx) = neg_idx {
+        let neg_end = params_idx.unwrap_or(lines.len());
+        let neg_str = lines[n_idx..neg_end].join("\n");
+        let neg_prompt = neg_str.strip_prefix("Negative prompt:").unwrap_or(&neg_str).trim().to_string();
+        if !neg_prompt.is_empty() {
+            metadata.negative_prompt = Some(neg_prompt);
+        }
+    }
+
+    if let Some(p_idx) = params_idx {
+        let params_line = lines[p_idx];
+        for part in params_line.split(',') {
+            if let Some((k, v)) = part.split_once(':') {
+                let key = k.trim().to_lowercase();
+                let val = v.trim().to_string();
+                match key.as_str() {
+                    "steps" => {
+                        if let Ok(steps) = val.parse::<i32>() {
+                            metadata.steps = Some(steps);
+                        }
+                    }
+                    "seed" => {
+                        if let Ok(seed) = val.parse::<i64>() {
+                            metadata.seed = Some(seed);
+                        }
+                    }
+                    "cfg scale" => {
+                        if let Ok(cfg) = val.parse::<f64>() {
+                            metadata.cfg_scale = Some(cfg);
+                        }
+                    }
+                    "model" => {
+                        metadata.model = Some(val);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 
 /// AVIF metadata parser (XMP, JSON and EXIF scanners)
 fn parse_avif_metadata(path: &Path) -> Result<AiMetadata, String> {
-    let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut file_data = vec![0u8; 512 * 1024];
-    let n = std::io::Read::read(&mut file, &mut file_data).map_err(|e| format!("Failed to read file: {}", e))?;
-    file_data.truncate(n);
+    let file_data = std::fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
     let mut metadata = AiMetadata::default();
     let mut raw_entries = Vec::new();
 
@@ -527,17 +657,25 @@ fn parse_avif_metadata(path: &Path) -> Result<AiMetadata, String> {
             key: "XMP".to_string(),
             value: xmp_str.clone(),
         });
-        if let Some(prompt) = extract_from_xml(&xmp_str, "prompt") {
-            metadata.positive_prompt = Some(prompt);
+        if let Some(workflow) = find_xml_value(&xmp_str, "workflow") {
+            metadata.workflow = Some(workflow.clone());
+            try_parse_json_metadata(&mut metadata, &workflow);
         }
-        if let Some(negative) = extract_from_xml(&xmp_str, "negative") {
-            metadata.negative_prompt = Some(negative);
+        if let Some(prompt) = find_xml_value(&xmp_str, "prompt") {
+            try_parse_json_metadata(&mut metadata, &prompt);
+            if metadata.positive_prompt.is_none() {
+                metadata.positive_prompt = Some(prompt);
+            }
         }
-        if let Some(workflow) = extract_from_xml(&xmp_str, "workflow") {
-            metadata.workflow = Some(workflow);
+        if let Some(negative) = find_xml_value(&xmp_str, "negative") {
+            if metadata.negative_prompt.is_none() {
+                metadata.negative_prompt = Some(negative);
+            }
         }
-        if let Some(model) = extract_from_xml(&xmp_str, "model") {
-            metadata.model = Some(model);
+        if let Some(model) = find_xml_value(&xmp_str, "model") {
+            if metadata.model.is_none() {
+                metadata.model = Some(model);
+            }
         }
     }
 

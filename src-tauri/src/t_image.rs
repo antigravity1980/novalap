@@ -819,6 +819,8 @@ pub async fn edit_image(params: EditParams) -> bool {
             cleanup_metadata_backup(&metadata_backup_path);
         }
 
+        crate::module4_backend::batch::sync_file_metadata_in_db(&params.dest_file_path);
+
         return true;
     }
     false
@@ -1230,12 +1232,18 @@ async fn get_edited_image(params: &EditParams) -> Result<DynamicImage, String> {
 
     // 3. Crop
     if params.crop.width > 0 && params.crop.height > 0 {
-        img = img.crop_imm(
-            params.crop.x,
-            params.crop.y,
-            params.crop.width,
-            params.crop.height,
-        );
+        let img_w = img.width();
+        let img_h = img.height();
+
+        let crop_x = params.crop.x.min(img_w);
+        let crop_y = params.crop.y.min(img_h);
+
+        let crop_w = params.crop.width.min(img_w - crop_x);
+        let crop_h = params.crop.height.min(img_h - crop_y);
+
+        if crop_w > 0 && crop_h > 0 {
+            img = img.crop_imm(crop_x, crop_y, crop_w, crop_h);
+        }
     }
 
     // 4. Resize

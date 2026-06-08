@@ -516,23 +516,22 @@ async function apply() {
     if (needCopyToTargets) {
       const copiedFiles = []
       for (const originalPath of props.selectedFiles) {
-        const lastSlash = Math.max(originalPath.lastIndexOf('/'), originalPath.lastIndexOf('\\'))
-        const isWindowsPath = originalPath.includes('\\') || !originalPath.includes('/')
-        const separator = isWindowsPath ? '\\' : '/'
+        const normalizedOriginal = originalPath.replace(/\\/g, '/')
+        const lastSlash = normalizedOriginal.lastIndexOf('/')
         
-        let folder = lastSlash !== -1 ? originalPath.substring(0, lastSlash) : ''
-        const filename = lastSlash !== -1 ? originalPath.substring(lastSlash + 1) : originalPath
+        let folder = lastSlash !== -1 ? normalizedOriginal.substring(0, lastSlash) : ''
+        const filename = lastSlash !== -1 ? normalizedOriginal.substring(lastSlash + 1) : normalizedOriginal
         
         const lastDot = filename.lastIndexOf('.')
         const name = lastDot !== -1 ? filename.substring(0, lastDot) : filename
         const ext = lastDot !== -1 ? filename.substring(lastDot + 1) : ''
         
-        let targetFolder = folder
+        let targetFolder = folder.replace(/\\/g, '/')
         if (saveOptions.mode === 'other') {
           if (!saveOptions.targetDir) {
             throw new Error('Пожалуйста, выберите папку назначения')
           }
-          targetFolder = saveOptions.targetDir
+          targetFolder = saveOptions.targetDir.replace(/\\/g, '/')
         }
         
         let pfx = saveOptions.prefix || ''
@@ -542,10 +541,11 @@ async function apply() {
         }
         
         const newFilename = pfx + name + sfx + (ext ? '.' + ext : '')
+        const separator = '/'
         const targetPath = targetFolder + (targetFolder.endsWith(separator) ? '' : separator) + newFilename
         
-        if (targetPath.toLowerCase() !== originalPath.toLowerCase()) {
-          await invoke('cross_copy', { src: originalPath, dest: targetPath })
+        if (targetPath.toLowerCase() !== normalizedOriginal.toLowerCase()) {
+          await invoke('cross_copy', { src: normalizedOriginal, dest: targetPath })
         }
         copiedFiles.push(targetPath)
       }
@@ -620,7 +620,13 @@ async function apply() {
     if (result) {
       resultMessage.value = t('batch_ops.success_message', { succeeded: result.succeeded, total: result.total })
       if (result.failed > 0) {
-        resultMessage.value += t('batch_ops.failed_message', { failed: result.failed })
+        resultMessage.value += '\n' + t('batch_ops.failed_message', { failed: result.failed })
+        if (result.errors && result.errors.length > 0) {
+          resultMessage.value += '\n\nОшибки:\n' + result.errors.slice(0, 5).join('\n')
+          if (result.errors.length > 5) {
+            resultMessage.value += `\n...и еще ${result.errors.length - 5} ошибок.`
+          }
+        }
       }
       emit('success')
     }

@@ -745,7 +745,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
-import { emit } from '@tauri-apps/api/event'
+import { emit, listen } from '@tauri-apps/api/event'
 
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useNavigationStore } from '@/modules/navigation/store'
@@ -1439,6 +1439,13 @@ function toggleTheme() {
 
 // Keyboard shortcuts global handler
 function handleKeyDown(e) {
+  // F5 Refresh
+  if (e.code === 'F5') {
+    e.preventDefault()
+    refreshData()
+    return
+  }
+
   // Игнорируем пробел/горячие клавиши, если фокус в инпуте
   const activeEl = document.activeElement
   const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
@@ -1544,8 +1551,19 @@ function handleKeyDown(e) {
   }
 }
 
+let unlistenDirectoryChanged = null
+
 onMounted(async () => {
   document.addEventListener('keydown', handleKeyDown)
+
+  // Подписка на событие изменения папки
+  unlistenDirectoryChanged = await listen('directory-changed', (event) => {
+    const changedPath = event.payload
+    if (changedPath === navigationStore.currentPath) {
+      refreshData()
+    }
+  })
+
   await navigationStore.loadDrives()
   await fetchTrash()
 
@@ -1558,6 +1576,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown)
+  if (unlistenDirectoryChanged) {
+    unlistenDirectoryChanged()
+  }
 })
 </script>
 

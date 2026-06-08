@@ -67,12 +67,12 @@ export const useGalleryStore = defineStore('gallery', {
 
       // Фильтрация по дате
       if (state.filters.dateFrom) {
-        const from = new Date(state.filters.dateFrom)
-        files = files.filter(f => new Date(f.modified) >= from)
+        const fromTime = new Date(state.filters.dateFrom).getTime()
+        files = files.filter(f => (f._modifiedTime || 0) >= fromTime)
       }
       if (state.filters.dateTo) {
-        const to = new Date(state.filters.dateTo)
-        files = files.filter(f => new Date(f.modified) <= to)
+        const toTime = new Date(state.filters.dateTo).getTime()
+        files = files.filter(f => (f._modifiedTime || 0) <= toTime)
       }
 
       // Поиск по имени
@@ -98,7 +98,7 @@ export const useGalleryStore = defineStore('gallery', {
             cmp = a.size - b.size
             break
           case 'date':
-            cmp = new Date(a.modified) - new Date(b.modified)
+            cmp = (a._modifiedTime || 0) - (b._modifiedTime || 0)
             break
           case 'resolution':
             const ar = a.resolution?.width || 0
@@ -121,8 +121,12 @@ export const useGalleryStore = defineStore('gallery', {
 
   actions: {
     setFiles(files) {
-      this.files = files
-      this.filteredFiles = [...files]
+      const normalized = files.map(f => ({
+        ...f,
+        _modifiedTime: f.modified ? new Date(f.modified).getTime() : 0
+      }))
+      this.files = normalized
+      this.filteredFiles = [...normalized]
     },
 
     setSorting(sortBy, order) {
@@ -268,27 +272,29 @@ export const useGalleryStore = defineStore('gallery', {
     async copySelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return
 
-      for (const src of this.selectedIds) {
+      const promises = this.selectedIds.map(async (src) => {
         try {
           const fileName = src.split('\\').pop() || src.split('/').pop()
           await invoke('cross_copy', { src, dest: `${destPath}\\${fileName}` })
         } catch (error) {
           console.error('Failed to copy:', error)
         }
-      }
+      })
+      await Promise.all(promises)
     },
 
     async moveSelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return
 
-      for (const src of this.selectedIds) {
+      const promises = this.selectedIds.map(async (src) => {
         try {
           const fileName = src.split('\\').pop() || src.split('/').pop()
           await invoke('cross_move', { src, dest: `${destPath}\\${fileName}` })
         } catch (error) {
           console.error('Failed to move:', error)
         }
-      }
+      })
+      await Promise.all(promises)
 
       // Обновляем список
       this.files = this.files.filter(f => !this.selectedIds.includes(f.path))
@@ -309,7 +315,7 @@ export const useGalleryStore = defineStore('gallery', {
       if (!this.clipboard.action || this.clipboard.paths.length === 0) return
       const { action, paths } = this.clipboard
 
-      for (const src of paths) {
+      const promises = paths.map(async (src) => {
         const fileName = src.split('\\').pop() || src.split('/').pop()
         const dest = `${destPath}\\${fileName}`
         try {
@@ -321,7 +327,8 @@ export const useGalleryStore = defineStore('gallery', {
         } catch (error) {
           console.error(`Failed to ${action} ${src} to ${dest}:`, error)
         }
-      }
+      })
+      await Promise.all(promises)
 
       if (action === 'cut') {
         this.clearClipboard()

@@ -369,3 +369,49 @@ fn get_file_resolution(path: &Path, extension: Option<&str>) -> Option<Resolutio
 
     None
 }
+
+static GLOBAL_WATCHER: std::sync::OnceLock<std::sync::Mutex<Option<(String, notify::RecommendedWatcher)>>> = std::sync::OnceLock::new();
+
+fn get_global_watcher() -> &'static std::sync::Mutex<Option<(String, notify::RecommendedWatcher)>> {
+    GLOBAL_WATCHER.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+#[command]
+pub fn watch_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    use notify::Watcher;
+    let watcher_mutex = get_global_watcher();
+    let mut watcher_guard = watcher_mutex.lock().map_err(|e| e.to_string())?;
+
+    // Если мы уже отслеживаем этот путь, ничего не делаем
+    if let Some((current_path, _)) = &*watcher_guard {
+        if current_path == &path {
+            return Ok(());
+        }
+    }
+
+    // Останавливаем старый вотчер
+    *watcher_guard = None;
+
+    let path_clone = path.clone();
+    let app_clone = app.clone();
+
+    // Создаем новый вотчер
+    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+        if let Ok(event) = res {
+            // Если произошло изменение (создание, удаление, изменение файлов)
+            if event.kind.is_create() || event.kind.is_remove() || event.kind.is_modify() {
+                use tauri::Emitter;
+                let _ = app_clone.emit("directory-changed", path_clone.clone());
+            }
+        }
+    }).map_err(|e| format!("Failed to create watcher: {}", e))?;
+
+    // Начинаем отслеживание папки (нерекурсивно)
+    watcher.watch(Path::new(&path), notify::RecursiveMode::NonRecursive)
+        .map_err(|e| format!("Failed to watch directory: {}", e))?;
+
+    // Сохраняем вотчер
+    *watcher_guard = Some((path, watcher));
+
+    Ok(())
+}

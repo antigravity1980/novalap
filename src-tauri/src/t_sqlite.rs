@@ -4501,10 +4501,69 @@ impl ALocation {
     }
 }
 
+struct SqliteConnectionPool {
+    current_path: String,
+    connections: Vec<Connection>,
+}
+
+static GLOBAL_POOL: std::sync::OnceLock<std::sync::Mutex<SqliteConnectionPool>> = std::sync::OnceLock::new();
+
+fn get_pool() -> &'static std::sync::Mutex<SqliteConnectionPool> {
+    GLOBAL_POOL.get_or_init(|| std::sync::Mutex::new(SqliteConnectionPool {
+        current_path: String::new(),
+        connections: Vec::new(),
+    }))
+}
+
+pub struct PooledConnection {
+    conn: Option<Connection>,
+}
+
+impl std::ops::Deref for PooledConnection {
+    type Target = Connection;
+    fn deref(&self) -> &Self::Target {
+        self.conn.as_ref().unwrap()
+    }
+}
+
+impl std::ops::DerefMut for PooledConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.conn.as_mut().unwrap()
+    }
+}
+
+impl Drop for PooledConnection {
+    fn drop(&mut self) {
+        if let Some(conn) = self.conn.take() {
+            let pool_mutex = get_pool();
+            if let Ok(mut pool) = pool_mutex.lock() {
+                if let Ok(path) = t_storage::get_current_db_path() {
+                    if pool.current_path == path && pool.connections.len() < 10 {
+                        pool.connections.push(conn);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// get connection to the db
-fn open_conn() -> Result<Connection, String> {
+fn open_conn() -> Result<PooledConnection, String> {
     let path = t_storage::get_current_db_path()
         .map_err(|e| format!("Failed to get the database file path: {}", e))?;
+
+    let pool_mutex = get_pool();
+    let mut pool = pool_mutex.lock().map_err(|e| e.to_string())?;
+
+    if pool.current_path != path {
+        pool.connections.clear();
+        pool.current_path = path.clone();
+    }
+
+    if let Some(conn) = pool.connections.pop() {
+        return Ok(PooledConnection { conn: Some(conn) });
+    }
 
     let conn = Connection::open(&path)
         .map_err(|e| format!("Failed to open database connection: {}", e))?;
@@ -4520,11 +4579,10 @@ fn open_conn() -> Result<Connection, String> {
     conn.execute("PRAGMA synchronous = NORMAL", [])
         .map_err(|e| format!("Failed to set SQLite synchronous mode: {}", e))?;
 
-    // Enable foreign key constraints
     conn.execute("PRAGMA foreign_keys = ON", [])
         .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
 
-    Ok(conn)
+    Ok(PooledConnection { conn: Some(conn) })
 }
 
 /// create all tables if not exists

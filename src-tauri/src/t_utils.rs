@@ -428,9 +428,17 @@ fn file_id(path: &Path) -> Option<u64> {
         if handle == INVALID_HANDLE_VALUE {
             return None;
         }
+
+        struct HandleGuard(HANDLE);
+        impl Drop for HandleGuard {
+            fn drop(&mut self) {
+                unsafe { CloseHandle(self.0); }
+            }
+        }
+        let guard = HandleGuard(handle);
+
         let mut info = core::mem::zeroed::<BY_HANDLE_FILE_INFORMATION>();
-        let ok = GetFileInformationByHandle(handle, &mut info);
-        CloseHandle(handle);
+        let ok = GetFileInformationByHandle(guard.0, &mut info);
         if ok == 0 {
             return None;
         }
@@ -1757,10 +1765,6 @@ pub fn get_file_type(file_path: &str) -> Option<i64> {
 
     if contains_ext(t_common::VIDEOS) {
         return Some(2);
-    }
-
-    if contains_ext(t_common::RAW_IMGS) {
-        return Some(3);
     }
 
     None

@@ -122,66 +122,78 @@ fn is_tool_available(name: &str) -> bool {
 
 /// Сжать PNG через pngquant
 #[command]
-pub fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, String> {
+pub async fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, String> {
+    let tool_path = find_tool_path("pngquant")
+        .ok_or_else(|| "pngquant not found. Install it first.".to_string())?;
+
+    let mut join_set = tokio::task::JoinSet::new();
+
+    for file_path in files {
+        let tool_path = tool_path.clone();
+        join_set.spawn_blocking(move || {
+            let path = Path::new(&file_path);
+            if !path.exists() {
+                return Err((file_path, "File not found".to_string()));
+            }
+
+            let ext = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+
+            if ext != "png" {
+                return Err((file_path, "Not a PNG file".to_string()));
+            }
+
+            let output_path = path.with_extension("pngquant.png");
+            let status = Command::new(&tool_path)
+                .args([
+                    "--quality=65-80",
+                    "--force",
+                    &format!("--output={}", output_path.to_string_lossy()),
+                    &file_path,
+                ])
+                .output();
+
+            match status {
+                Ok(out) => {
+                    if out.status.success() {
+                        if let Err(e) = std::fs::rename(&output_path, path) {
+                            Err((file_path, format!("Failed to replace with optimized: {}", e)))
+                        } else {
+                            Ok(file_path)
+                        }
+                    } else {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        Err((file_path, format!("pngquant failed: {}", stderr.trim())))
+                    }
+                }
+                Err(e) => Err((file_path, format!("Failed to run pngquant: {}", e))),
+            }
+        });
+    }
+
     let mut result = BatchResult {
-        total: files.len(),
+        total: 0,
         succeeded: 0,
         failed: 0,
         errors: Vec::new(),
     };
 
-    let tool_path = find_tool_path("pngquant")
-        .ok_or_else(|| "pngquant not found. Install it first.".to_string())?;
-
-    for file_path in &files {
-        let path = Path::new(file_path);
-        if !path.exists() {
-            result.failed += 1;
-            result.errors.push(format!("File not found: {}", file_path));
-            continue;
-        }
-
-        let ext = path
-            .extension()
-            .map(|e| e.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
-        if ext != "png" {
-            result.failed += 1;
-            result
-                .errors
-                .push(format!("Not a PNG file: {}", file_path));
-            continue;
-        }
-
-        // pngquant --quality=65-80 --force --output output.png input.png
-        let output_path = path.with_extension("pngquant.png");
-        let status = Command::new(&tool_path)
-            .args([
-                "--quality=65-80",
-                "--force",
-                &format!("--output={}", output_path.to_string_lossy()),
-                file_path,
-            ])
-            .output()
-            .map_err(|e| format!("Failed to run pngquant: {}", e))?;
-
-        if status.status.success() {
-            // Заменяем оригинал сжатым
-            if let Err(e) = std::fs::rename(&output_path, path) {
-                result.failed += 1;
-                result
-                    .errors
-                    .push(format!("Failed to replace with optimized: {}", e));
-                continue;
+    while let Some(res) = join_set.join_next().await {
+        result.total += 1;
+        match res {
+            Ok(Ok(_path)) => {
+                result.succeeded += 1;
             }
-            result.succeeded += 1;
-        } else {
-            let stderr = String::from_utf8_lossy(&status.stderr);
-            result.failed += 1;
-            result
-                .errors
-                .push(format!("pngquant failed for {}: {}", file_path, stderr.trim()));
+            Ok(Err((path, err))) => {
+                result.failed += 1;
+                result.errors.push(format!("{}: {}", path, err));
+            }
+            Err(e) => {
+                result.failed += 1;
+                result.errors.push(format!("Task panicked: {}", e));
+            }
         }
     }
 
@@ -190,67 +202,80 @@ pub fn optimize_with_pngquant(files: Vec<String>) -> Result<BatchResult, String>
 
 /// Сжать JPEG через mozjpeg (cjpeg)
 #[command]
-pub fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> {
+pub async fn optimize_with_mozjpeg(files: Vec<String>) -> Result<BatchResult, String> {
+    let tool_path = find_tool_path("cjpeg")
+        .ok_or_else(|| "mozjpeg (cjpeg) not found. Install it first.".to_string())?;
+
+    let mut join_set = tokio::task::JoinSet::new();
+
+    for file_path in files {
+        let tool_path = tool_path.clone();
+        join_set.spawn_blocking(move || {
+            let path = Path::new(&file_path);
+            if !path.exists() {
+                return Err((file_path, "File not found".to_string()));
+            }
+
+            let ext = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+
+            if ext != "jpg" && ext != "jpeg" {
+                return Err((file_path, "Not a JPEG file".to_string()));
+            }
+
+            let output_path = path.with_extension("mozjpeg.jpg");
+            let status = Command::new(&tool_path)
+                .args([
+                    "-quality",
+                    "85",
+                    "-optimize",
+                    "-outfile",
+                    &output_path.to_string_lossy(),
+                    &file_path,
+                ])
+                .output();
+
+            match status {
+                Ok(out) => {
+                    if out.status.success() {
+                        if let Err(e) = std::fs::rename(&output_path, path) {
+                            Err((file_path, format!("Failed to replace with optimized: {}", e)))
+                        } else {
+                            Ok(file_path)
+                        }
+                    } else {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        Err((file_path, format!("cjpeg failed: {}", stderr.trim())))
+                    }
+                }
+                Err(e) => Err((file_path, format!("Failed to run cjpeg: {}", e))),
+            }
+        });
+    }
+
     let mut result = BatchResult {
-        total: files.len(),
+        total: 0,
         succeeded: 0,
         failed: 0,
         errors: Vec::new(),
     };
 
-    let tool_path = find_tool_path("cjpeg")
-        .ok_or_else(|| "mozjpeg (cjpeg) not found. Install it first.".to_string())?;
-
-    for file_path in &files {
-        let path = Path::new(file_path);
-        if !path.exists() {
-            result.failed += 1;
-            result.errors.push(format!("File not found: {}", file_path));
-            continue;
-        }
-
-        let ext = path
-            .extension()
-            .map(|e| e.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
-        if ext != "jpg" && ext != "jpeg" {
-            result.failed += 1;
-            result
-                .errors
-                .push(format!("Not a JPEG file: {}", file_path));
-            continue;
-        }
-
-        // cjpeg -quality 85 -optimize -outfile output.jpg input.jpg
-        let output_path = path.with_extension("mozjpeg.jpg");
-        let status = Command::new(&tool_path)
-            .args([
-                "-quality",
-                "85",
-                "-optimize",
-                "-outfile",
-                &output_path.to_string_lossy(),
-                file_path,
-            ])
-            .output()
-            .map_err(|e| format!("Failed to run cjpeg: {}", e))?;
-
-        if status.status.success() {
-            if let Err(e) = std::fs::rename(&output_path, path) {
-                result.failed += 1;
-                result
-                    .errors
-                    .push(format!("Failed to replace with optimized: {}", e));
-                continue;
+    while let Some(res) = join_set.join_next().await {
+        result.total += 1;
+        match res {
+            Ok(Ok(_path)) => {
+                result.succeeded += 1;
             }
-            result.succeeded += 1;
-        } else {
-            let stderr = String::from_utf8_lossy(&status.stderr);
-            result.failed += 1;
-            result
-                .errors
-                .push(format!("cjpeg failed for {}: {}", file_path, stderr.trim()));
+            Ok(Err((path, err))) => {
+                result.failed += 1;
+                result.errors.push(format!("{}: {}", path, err));
+            }
+            Err(e) => {
+                result.failed += 1;
+                result.errors.push(format!("Task panicked: {}", e));
+            }
         }
     }
 
@@ -272,7 +297,7 @@ pub async fn download_optimizers() -> Result<(), String> {
         let dest_dir = get_writable_optimizers_dir();
         std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Failed to create optimizers directory: {}", e))?;
 
-        let cjpeg_url = "https://raw.githubusercontent.com/imagemin/mozjpeg-bin/main/vendor/win/cjpeg.exe";
+        let cjpeg_url = "https://raw.githubusercontent.com/imagemin/mozjpeg-bin/main/vendor/win/x64/cjpeg.exe";
         let pngquant_url = "https://raw.githubusercontent.com/imagemin/pngquant-bin/main/vendor/win/pngquant.exe";
 
         let client = reqwest::Client::new();

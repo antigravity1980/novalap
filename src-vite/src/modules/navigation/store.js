@@ -52,9 +52,17 @@ export const useNavigationStore = defineStore('navigation', {
         const treeData = await invoke('expand_folder', { path })
         this.treeFolders[path] = treeData
 
+        // Начинаем отслеживание изменений
+        await invoke('watch_directory', { path }).catch(err => console.error('Failed to watch directory:', err))
+
         this.selectedFiles = []
       } catch (error) {
         console.error('Navigation error:', error)
+        if (typeof window !== 'undefined' && window.__tauri_ipc__) {
+          this.folders = []
+          this.selectedFiles = []
+          throw error
+        }
         
         // Browser fallback
         const suffix = path.endsWith('\\') ? '' : '\\';
@@ -90,7 +98,11 @@ export const useNavigationStore = defineStore('navigation', {
         this.isLoading = true
         try {
           this.folders = await invoke('list_directory', { path })
+          await invoke('watch_directory', { path }).catch(err => console.error('Failed to watch directory:', err))
         } catch (error) {
+          if (typeof window !== 'undefined' && window.__tauri_ipc__) {
+            throw error
+          }
           // Fallback
           const suffix = path.endsWith('\\') ? '' : '\\';
           this.folders = [
@@ -113,7 +125,11 @@ export const useNavigationStore = defineStore('navigation', {
         this.isLoading = true
         try {
           this.folders = await invoke('list_directory', { path })
+          await invoke('watch_directory', { path }).catch(err => console.error('Failed to watch directory:', err))
         } catch (error) {
+          if (typeof window !== 'undefined' && window.__tauri_ipc__) {
+            throw error
+          }
           // Fallback
           const suffix = path.endsWith('\\') ? '' : '\\';
           this.folders = [
@@ -147,6 +163,9 @@ export const useNavigationStore = defineStore('navigation', {
           this.treeFolders[path] = children
         } catch (error) {
           console.error('Failed to expand folder tree:', error)
+          if (typeof window !== 'undefined' && window.__tauri_ipc__) {
+            throw error
+          }
           const suffix = path.endsWith('\\') ? '' : '\\';
           this.treeFolders[path] = [
             { name: 'Documents', path: path + suffix + 'Documents', is_dir: true },
@@ -183,4 +202,7 @@ export const useNavigationStore = defineStore('navigation', {
         .map(f => f.path)
     },
   },
+  persist: {
+    paths: ['currentPath']
+  }
 })

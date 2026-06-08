@@ -44,7 +44,7 @@
       </div>
 
       <!-- AI Source indicator (corner badge) -->
-      <div v-if="file.ai_source" class="absolute top-2 left-2 z-10">
+      <div v-if="file.ai_source && file.ai_source !== 'ComfyUI'" class="absolute top-2 left-2 z-10">
         <span
           class="badge badge-xs text-[9px] font-bold py-1 px-1.5 border border-white/10 shadow shadow-black/20"
           :class="getAiSourceClass(file.ai_source)"
@@ -53,8 +53,15 @@
         </span>
       </div>
 
+      <!-- ComfyUI Badge in Top-Right Corner -->
+      <div v-if="file.ai_source === 'ComfyUI'" class="absolute top-2 z-10 transition-all duration-200" :class="selected ? 'right-8' : 'right-2'">
+        <span class="bg-yellow-400 text-black text-[9.5px] font-extrabold py-0.5 px-1.5 rounded shadow border border-yellow-500">
+          ComfyUI
+        </span>
+      </div>
+
       <!-- Selection checkmark badge -->
-      <div v-if="selected" class="absolute top-2 right-2 bg-primary text-primary-content w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-white/20 shadow-md">
+      <div v-if="selected" class="absolute top-2 right-2 bg-primary text-primary-content w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-white/20 shadow-md z-20">
         ✓
       </div>
     </div>
