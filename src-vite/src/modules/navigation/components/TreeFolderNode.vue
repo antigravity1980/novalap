@@ -32,7 +32,7 @@
       <span class="truncate flex-1">{{ folder.name }}</span>
     </div>
 
-    <!-- Children list -->
+    <!-- Children list — читаем из стора, computed реактивно -->
     <div v-if="isExpanded && children.length" class="tree-children ml-4 border-l border-base-content/5 pl-2 mt-0.5 space-y-0.5">
       <TreeFolderNode
         v-for="child in children"
@@ -52,10 +52,14 @@
         type="text"
         class="flex-1 px-2 py-1 text-xs bg-base-100 border border-primary/30 rounded outline-none focus:border-primary"
         placeholder="Имя папки"
-        @keydown.enter="confirmNewFolder"
+        @keydown.enter.prevent="confirmNewFolder"
         @keydown.escape="cancelNewFolder"
-        @blur="confirmNewFolder"
       />
+      <button
+        class="px-2 py-1 text-xs bg-primary/20 hover:bg-primary/30 rounded border border-primary/30"
+        @click="confirmNewFolder"
+        @mousedown.prevent
+      >OK</button>
     </div>
 
     <ContextMenu
@@ -89,7 +93,7 @@ const clipboardStore = useClipboardStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
 const isExpanded = ref(false)
-const children = ref(props.folder.children || [])
+const children = computed(() => navigationStore.treeFolders[props.folder.path] || [])
 const hasChildren = computed(() => props.folder.has_subfolders)
 const isActive = computed(() => props.folder.path === navigationStore.currentPath)
 const contextMenuRef = ref(null)
@@ -211,19 +215,17 @@ function startNewFolder() {
 
 async function confirmNewFolder() {
   const name = newFolderName.value.trim()
-  if (!name) {
-    showNewFolderInput.value = false
-    return
-  }
+  showNewFolderInput.value = false
+  if (!name) return
+
   try {
     const folderPath = props.folder.path.endsWith('\\') || props.folder.path.endsWith('/')
       ? props.folder.path + name
       : props.folder.path + '\\' + name
     await invoke('mkdir_folder', { path: folderPath })
-    showNewFolderInput.value = false
-    // Обновить дерево
-    await navigationStore.expandTreeFolder(props.folder.path)
-    children.value = navigationStore.treeFolders[props.folder.path] || []
+    // Перезагружаем родительскую папку (где создали подпапку)
+    await navigationStore.refreshTreeFolder(props.folder.path)
+    // Автоматически разворачиваем родителя
     if (!isExpanded.value) {
       isExpanded.value = true
     }
@@ -240,12 +242,18 @@ function cancelNewFolder() {
 async function handlePaste() {
   try {
     await clipboardStore.paste(props.folder.path)
-    // Обновить дерево
-    await navigationStore.expandTreeFolder(props.folder.path)
-    children.value = navigationStore.treeFolders[props.folder.path] || []
-    if (!isExpanded.value) {
-      isExpanded.value = true
+    // Перезагружаем целевую папку (и родителя если был cut)
+    await navigationStore.refreshTreeFolder(props.folder.path)
+    // Если cut — перезагружаем родителя источника
+    if (clipboardStore.mode === 'cut' && clipboardStore.items.length) {
+      for (const src of clipboardStore.items) {
+        const parentSrc = src.substring(0, src.lastIndexOf('\\'))
+        if (parentSrc && parentSrc !== props.folder.path) {
+          await navigationStore.refreshTreeFolder(parentSrc)
+        }
+      }
     }
+    isExpanded.value = true
     // Также обновить галерею если мы в этой папке
     if (navigationStore.currentPath === props.folder.path) {
       await navigationStore.navigateTo(navigationStore.currentPath)
@@ -258,18 +266,15 @@ async function handlePaste() {
 
 async function handleDelete() {
   try {
-    await invoke('delete_file_system', { path: props.folder.path })
-    // Обновить дерево
-    if (isExpanded.value) {
-      isExpanded.value = false
-    }
-    // Найти родительский путь и обновить его
-    const parentPath = props.folder.path.substring(0, props.folder.path.lastIndexOf('\\'))
+    const pathToDelete = props.folder.path
+    const parentPath = pathToDelete.substring(0, pathToDelete.lastIndexOf('\\'))
+    await invoke('delete_file_system', { path: pathToDelete })
+    // Перезагружаем родителя
     if (parentPath) {
-      await navigationStore.expandTreeFolder(parentPath)
+      await navigationStore.refreshTreeFolder(parentPath)
     }
-    // Если мы находимся в удалённой папке, перейти в родительскую
-    if (navigationStore.currentPath === props.folder.path || navigationStore.currentPath.startsWith(props.folder.path + '\\')) {
+    // Если мы в удалённой папке — перейти в родителя
+    if (navigationStore.currentPath === pathToDelete || navigationStore.currentPath.startsWith(pathToDelete + '\\')) {
       await navigationStore.navigateTo(parentPath || 'C:\\')
       galleryStore.setFiles(navigationStore.folders)
     }
@@ -278,17 +283,12 @@ async function handleDelete() {
   }
 }
 
-watch(() => props.folder.has_subfolders, (val) => {
-  if (!val) isExpanded.value = false
-})
-
 async function toggle() {
   if (!hasChildren.value) return
   isExpanded.value = !isExpanded.value
-  if (isExpanded.value && (!children.value || children.value.length === 0)) {
+  if (isExpanded.value && children.value.length === 0) {
     emit('expand', props.folder.path)
     await navigationStore.expandTreeFolder(props.folder.path)
-    children.value = navigationStore.treeFolders[props.folder.path] || []
   }
 }
 

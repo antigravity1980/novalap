@@ -53,10 +53,14 @@
             type="text"
             class="flex-1 px-2 py-1 text-xs bg-base-100 border border-primary/30 rounded outline-none focus:border-primary"
             placeholder="Имя папки"
-            @keydown.enter="confirmNewFolderOnDrive"
+            @keydown.enter.prevent="confirmNewFolderOnDrive"
             @keydown.escape="cancelNewFolderOnDrive"
-            @blur="confirmNewFolderOnDrive"
           />
+          <button
+            class="px-2 py-1 text-xs bg-primary/20 hover:bg-primary/30 rounded border border-primary/30"
+            @click="confirmNewFolderOnDrive"
+            @mousedown.prevent
+          >OK</button>
         </div>
       </div>
     </div>
@@ -100,7 +104,7 @@ const visibleDrives = computed(() => {
 })
 
 const driveMenuItems = computed(() => {
-  const items = [
+  return [
     {
       label: 'Создать папку',
       action: () => startNewFolderOnDrive()
@@ -111,7 +115,6 @@ const driveMenuItems = computed(() => {
       action: () => handlePasteOnDrive()
     },
   ]
-  return items
 })
 
 function handleDriveContextMenu(e, drivePath) {
@@ -129,23 +132,17 @@ function startNewFolderOnDrive() {
 
 async function confirmNewFolderOnDrive() {
   const name = newFolderName.value.trim()
-  if (!name) {
-    showNewFolderOnDrive.value = false
-    return
-  }
+  showNewFolderOnDrive.value = false
+  if (!name) return
+
   try {
     const folderPath = currentContextDrivePath.value.endsWith('\\')
       ? currentContextDrivePath.value + name
       : currentContextDrivePath.value + '\\' + name
     await invoke('mkdir_folder', { path: folderPath })
-    showNewFolderOnDrive.value = false
-    // Обновить дерево
-    if (expandedNodes[currentContextDrivePath.value]) {
-      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
-    } else {
-      expandedNodes[currentContextDrivePath.value] = true
-      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
-    }
+    // Принудительно перезагружаем кеш диска
+    await navigationStore.refreshTreeFolder(currentContextDrivePath.value)
+    expandedNodes[currentContextDrivePath.value] = true
   } catch (err) {
     console.error('Failed to create folder on drive:', err)
   }
@@ -159,12 +156,17 @@ function cancelNewFolderOnDrive() {
 async function handlePasteOnDrive() {
   try {
     await clipboardStore.paste(currentContextDrivePath.value)
-    // Обновить дерево
-    if (expandedNodes[currentContextDrivePath.value]) {
-      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
-    } else {
-      expandedNodes[currentContextDrivePath.value] = true
-      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
+    // Перезагружаем диск
+    await navigationStore.refreshTreeFolder(currentContextDrivePath.value)
+    expandedNodes[currentContextDrivePath.value] = true
+    // Перезагружаем родителей источников при cut
+    if (clipboardStore.mode === 'cut' && clipboardStore.items.length) {
+      for (const src of clipboardStore.items) {
+        const parentSrc = src.substring(0, src.lastIndexOf('\\'))
+        if (parentSrc && parentSrc !== currentContextDrivePath.value) {
+          await navigationStore.refreshTreeFolder(parentSrc)
+        }
+      }
     }
     // Обновить галерею если мы в этом диске
     if (navigationStore.currentPath === currentContextDrivePath.value) {
@@ -233,7 +235,6 @@ async function expandFolder(path) {
 }
 
 onMounted(() => {
-  // If there's an active path, expand its drive node
   if (navigationStore.currentPath) {
     const drive = navigationStore.drives.find(d => navigationStore.currentPath.startsWith(d.path))
     if (drive) {
@@ -242,7 +243,6 @@ onMounted(() => {
   }
 })
 
-// Авторазвёртывание дерева при навигации
 watch(() => navigationStore.currentPath, (newPath) => {
   if (newPath) {
     const drive = navigationStore.drives.find(d => newPath.startsWith(d.path))

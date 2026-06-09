@@ -177,6 +177,19 @@ export const useNavigationStore = defineStore('navigation', {
       }
     },
 
+    /** Всегда перезагружает дерево для указанного пути (даже если уже закешировано) */
+    async refreshTreeFolder(path) {
+      try {
+        const children = await invoke('expand_folder', { path })
+        this.treeFolders[path] = children
+      } catch (error) {
+        console.error('Failed to refresh tree folder:', error)
+        if (typeof window !== 'undefined' && window.__tauri_ipc__) {
+          throw error
+        }
+      }
+    },
+
     async refresh() {
       if (this.currentPath) {
         await this.navigateTo(this.currentPath)
