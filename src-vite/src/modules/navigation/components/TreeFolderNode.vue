@@ -44,6 +44,20 @@
       />
     </div>
 
+    <!-- New folder input -->
+    <div v-if="showNewFolderInput" class="ml-7 mt-1 flex items-center gap-1">
+      <input
+        ref="newFolderInputRef"
+        v-model="newFolderName"
+        type="text"
+        class="flex-1 px-2 py-1 text-xs bg-base-100 border border-primary/30 rounded outline-none focus:border-primary"
+        placeholder="Имя папки"
+        @keydown.enter="confirmNewFolder"
+        @keydown.escape="cancelNewFolder"
+        @blur="confirmNewFolder"
+      />
+    </div>
+
     <ContextMenu
       ref="contextMenuRef"
       :menuItems="recolorMenuItems"
@@ -54,8 +68,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useNavigationStore } from '../store'
+import { useClipboardStore } from '../stores/clipboardStore'
 import { useGalleryStore } from '../../gallery/store'
 import { useConfigStore } from '@/stores/configStore'
 import { getAssetSrc } from '@/common/utils'
@@ -70,6 +85,7 @@ const props = defineProps({
 const emit = defineEmits(['navigate', 'expand'])
 
 const navigationStore = useNavigationStore()
+const clipboardStore = useClipboardStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
 const isExpanded = ref(false)
@@ -78,6 +94,9 @@ const hasChildren = computed(() => props.folder.has_subfolders)
 const isActive = computed(() => props.folder.path === navigationStore.currentPath)
 const contextMenuRef = ref(null)
 const dragOverFolderPath = ref('')
+const showNewFolderInput = ref(false)
+const newFolderName = ref('')
+const newFolderInputRef = ref(null)
 
 async function handleFolderDrop(e, destPath) {
   dragOverFolderPath.value = ''
@@ -117,6 +136,13 @@ const recolorMenuItems = computed(() => {
   const isFav = configStore.settings.favorites?.includes(props.folder.path)
   return [
     {
+      label: 'Создать папку',
+      action: () => startNewFolder()
+    },
+    {
+      label: '-',
+    },
+    {
       label: isFav ? 'Удалить из избранного' : 'Добавить в избранное',
       action: () => configStore.toggleFavorite(props.folder.path)
     },
@@ -140,8 +166,31 @@ const recolorMenuItems = computed(() => {
         { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\12.ico'), tooltip: 'Папка 12', action: () => setFolderIcon('12.ico') },
         { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\15.ico'), tooltip: 'Папка 15', action: () => setFolderIcon('15.ico') },
       ]
-    }
-]
+    },
+    {
+      label: '-',
+    },
+    {
+      label: 'Копировать',
+      action: () => clipboardStore.copy(props.folder.path)
+    },
+    {
+      label: 'Вырезать',
+      action: () => clipboardStore.cut(props.folder.path)
+    },
+    {
+      label: 'Вставить',
+      disabled: !clipboardStore.hasItems,
+      action: () => handlePaste()
+    },
+    {
+      label: '-',
+    },
+    {
+      label: 'Удалить',
+      action: () => handleDelete()
+    },
+  ]
 })
 
 function handleContextMenu(e) {
@@ -150,6 +199,83 @@ function handleContextMenu(e) {
 
 function setFolderIcon(iconName) {
   configStore.setFolderIcon(props.folder.path, iconName)
+}
+
+function startNewFolder() {
+  showNewFolderInput.value = true
+  newFolderName.value = ''
+  nextTick(() => {
+    newFolderInputRef.value?.focus()
+  })
+}
+
+async function confirmNewFolder() {
+  const name = newFolderName.value.trim()
+  if (!name) {
+    showNewFolderInput.value = false
+    return
+  }
+  try {
+    const folderPath = props.folder.path.endsWith('\\') || props.folder.path.endsWith('/')
+      ? props.folder.path + name
+      : props.folder.path + '\\' + name
+    await invoke('mkdir_folder', { path: folderPath })
+    showNewFolderInput.value = false
+    // Обновить дерево
+    await navigationStore.expandTreeFolder(props.folder.path)
+    children.value = navigationStore.treeFolders[props.folder.path] || []
+    if (!isExpanded.value) {
+      isExpanded.value = true
+    }
+  } catch (err) {
+    console.error('Failed to create folder:', err)
+  }
+}
+
+function cancelNewFolder() {
+  showNewFolderInput.value = false
+  newFolderName.value = ''
+}
+
+async function handlePaste() {
+  try {
+    await clipboardStore.paste(props.folder.path)
+    // Обновить дерево
+    await navigationStore.expandTreeFolder(props.folder.path)
+    children.value = navigationStore.treeFolders[props.folder.path] || []
+    if (!isExpanded.value) {
+      isExpanded.value = true
+    }
+    // Также обновить галерею если мы в этой папке
+    if (navigationStore.currentPath === props.folder.path) {
+      await navigationStore.navigateTo(navigationStore.currentPath)
+      galleryStore.setFiles(navigationStore.folders)
+    }
+  } catch (err) {
+    console.error('Paste failed:', err)
+  }
+}
+
+async function handleDelete() {
+  try {
+    await invoke('delete_file_system', { path: props.folder.path })
+    // Обновить дерево
+    if (isExpanded.value) {
+      isExpanded.value = false
+    }
+    // Найти родительский путь и обновить его
+    const parentPath = props.folder.path.substring(0, props.folder.path.lastIndexOf('\\'))
+    if (parentPath) {
+      await navigationStore.expandTreeFolder(parentPath)
+    }
+    // Если мы находимся в удалённой папке, перейти в родительскую
+    if (navigationStore.currentPath === props.folder.path || navigationStore.currentPath.startsWith(props.folder.path + '\\')) {
+      await navigationStore.navigateTo(parentPath || 'C:\\')
+      galleryStore.setFiles(navigationStore.folders)
+    }
+  } catch (err) {
+    console.error('Delete failed:', err)
+  }
 }
 
 watch(() => props.folder.has_subfolders, (val) => {

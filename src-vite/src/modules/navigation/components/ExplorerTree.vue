@@ -11,6 +11,7 @@
             'bg-secondary/20 text-secondary border border-dashed border-secondary/50': dragOverDrivePath === drive.path,
           }"
           @click="navigateTo(drive.path)"
+          @contextmenu.prevent.stop="handleDriveContextMenu($event, drive.path)"
           @dragover.prevent="dragOverDrivePath = drive.path"
           @dragenter.prevent="dragOverDrivePath = drive.path"
           @dragleave="dragOverDrivePath = ''"
@@ -43,31 +44,137 @@
             @expand="expandFolder"
           />
         </div>
+
+        <!-- New folder input for drive -->
+        <div v-if="showNewFolderOnDrive && currentContextDrivePath === drive.path" class="ml-7 mt-1 flex items-center gap-1">
+          <input
+            ref="newFolderInputRef"
+            v-model="newFolderName"
+            type="text"
+            class="flex-1 px-2 py-1 text-xs bg-base-100 border border-primary/30 rounded outline-none focus:border-primary"
+            placeholder="Имя папки"
+            @keydown.enter="confirmNewFolderOnDrive"
+            @keydown.escape="cancelNewFolderOnDrive"
+            @blur="confirmNewFolderOnDrive"
+          />
+        </div>
       </div>
     </div>
+
+    <ContextMenu
+      ref="contextMenuRef"
+      :menuItems="driveMenuItems"
+      :smallIcon="true"
+      style="display: none;"
+    />
   </div>
 </template>
 
 <script setup>
-import { reactive, onMounted, watch, computed, ref } from 'vue'
+import { reactive, onMounted, watch, computed, ref, nextTick } from 'vue'
 import { useNavigationStore } from '../store'
+import { useClipboardStore } from '../stores/clipboardStore'
 import { useGalleryStore } from '../../gallery/store'
 import { useConfigStore } from '@/stores/configStore'
 import { IconDrive } from '@/common/icons'
 import { invoke } from '@tauri-apps/api/core'
 import TreeFolderNode from './TreeFolderNode.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const navigationStore = useNavigationStore()
+const clipboardStore = useClipboardStore()
 const galleryStore = useGalleryStore()
 const configStore = useConfigStore()
 const expandedNodes = reactive({})
 
 const dragOverDrivePath = ref('')
+const contextMenuRef = ref(null)
+const currentContextDrivePath = ref('')
+const showNewFolderOnDrive = ref(false)
+const newFolderName = ref('')
+const newFolderInputRef = ref(null)
 
 const visibleDrives = computed(() => {
   const hidden = configStore.settings.hiddenDrives || []
   return navigationStore.drives.filter(d => !hidden.includes(d.path))
 })
+
+const driveMenuItems = computed(() => {
+  const items = [
+    {
+      label: 'Создать папку',
+      action: () => startNewFolderOnDrive()
+    },
+    {
+      label: 'Вставить',
+      disabled: !clipboardStore.hasItems,
+      action: () => handlePasteOnDrive()
+    },
+  ]
+  return items
+})
+
+function handleDriveContextMenu(e, drivePath) {
+  currentContextDrivePath.value = drivePath
+  contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+function startNewFolderOnDrive() {
+  showNewFolderOnDrive.value = true
+  newFolderName.value = ''
+  nextTick(() => {
+    newFolderInputRef.value?.focus()
+  })
+}
+
+async function confirmNewFolderOnDrive() {
+  const name = newFolderName.value.trim()
+  if (!name) {
+    showNewFolderOnDrive.value = false
+    return
+  }
+  try {
+    const folderPath = currentContextDrivePath.value.endsWith('\\')
+      ? currentContextDrivePath.value + name
+      : currentContextDrivePath.value + '\\' + name
+    await invoke('mkdir_folder', { path: folderPath })
+    showNewFolderOnDrive.value = false
+    // Обновить дерево
+    if (expandedNodes[currentContextDrivePath.value]) {
+      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
+    } else {
+      expandedNodes[currentContextDrivePath.value] = true
+      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
+    }
+  } catch (err) {
+    console.error('Failed to create folder on drive:', err)
+  }
+}
+
+function cancelNewFolderOnDrive() {
+  showNewFolderOnDrive.value = false
+  newFolderName.value = ''
+}
+
+async function handlePasteOnDrive() {
+  try {
+    await clipboardStore.paste(currentContextDrivePath.value)
+    // Обновить дерево
+    if (expandedNodes[currentContextDrivePath.value]) {
+      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
+    } else {
+      expandedNodes[currentContextDrivePath.value] = true
+      await navigationStore.expandTreeFolder(currentContextDrivePath.value)
+    }
+    // Обновить галерею если мы в этом диске
+    if (navigationStore.currentPath === currentContextDrivePath.value) {
+      await navigationStore.navigateTo(navigationStore.currentPath)
+      galleryStore.setFiles(navigationStore.folders)
+    }
+  } catch (err) {
+    console.error('Paste on drive failed:', err)
+  }
+}
 
 async function handleDriveDrop(e, destPath) {
   dragOverDrivePath.value = ''
