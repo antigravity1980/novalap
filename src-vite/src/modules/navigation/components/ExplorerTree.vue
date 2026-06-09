@@ -1,5 +1,5 @@
 <template>
-  <div class="explorer-tree py-2">
+  <div class="explorer-tree py-2 h-full" @contextmenu.prevent.stop="handleEmptySpaceContextMenu($event)">
     <div class="tree-content space-y-1">
       <!-- Drives list -->
       <div v-for="drive in visibleDrives" :key="drive.path" class="tree-node px-1">
@@ -67,7 +67,7 @@
 
     <ContextMenu
       ref="contextMenuRef"
-      :menuItems="driveMenuItems"
+      :menuItems="activeMenuItems"
       :smallIcon="true"
       style="display: none;"
     />
@@ -98,9 +98,15 @@ const showNewFolderOnDrive = ref(false)
 const newFolderName = ref('')
 const newFolderInputRef = ref(null)
 
+const contextMenuType = ref('drive')
+
 const visibleDrives = computed(() => {
   const hidden = configStore.settings.hiddenDrives || []
   return navigationStore.drives.filter(d => !hidden.includes(d.path))
+})
+
+const activeMenuItems = computed(() => {
+  return contextMenuType.value === 'drive' ? driveMenuItems.value : emptySpaceMenuItems.value
 })
 
 const driveMenuItems = computed(() => {
@@ -117,9 +123,87 @@ const driveMenuItems = computed(() => {
   ]
 })
 
+const emptySpaceMenuItems = computed(() => {
+  return [
+    {
+      label: 'Создать папку',
+      disabled: !navigationStore.currentPath,
+      action: () => createFolderInCurrentDir()
+    },
+    {
+      label: 'Вставить',
+      disabled: !navigationStore.currentPath || !clipboardStore.hasItems,
+      action: () => handlePasteInCurrentDir()
+    },
+  ]
+})
+
 function handleDriveContextMenu(e, drivePath) {
   currentContextDrivePath.value = drivePath
+  contextMenuType.value = 'drive'
   contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+function handleEmptySpaceContextMenu(e) {
+  if (e.target.closest('.tree-item') || e.target.closest('.chevron')) return
+  contextMenuType.value = 'empty'
+  contextMenuRef.value?.open(e.clientX, e.clientY)
+}
+
+async function createFolderInCurrentDir() {
+  if (!navigationStore.currentPath) return
+  const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
+  
+  let name = 'Новая папка'
+  let counter = 1
+  const checkNameExists = (n) => {
+    return navigationStore.folders.some(f => f.name.toLowerCase() === n.toLowerCase())
+  }
+  
+  while (checkNameExists(name)) {
+    counter++
+    name = `Новая папка (${counter})`
+  }
+
+  const newPath = navigationStore.currentPath.endsWith(separator)
+    ? navigationStore.currentPath + name
+    : navigationStore.currentPath + separator + name
+  
+  try {
+    await invoke('mkdir_folder', { path: newPath })
+    await navigationStore.refreshTreeFolder(navigationStore.currentPath)
+    expandedNodes[navigationStore.currentPath] = true
+    
+    await navigationStore.navigateTo(navigationStore.currentPath)
+    galleryStore.setFiles(navigationStore.folders)
+    galleryStore.renamingPath = newPath
+  } catch (err) {
+    console.error('Failed to create folder from sidebar tree:', err)
+  }
+}
+
+async function handlePasteInCurrentDir() {
+  const destPath = navigationStore.currentPath
+  if (!destPath) return
+  try {
+    await clipboardStore.paste(destPath)
+    await navigationStore.refreshTreeFolder(destPath)
+    expandedNodes[destPath] = true
+    
+    if (clipboardStore.mode === 'cut' && clipboardStore.items.length) {
+      for (const src of clipboardStore.items) {
+        const parentSrc = src.substring(0, src.lastIndexOf('\\'))
+        if (parentSrc && parentSrc !== destPath) {
+          await navigationStore.refreshTreeFolder(parentSrc)
+        }
+      }
+    }
+    
+    await navigationStore.navigateTo(destPath)
+    galleryStore.setFiles(navigationStore.folders)
+  } catch (err) {
+    console.error('Paste in current dir failed:', err)
+  }
 }
 
 function startNewFolderOnDrive() {

@@ -315,30 +315,69 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
     })
 }
 
-/// Получить эскиз изображения в base64
+/// Получить эскиз изображения в base64 (с дисковым кешем)
 #[command]
 pub async fn get_explorer_thumbnail(path: String, size: u32) -> Result<String, String> {
     use base64::{Engine, engine::general_purpose};
     let path_clone = path.clone();
     tokio::task::spawn_blocking(move || {
+        // --- 1. Вычисляем ключ кеша на основе пути, mtime, размера файла и размера миниатюры ---
+        let meta = fs::metadata(&path_clone).map_err(|e| e.to_string())?;
+        let mtime: i64 = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let file_size: u64 = meta.len();
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"explorer-thumb-v1");
+        hasher.update(path_clone.as_bytes());
+        hasher.update(&mtime.to_le_bytes());
+        hasher.update(&file_size.to_le_bytes());
+        hasher.update(&size.to_le_bytes());
+        let hash = hasher.finalize().to_hex().to_string();
+
+        // --- 2. Ищем файл в кеше ---
+        let cache_root = crate::t_config::get_app_cache_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from(".cache"))
+            .join("explorer_thumbs");
+        let shard = &hash[0..2];
+        let cache_file = cache_root.join(shard).join(format!("{}.jpg", hash));
+
+        if cache_file.exists() {
+            // Кеш найден — читаем готовые байты без декодирования изображения
+            let bytes = fs::read(&cache_file).map_err(|e| e.to_string())?;
+            let encoded = general_purpose::STANDARD.encode(&bytes);
+            return Ok(format!("data:image/jpeg;base64,{}", encoded));
+        }
+
+        // --- 3. Кеш холодный — декодируем и масштабируем ---
         let p = Path::new(&path_clone);
-        let is_raw = crate::t_libraw::is_tiff_path(&path_clone) || 
+        let is_raw = crate::t_libraw::is_tiff_path(&path_clone) ||
             p.extension()
                 .map(|e| e.to_string_lossy().to_lowercase())
                 .map(|ext| {
                     matches!(ext.as_str(), "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf")
                 })
                 .unwrap_or(false);
-            
+
         let orientation = crate::t_image::get_image_orientation(&path_clone);
         let thumb_bytes = if is_raw {
             crate::t_image::get_raw_thumbnail(&path_clone, orientation, size)
         } else {
             crate::t_image::get_image_thumbnail(&path_clone, orientation, size)
         };
-        
+
         match thumb_bytes {
             Ok(Some(bytes)) => {
+                // --- 4. Сохраняем в кеш асинхронно (без блокировки) ---
+                let shard_dir = cache_root.join(shard);
+                if fs::create_dir_all(&shard_dir).is_ok() {
+                    let _ = fs::write(&cache_file, &bytes);
+                }
+
                 let encoded = general_purpose::STANDARD.encode(&bytes);
                 Ok(format!("data:image/jpeg;base64,{}", encoded))
             }

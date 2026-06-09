@@ -125,8 +125,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { getAssetSrc } from '@/common/utils'
+import { getCachedThumbnail, setCachedThumbnail } from '@/modules/gallery/explorerThumbnailsCache'
 import { useConfigStore } from '@/stores/configStore'
 import { useNavigationStore } from '@/modules/navigation/store'
 import { useGalleryStore } from '@/modules/gallery/store'
@@ -175,25 +176,64 @@ const isVideo = computed(() => {
 // Async loading of generated thumbnails for large files to prevent UI freeze
 const thumbnailUrl = ref('')
 let debounceTimeout = null
+
 async function loadThumbnail() {
   if (!isImage.value) return
+
+  const currentPath = props.file.path
+  const cacheKey = `${currentPath}__${props.size}`
+
+  // --- 1. Мгновенная загрузка из кеша в памяти ---
+  const cached = getCachedThumbnail(cacheKey)
+  if (cached) {
+    thumbnailUrl.value = cached
+    return
+  }
+
+  // --- 2. Отменяем предыдущий дебаунс ---
   if (debounceTimeout) {
     clearTimeout(debounceTimeout)
   }
+
+  // --- 3. Маленькие файлы загружаем мгновенно, без задержки ---
+  if (props.file.size < 200 * 1024) {
+    const url = getAssetSrc(currentPath)
+    setCachedThumbnail(cacheKey, url)
+    thumbnailUrl.value = url
+    return
+  }
+
+  // --- 4. Крупные файлы — дебаунс + IPC (только если не закешировано) ---
   debounceTimeout = setTimeout(async () => {
-    const currentPath = props.file.path
+    // Проверяем кеш ещё раз — могло быть заполнено параллельным вызовом
+    const cachedNow = getCachedThumbnail(cacheKey)
+    if (cachedNow) {
+      thumbnailUrl.value = cachedNow
+      return
+    }
     const targetSize = Math.max(256, Math.round(props.size))
-    if (props.file.size < 200 * 1024) {
-      thumbnailUrl.value = getAssetSrc(currentPath)
-    } else {
-      try {
-        thumbnailUrl.value = await invoke('get_explorer_thumbnail', { path: currentPath, size: targetSize })
-      } catch (e) {
-        thumbnailUrl.value = getAssetSrc(currentPath)
+    try {
+      const url = await invoke('get_explorer_thumbnail', { path: currentPath, size: targetSize })
+      setCachedThumbnail(cacheKey, url)
+      // Проверяем, что карточка всё ещё отображает тот же файл
+      if (props.file.path === currentPath) {
+        thumbnailUrl.value = url
+      }
+    } catch (e) {
+      const fallback = getAssetSrc(currentPath)
+      setCachedThumbnail(cacheKey, fallback)
+      if (props.file.path === currentPath) {
+        thumbnailUrl.value = fallback
       }
     }
-  }, 150)
+  }, 100)
 }
+
+onBeforeUnmount(() => {
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout)
+  }
+})
 watch([() => props.file.path, () => props.size, () => uiStore.fileVersions[props.file.path]], loadThumbnail, { immediate: true })
 
 const folderIconUrl = computed(() => {

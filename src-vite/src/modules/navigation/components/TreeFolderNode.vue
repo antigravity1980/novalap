@@ -277,6 +277,9 @@ async function handleDelete() {
     if (navigationStore.currentPath === pathToDelete || navigationStore.currentPath.startsWith(pathToDelete + '\\')) {
       await navigationStore.navigateTo(parentPath || 'C:\\')
       galleryStore.setFiles(navigationStore.folders)
+    } else if (navigationStore.currentPath === parentPath) {
+      await navigationStore.navigateTo(navigationStore.currentPath)
+      galleryStore.setFiles(navigationStore.folders)
     }
   } catch (err) {
     console.error('Delete failed:', err)

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
+import { clearThumbnailCache } from '@/modules/gallery/explorerThumbnailsCache'
 
 /**
  * Store для навигации (Модуль 1)
@@ -34,6 +35,7 @@ export const useNavigationStore = defineStore('navigation', {
 
   actions: {
     async navigateTo(path) {
+      clearThumbnailCache()
       this.navigatedCount++
       this.isLoading = true
       try {
@@ -92,6 +94,7 @@ export const useNavigationStore = defineStore('navigation', {
 
     async goBack() {
       if (this.canGoBack) {
+        clearThumbnailCache()
         this.historyIndex--
         const path = this.history[this.historyIndex]
         this.currentPath = path
@@ -119,6 +122,7 @@ export const useNavigationStore = defineStore('navigation', {
 
     async goForward() {
       if (this.canGoForward) {
+        clearThumbnailCache()
         this.historyIndex++
         const path = this.history[this.historyIndex]
         this.currentPath = path

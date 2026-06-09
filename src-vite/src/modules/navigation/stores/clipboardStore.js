@@ -1,72 +1,63 @@
 import { defineStore } from 'pinia'
-import { invoke } from '@tauri-apps/api/core'
+import { useGalleryStore } from '../../gallery/store'
 
 /**
  * Буфер обмена для операций Копировать/Вырезать/Вставить
+ * Синхронизирован с useGalleryStore.clipboard
  */
 export const useClipboardStore = defineStore('clipboard', {
   state: () => ({
-    /** Массив путей, которые скопированы или вырезаны */
-    items: [],
-    /** Режим: 'copy' или 'cut' */
-    mode: null,
+    // Состояние делегируется в galleryStore
   }),
 
   getters: {
-    hasItems: (state) => state.items.length > 0,
-    isCut: (state) => state.mode === 'cut',
-    isCopy: (state) => state.mode === 'copy',
+    items() {
+      const galleryStore = useGalleryStore()
+      return galleryStore.clipboard.paths
+    },
+    mode() {
+      const galleryStore = useGalleryStore()
+      return galleryStore.clipboard.action
+    },
+    hasItems() {
+      const galleryStore = useGalleryStore()
+      return galleryStore.clipboard.paths.length > 0
+    },
+    isCut() {
+      const galleryStore = useGalleryStore()
+      return galleryStore.clipboard.action === 'cut'
+    },
+    isCopy() {
+      const galleryStore = useGalleryStore()
+      return galleryStore.clipboard.action === 'copy'
+    },
   },
 
   actions: {
     /** Скопировать пути в буфер */
     copy(paths) {
+      const galleryStore = useGalleryStore()
       const arr = Array.isArray(paths) ? paths : [paths]
-      this.items = [...arr]
-      this.mode = 'copy'
+      galleryStore.setClipboard('copy', arr)
     },
 
     /** Вырезать пути в буфер */
     cut(paths) {
+      const galleryStore = useGalleryStore()
       const arr = Array.isArray(paths) ? paths : [paths]
-      this.items = [...arr]
-      this.mode = 'cut'
+      galleryStore.setClipboard('cut', arr)
     },
 
     /** Вставить элементы из буфера в папку destPath */
     async paste(destPath) {
-      if (!this.items.length || !this.mode) return
-
-      const normalizedDest = destPath.endsWith('\\') || destPath.endsWith('/') 
-        ? destPath 
-        : destPath + '\\'
-
-      try {
-        for (const src of this.items) {
-          const lastSlash = Math.max(src.lastIndexOf('\\'), src.lastIndexOf('/'))
-          const fileName = lastSlash !== -1 ? src.substring(lastSlash + 1) : src
-          const dest = normalizedDest + fileName
-
-          if (src.toLowerCase() === dest.toLowerCase()) continue
-
-          if (this.mode === 'cut') {
-            await invoke('cross_move', { src, dest })
-          } else {
-            await invoke('cross_copy', { src, dest })
-          }
-        }
-      } finally {
-        // После вставки в режиме вырезания — очищаем буфер
-        if (this.mode === 'cut') {
-          this.clear()
-        }
-      }
+      const galleryStore = useGalleryStore()
+      await galleryStore.paste(destPath)
     },
 
     /** Очистить буфер */
     clear() {
-      this.items = []
-      this.mode = null
+      const galleryStore = useGalleryStore()
+      galleryStore.clearClipboard()
     },
   },
-})
+})

@@ -49,6 +49,24 @@ fn get_temp_backup_dir() -> Result<PathBuf, String> {
     Ok(backup_dir)
 }
 
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+    if !dst.exists() {
+        fs::create_dir_all(dst)?;
+    }
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            copy_dir_all(entry.path(), dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
 /// Переместить файлы в корзину
 #[command]
 pub fn move_to_trash(paths: Vec<String>) -> Result<Vec<TrashEntry>, String> {
@@ -76,12 +94,19 @@ pub fn move_to_trash(paths: Vec<String>) -> Result<Vec<TrashEntry>, String> {
 
         // Перемещаем в корзину
         if let Err(e) = fs::rename(path, &trash_path) {
-            // Если rename не работает (cross-disk), копируем и удаляем
-            if let Err(copy_err) = fs::copy(path, &trash_path) {
-                eprintln!("Failed to move to trash {}: {} / {}", path_str, e, copy_err);
-                continue;
+            if path.is_dir() {
+                if let Err(copy_err) = copy_dir_all(path, &trash_path) {
+                    eprintln!("Failed to move directory to trash {}: {} / {}", path_str, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_dir_all(path);
+            } else {
+                if let Err(copy_err) = fs::copy(path, &trash_path) {
+                    eprintln!("Failed to move file to trash {}: {} / {}", path_str, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_file(path);
             }
-            let _ = fs::remove_file(path);
         }
 
         entries.push(TrashEntry {
@@ -133,12 +158,19 @@ pub fn restore_from_trash(trash_paths: Vec<String>) -> Result<Vec<String>, Strin
 
         // Перемещаем обратно
         if let Err(e) = fs::rename(trash_path, &original_path) {
-            // Пробуем копировать + удалить
-            if let Err(copy_err) = fs::copy(trash_path, &original_path) {
-                eprintln!("Failed to restore {}: {} / {}", trash_path_str, e, copy_err);
-                continue;
+            if trash_path.is_dir() {
+                if let Err(copy_err) = copy_dir_all(trash_path, &original_path) {
+                    eprintln!("Failed to restore directory {}: {} / {}", trash_path_str, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_dir_all(trash_path);
+            } else {
+                if let Err(copy_err) = fs::copy(trash_path, &original_path) {
+                    eprintln!("Failed to restore file {}: {} / {}", trash_path_str, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_file(trash_path);
             }
-            fs::remove_file(trash_path).ok();
         }
 
         // Удаляем файл метаданных
