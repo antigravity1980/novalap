@@ -289,16 +289,46 @@ export const useGalleryStore = defineStore("gallery", {
       let result = [...allFiles];
 
       if (hasActiveFilter) {
-        const q = f.search ? f.search.toLowerCase() : null;
+        const q = f.search ? String(f.search).toLowerCase() : null;
         const fromTime = f.dateFrom ? new Date(f.dateFrom).getTime() : null;
         const toTime = f.dateTo ? new Date(f.dateTo).getTime() : null;
-        result = result.filter(file => {
-          if (f.format && file.extension !== f.format) return false;
-          if (f.aiSource && file.ai_source !== f.aiSource) return false;
-          if (fromTime != null && (f._modifiedTime || 0) < fromTime)
-            return false;
-          if (toTime != null && (f._modifiedTime || 0) > toTime) return false;
-          if (q && !f.name.toLowerCase().includes(q)) return false;
+
+        const normalizeSource = (v) =>
+          v == null ? "" : String(v).trim().replace(/\s+/g, " ");
+
+        const normalizeExt = (v) => {
+          if (v == null) return "";
+          return String(v).trim().toLowerCase();
+        };
+
+        result = result.filter((file) => {
+          const fileExt = normalizeExt(file.extension);
+          const wantExt = normalizeExt(f.format);
+
+          if (wantExt && fileExt !== wantExt) return false;
+
+          const fileSource = normalizeSource(file.ai_source);
+          const wantSource = normalizeSource(f.aiSource);
+          if (wantSource && fileSource !== wantSource) return false;
+
+          const modifiedTime = file._modifiedTime ?? file.modified ?? 0;
+          const modifiedMs =
+            typeof modifiedTime === "number"
+              ? modifiedTime
+              : new Date(modifiedTime).getTime() || 0;
+
+          if (fromTime != null && modifiedMs < fromTime) return false;
+          if (toTime != null && modifiedMs > toTime) return false;
+
+          if (q) {
+            const nameLike =
+              file.name ??
+              file.base_name ??
+              (file.path ? String(file.path).split(/[\\/]/).pop() : "") ??
+              "";
+            if (!String(nameLike).toLowerCase().includes(q)) return false;
+          }
+
           return true;
         });
       }
