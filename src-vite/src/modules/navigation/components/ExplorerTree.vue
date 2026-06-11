@@ -86,6 +86,7 @@ import TreeFolderNode from './TreeFolderNode.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 
 function buildNewFolderEntry(path) {
+  path = navigationStore.normalizePath(path)
   const normalizedPath = path.replace(/[\\/]+$/, '')
   const lastSlash = Math.max(normalizedPath.lastIndexOf('\\'), normalizedPath.lastIndexOf('/'))
   const name = lastSlash >= 0 ? normalizedPath.substring(lastSlash + 1) : normalizedPath
@@ -151,6 +152,7 @@ const emptySpaceMenuItems = computed(() => {
 })
 
 function handleDriveContextMenu(e, drivePath) {
+  drivePath = navigationStore.normalizePath(drivePath)
   currentContextDrivePath.value = drivePath
   contextMenuType.value = 'drive'
   contextMenuRef.value?.open(e.clientX, e.clientY)

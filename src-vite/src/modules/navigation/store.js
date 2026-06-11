@@ -8,7 +8,13 @@ import { clearThumbnailCache } from "@/modules/gallery/explorerThumbnailsCache";
  * Управляет выбранной директорией, историей навигации, дисками
  */
 export const useNavigationStore = defineStore("navigation", {
+  // eslint-disable-next-line no-unused-vars
+  // normalize paths to avoid treeFolders key mismatch ("/" vs "\\")
+
   state: () => ({
+    // NOTE: normalize paths to avoid treeFolders key mismatch ("/" vs "\\")
+    // across backend/frontend calls.
+    _pathNormMode: 'backslash',
     currentPath: "",
     history: [],
     historyIndex: -1,
@@ -40,6 +46,16 @@ export const useNavigationStore = defineStore("navigation", {
   },
 
   actions: {
+    normalizePath(path) {
+      if (!path) return "";
+      // unify separators to backslash, trim trailing separators (except root like C:\)
+      let p = String(path).replace(/[\/]+/g, "\\");
+      // remove trailing slash unless it is like "C:\\" or "\\\\server\\share\\"
+      p = p.replace(/\\+$/,'');
+      // restore drive root "C:\" if it got trimmed
+      if (/^[a-zA-Z]:\\?$/.test(p)) p = p.replace(/\\?$/, '\\');
+      return p;
+    },
     async _stopWatching() {
       try {
         if (typeof this.watchUnlisten === "function") {
@@ -66,6 +82,7 @@ export const useNavigationStore = defineStore("navigation", {
     },
 
     async navigateTo(path) {
+      path = this.normalizePath(path);
       clearThumbnailCache();
       this.navigatedCount++;
       this.isLoading = true;
@@ -337,7 +354,9 @@ export const useNavigationStore = defineStore("navigation", {
       }
     },
 
-    async expandTreeFolder(path) {
+async expandTreeFolder(path) {
+      path = this.normalizePath(path);
+      
       if (!this.treeFolders[path]) {
         try {
           const children = await invoke("expand_folder", { path });
@@ -375,7 +394,9 @@ export const useNavigationStore = defineStore("navigation", {
     },
 
     /** Всегда перезагружает дерево для указанного пути (даже если уже закешировано) */
-    async refreshTreeFolder(path) {
+async refreshTreeFolder(path) {
+      path = this.normalizePath(path);
+      
       try {
         const children = await invoke("expand_folder", { path });
         this.treeFolders[path] = children;
