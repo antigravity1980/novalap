@@ -1544,7 +1544,7 @@ impl AFile {
         let base_query = "SELECT COUNT(*), SUM(a.size)
             FROM afiles a 
             LEFT JOIN afolders b ON a.folder_id = b.id
-            LEFT JOIN albums c ON b.album_id = c.id";
+            LEFT JOIN albums c ON b.album_id = c.id\n             LEFT JOIN athumbs t ON a.id = t.file_id";
 
         base_query.to_string()
     }
@@ -1561,13 +1561,13 @@ impl AFile {
                 a.gps_latitude, a.gps_longitude, a.gps_altitude, a.geo_name, a.geo_admin1, a.geo_admin2, a.geo_cc,
                 b.path,
                 c.id AS album_id, c.name AS album_name,
-                (SELECT 1 FROM athumbs t WHERE t.file_id = a.id LIMIT 1) AS has_thumbnail,
+                t.id IS NOT NULL AS has_thumbnail,
                 CASE WHEN a.embeds IS NOT NULL THEN 1 ELSE 0 END AS has_embedding,
                 a.has_faces,
                 a.last_scan_time
             FROM afiles a 
             LEFT JOIN afolders b ON a.folder_id = b.id
-            LEFT JOIN albums c ON b.album_id = c.id"
+            LEFT JOIN albums c ON b.album_id = c.id\n             LEFT JOIN athumbs t ON a.id = t.file_id"
         )
     }
 
@@ -2054,7 +2054,7 @@ impl AFile {
             format!(
                 "SELECT COUNT(*), SUM(size) FROM (SELECT a.id, a.size FROM afiles a 
                 LEFT JOIN afolders b ON a.folder_id = b.id 
-                LEFT JOIN albums c ON b.album_id = c.id 
+                LEFT JOIN albums c ON b.album_id = c.id\n             LEFT JOIN athumbs t ON a.id = t.file_id 
                 {}{} GROUP BY a.id)",
                 joins, where_clause
             )
@@ -2132,7 +2132,7 @@ impl AFile {
                     ROW_NUMBER() OVER (ORDER BY {}) - 1 AS position
                 FROM afiles a
                 LEFT JOIN afolders b ON a.folder_id = b.id
-                LEFT JOIN albums c ON b.album_id = c.id
+                LEFT JOIN albums c ON b.album_id = c.id\n             LEFT JOIN athumbs t ON a.id = t.file_id
                 {}
                 {}
                 {}

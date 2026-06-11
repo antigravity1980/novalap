@@ -237,6 +237,8 @@ const rubberBandStyle = computed(() => {
 });
 
 let cardRects = [];
+let isCardRectsDirty = true;
+watch([rows, gap, () => props.thumbnailSize], () => { isCardRectsDirty = true; });
 
 function cacheCardRects() {
   cardRects = [];
