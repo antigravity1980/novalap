@@ -5,7 +5,8 @@
 use crate::t_common;
 use image::DynamicImage;
 use ndarray::{Array, Array4};
-use ort::{\n    execution_providers::*,
+use ort::{
+    execution_providers::*,
     inputs,
     session::{Session, builder::GraphOptimizationLevel},
     value::Value,
@@ -118,7 +119,15 @@ impl AiEngine {
             .map_err(|e| e.to_string())?
             .with_intra_threads(AI_INTRA_THREADS)
             .map_err(|e| e.to_string())?
-            .with_execution_providers([\n                CoreMLExecutionProvider::default().build(),\n                CUDAExecutionProvider::default().build(),\n                TensorRTExecutionProvider::default().build(),\n                DirectMLExecutionProvider::default().build(),\n                CPUExecutionProvider::default().build(),\n            ])\n            .map_err(|e| e.to_string())?\n            .commit_from_file(path)
+            .with_execution_providers([
+                CoreMLExecutionProvider::default().build(),
+                CUDAExecutionProvider::default().build(),
+                TensorRTExecutionProvider::default().build(),
+                DirectMLExecutionProvider::default().build(),
+                CPUExecutionProvider::default().build(),
+            ])
+            .map_err(|e| e.to_string())?
+            .commit_from_file(path)
             .map_err(|e| format!("Failed to load {} model from {:?}: {}", model_name, path, e))
     }
 
