@@ -45,7 +45,7 @@
             left: 0,
             right: 0,
             height: row.height + 'px',
-            gap: gap + 'px',
+            gap: galleryStore.thumbnailGap + 'px',
           }"
         >
           <ThumbnailCard
@@ -115,7 +115,7 @@ const colsPerRow = computed(() => {
 
 // Group files into rows/headers
 const rows = computed(() => {
-  const cols = colsPerRow.value;
+  const cols = Math.max(1, colsPerRow.value || 1);
   const result = [];
 
   if (!galleryStore.groupBy || galleryStore.groupBy === "none") {
@@ -240,7 +240,7 @@ let cardRects = [];
 
 function cacheCardRects() {
   cardRects = [];
-  const cols = colsPerRow.value;
+  const cols = Math.max(1, colsPerRow.value || 1);
   let currentTop = 0;
 
   for (const row of rows.value) {
@@ -538,7 +538,7 @@ function onKeyDown(e) {
       currentIndex = 0;
     }
 
-    const cols = colsPerRow.value;
+    const cols = Math.max(1, colsPerRow.value || 1);
     let nextIndex = currentIndex;
 
     if (e.key === "ArrowLeft") {

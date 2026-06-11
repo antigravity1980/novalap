@@ -207,7 +207,6 @@ export const useGalleryStore = defineStore("gallery", {
     files: [],
     filteredFiles: [],
     isLoading: false,
-    isLoading: false,
 
     // Стек сравнения (выживает между папками)
     compareStack: [], // array of { path, name, extension, is_dir }
@@ -275,7 +274,7 @@ export const useGalleryStore = defineStore("gallery", {
     // Работает только при реальном изменении ссылок или фильтров/сортировки/группировки.
     displayedFiles: (state) => {
       // alias для читаемости + одиночная точка входа
-      const allFiles = state.files ? state.files : (state.files || []);
+      const allFiles = Array.isArray(state.files) ? state.files : [];
       if (!allFiles || allFiles.length === 0) return [];
 
       const f = state.filters;
@@ -294,8 +293,8 @@ export const useGalleryStore = defineStore("gallery", {
         const fromTime = f.dateFrom ? new Date(f.dateFrom).getTime() : null;
         const toTime = f.dateTo ? new Date(f.dateTo).getTime() : null;
         result = result.filter(file => {
-          if (state.filters.format && file.extension !== state.filters.format) return false;
-          if (state.filters.aiSource && file.ai_source !== state.filters.aiSource) return false;
+          if (f.format && file.extension !== f.format) return false;
+          if (f.aiSource && file.ai_source !== f.aiSource) return false;
           if (fromTime != null && (f._modifiedTime || 0) < fromTime)
             return false;
           if (toTime != null && (f._modifiedTime || 0) > toTime) return false;
