@@ -204,8 +204,8 @@ export const useGalleryStore = defineStore("gallery", {
     thumbnailGap: 11,
     // shallowRef: большой массив файлов, нет смысла гонять Proxy по каждому элементу.
     // Обновляется через $patch / прямое присваивание, реактивность по длине/идентичности.
-    files: shallowRef([]),
-    filteredFiles: shallowRef([]),
+    files: [],
+    filteredFiles: [],
     isLoading: false,
     isLoading: false,
 
@@ -275,7 +275,7 @@ export const useGalleryStore = defineStore("gallery", {
     // Работает только при реальном изменении ссылок или фильтров/сортировки/группировки.
     displayedFiles: (state) => {
       // alias для читаемости + одиночная точка входа
-      const allFiles = (state.files && state.files.value) ? state.files.value : (state.files || []);
+      const allFiles = state.files ? state.files : (state.files || []);
       if (!allFiles || allFiles.length === 0) return [];
 
       const f = state.filters;
@@ -293,9 +293,9 @@ export const useGalleryStore = defineStore("gallery", {
         const q = f.search ? f.search.toLowerCase() : null;
         const fromTime = f.dateFrom ? new Date(f.dateFrom).getTime() : null;
         const toTime = f.dateTo ? new Date(f.dateTo).getTime() : null;
-        result = result.filter((file) => {
-          if (filters.format && file.extension !== filters.format) return false;
-          if (filters.aiSource && file.ai_source !== filters.aiSource) return false;
+        result = result.filter(file => {
+          if (state.filters.format && file.extension !== state.filters.format) return false;
+          if (state.filters.aiSource && file.ai_source !== state.filters.aiSource) return false;
           if (fromTime != null && (f._modifiedTime || 0) < fromTime)
             return false;
           if (toTime != null && (f._modifiedTime || 0) > toTime) return false;
@@ -345,7 +345,7 @@ export const useGalleryStore = defineStore("gallery", {
         const groups = groupFilesHelper(result, state.groupBy);
         const flat = [];
         for (const g of groups) {
-          for (const f of g.files) flat.push(f);
+          for (const item of g.files) flat.push(item);
         }
         return flat;
       }

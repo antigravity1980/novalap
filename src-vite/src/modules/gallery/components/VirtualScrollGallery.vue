@@ -45,7 +45,7 @@
             left: 0,
             right: 0,
             height: row.height + 'px',
-            gap: gap.value + 'px',
+            gap: gap + 'px',
           }"
         >
           <ThumbnailCard
