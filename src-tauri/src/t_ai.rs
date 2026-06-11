@@ -120,10 +120,10 @@ impl AiEngine {
             .with_intra_threads(AI_INTRA_THREADS)
             .map_err(|e| e.to_string())?
             .with_execution_providers([
-                CoreMLExecutionProvider::default().build(),
-                CUDAExecutionProvider::default().build(),
-                TensorRTExecutionProvider::default().build(),
-                DirectMLExecutionProvider::default().build(),
+                #[cfg(target_os = "macos")] CoreMLExecutionProvider::default().build(),
+                #[cfg(any(target_os = "windows", target_os = "linux"))] CUDAExecutionProvider::default().build(),
+                #[cfg(any(target_os = "windows", target_os = "linux"))] TensorRTExecutionProvider::default().build(),
+                #[cfg(target_os = "windows")] DirectMLExecutionProvider::default().build(),
                 CPUExecutionProvider::default().build(),
             ])
             .map_err(|e| e.to_string())?

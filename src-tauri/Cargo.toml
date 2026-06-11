@@ -24,7 +24,7 @@ strip = true
 [profile.dev.package."*"]
 opt-level = 3
 
-[dependencies]
+[target."cfg(target_os = "windows")".dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt", "directml"] }\n\n[target."cfg(target_os = "macos")".dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "coreml"] }\n\n[target."cfg(target_os = "linux")".dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt"] }\n\n[dependencies]
 tauri = { version = "2", features = [
     "macos-private-api",
     "protocol-asset",
@@ -64,7 +64,7 @@ ort = { version = "=2.0.0-rc.10", default-features = false, features = [
     "std",
     "ndarray",
     "download-binaries",
-    "copy-dylibs", "cuda", "tensorrt", "directml", "coreml",
+    "copy-dylibs",
 ] }
 ndarray = "0.16"
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }

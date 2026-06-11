@@ -274,7 +274,7 @@ export const useGalleryStore = defineStore("gallery", {
     // Работает только при реальном изменении ссылок или фильтров/сортировки/группировки.
     displayedFiles: (state) => {
       // alias для читаемости + одиночная точка входа
-      const allFiles = Array.isArray(state.files) ? state.files : [];
+      const allFiles = Array.isArray(state.files) ? state.files : (state.files && Array.isArray(state.files.value) ? state.files.value : []);
       if (!allFiles || allFiles.length === 0) return [];
 
       const f = state.filters;

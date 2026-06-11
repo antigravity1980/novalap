@@ -1,4 +1,4 @@
-use std::ffi::CString;
+#![allow(dead_code)]\nuse std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 use std::slice;

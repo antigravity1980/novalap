@@ -1,4 +1,4 @@
-import { defineStore } from "pinia";
+import { useGalleryStore } from "@/modules/gallery/store";\nimport { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 import { clearThumbnailCache } from "@/modules/gallery/explorerThumbnailsCache";
 
@@ -55,7 +55,7 @@ export const useNavigationStore = defineStore("navigation", {
         this.currentPath = path;
 
         // Загружаем содержимое
-        this.folders = await invoke("list_directory", { path });
+        this.folders = await invoke("list_directory", { path });\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);
 
         // Кешируем поддерево для tree view
         const treeData = await invoke("expand_folder", { path });
@@ -181,7 +181,7 @@ export const useNavigationStore = defineStore("navigation", {
         this.currentPath = path;
         this.isLoading = true;
         try {
-          this.folders = await invoke("list_directory", { path });
+          this.folders = await invoke("list_directory", { path });\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);
           await invoke("watch_directory", { path }).catch((err) =>
             console.error("Failed to watch directory:", err),
           );
@@ -238,7 +238,7 @@ export const useNavigationStore = defineStore("navigation", {
         this.currentPath = path;
         this.isLoading = true;
         try {
-          this.folders = await invoke("list_directory", { path });
+          this.folders = await invoke("list_directory", { path });\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);\n        const galleryStore = useGalleryStore();\n        galleryStore.setFiles(this.folders);
           await invoke("watch_directory", { path }).catch((err) =>
             console.error("Failed to watch directory:", err),
           );
