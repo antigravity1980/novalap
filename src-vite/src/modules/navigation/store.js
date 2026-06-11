@@ -354,10 +354,11 @@ export const useNavigationStore = defineStore("navigation", {
       }
     },
 
-async expandTreeFolder(path) {
+    async expandTreeFolder(path) {
       path = this.normalizePath(path);
       
       if (!this.treeFolders[path]) {
+
         try {
           const children = await invoke("expand_folder", { path });
           this.treeFolders[path] = children;

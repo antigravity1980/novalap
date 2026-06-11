@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive } from "vue";
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from "vue";
 import { useGalleryStore, groupFilesHelper } from "../store";
 import { useNavigationStore } from "../../navigation/store";
 import { invoke } from "@tauri-apps/api/core";
@@ -238,7 +238,9 @@ const rubberBandStyle = computed(() => {
 
 let cardRects = [];
 let isCardRectsDirty = true;
-watch([rows, gap, () => props.thumbnailSize], () => { isCardRectsDirty = true; });
+watch([rows, gap, () => props.thumbnailSize], () => {
+  isCardRectsDirty = true;
+});
 
 function cacheCardRects() {
   cardRects = [];

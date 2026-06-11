@@ -234,7 +234,7 @@ watch(
 
 const isCountPending = computed(() => {
   if (!isFolder.value) return false;
-  return !props.file.dir_count || !props.file.file_count;
+  return props.file.dir_count == null || props.file.file_count == null;
 });
 
 const aiSourceBadge = computed(() => {
