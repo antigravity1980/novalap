@@ -808,6 +808,7 @@ import {
   shortenFilename,
   getSlideShowInterval,
 } from "@/common/utils";
+import { clearCachedThumbnail } from "@/modules/gallery/explorerThumbnailsCache";
 
 import DropDownSelect from "@/components/DropDownSelect.vue";
 import ProgressBar from "@/components/ProgressBar.vue";
@@ -4959,13 +4960,42 @@ const onFileSaved = async (
   payload: SavedFilePayload = {},
 ) => {
   if (success) {
-    if (payload.saveAsNew && payload.filePath) {
+    if (payload.filePath) {
       uiStore.updateFileVersion(payload.filePath);
       clearPreviewPreloadCache(payload.filePath);
-      const inserted = await indexAndInsertSavedFile(payload.filePath);
-      if (!inserted) {
-        updateContent();
+    }
+
+    const navigationStore = useNavigationStore();
+    const isExplorerSave = !!payload.filePath && config.main.sidebarIndex === 0;
+
+    if (isExplorerSave) {
+      clearCachedThumbnail(payload.filePath);
+
+      if (payload.saveAsNew) {
+        await navigationStore.navigateTo(navigationStore.currentPath);
       } else {
+        const updatedEntry = await invoke("get_file_entry", {
+          path: payload.filePath,
+        });
+        if (updatedEntry) {
+          updatedEntry._modifiedTime = updatedEntry.modified
+            ? new Date(updatedEntry.modified).getTime()
+            : Date.now();
+
+          const galleryStore = useGalleryStore();
+          galleryStore.upsertFile(updatedEntry);
+          navigationStore.folders = navigationStore.folders.map((entry) =>
+            entry.path === payload.filePath ? updatedEntry : entry,
+          );
+        }
+      }
+    }
+
+    if (payload.saveAsNew && payload.filePath) {
+      const inserted = await indexAndInsertSavedFile(payload.filePath);
+      if (!inserted && !isExplorerSave) {
+        updateContent();
+      } else if (!isExplorerSave) {
         getQueryTimeLine(currentQueryParams.value).then((data) => {
           timelineData.value = data;
         });
@@ -4974,7 +5004,7 @@ const onFileSaved = async (
         localeMsg.value.tooltip.save_image.save_as_success ||
           localeMsg.value.tooltip.save_image.success,
       );
-    } else {
+    } else if (!isExplorerSave) {
       const savedFile = fileList.value[selectedItemIndex.value];
       if (savedFile?.file_path) {
         uiStore.updateFileVersion(savedFile.file_path);
@@ -4986,6 +5016,8 @@ const onFileSaved = async (
         await syncFileMetaToImageViewer(savedFile.id, { rotate: 0 });
       }
       await updateFile(fileList.value[selectedItemIndex.value]);
+      toast.success(localeMsg.value.tooltip.save_image.success);
+    } else {
       toast.success(localeMsg.value.tooltip.save_image.success);
     }
   } else {
@@ -6582,19 +6614,29 @@ async function openImageEditor(index: number) {
   const file = fileList.value[index];
   if (!file) return;
   const fileId = Number(file.id || 0);
-  if (fileId <= 0) return;
+  const filePath = String(file.file_path || file.path || "");
+  if (fileId <= 0 && !filePath) return;
 
   const webViewLabel = "imageeditor";
   const imageWindow = await WebviewWindow.getByLabel(webViewLabel);
   if (imageWindow) {
-    await imageWindow.emit("update-file", { fileId });
+    if (fileId > 0) {
+      await imageWindow.emit("update-file", { fileId });
+    } else {
+      await imageWindow.emit("update-file", { filePath });
+    }
     imageWindow.show();
     imageWindow.setFocus();
     return;
   }
 
+  const editorUrl =
+    fileId > 0
+      ? `/image-editor?fileId=${fileId}`
+      : `/image-editor?filePath=${encodeURIComponent(filePath)}`;
+
   const newWindow = new WebviewWindow(webViewLabel, {
-    url: `/image-editor?fileId=${fileId}`,
+    url: editorUrl,
     title: "Image Editor",
     width: 1100,
     height: 700,

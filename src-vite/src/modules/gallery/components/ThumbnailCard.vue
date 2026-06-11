@@ -316,6 +316,8 @@ const thumbnailUrl = ref("");
 let debounceTimeout = null;
 
 async function loadThumbnail() {
+  thumbnailUrl.value = "";
+
   if (!isImage.value) return;
 
   const currentPath = props.file.path;

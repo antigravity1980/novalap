@@ -18,7 +18,7 @@
  */
 
 /** @type {Map<string, string>} path → data-URL / asset-URL */
-const _cache = new Map()
+const _cache = new Map();
 
 /**
  * Retrieve a cached thumbnail URL for the given file path.
@@ -26,7 +26,7 @@ const _cache = new Map()
  * @returns {string|undefined}
  */
 export function getCachedThumbnail(filePath) {
-  return _cache.get(filePath)
+  return _cache.get(filePath);
 }
 
 /**
@@ -35,7 +35,16 @@ export function getCachedThumbnail(filePath) {
  * @param {string} url
  */
 export function setCachedThumbnail(filePath, url) {
-  _cache.set(filePath, url)
+  _cache.set(filePath, url);
+}
+
+/**
+ * Clear cached thumbnail URL for a single file path.
+ * @param {string} filePath
+ */
+export function clearCachedThumbnail(filePath) {
+  if (!filePath) return;
+  _cache.delete(filePath);
 }
 
 /**
@@ -43,5 +52,5 @@ export function setCachedThumbnail(filePath, url) {
  * Call this when the user navigates to a new directory.
  */
 export function clearThumbnailCache() {
-  _cache.clear()
+  _cache.clear();
 }

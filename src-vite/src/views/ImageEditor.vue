@@ -1,6 +1,7 @@
 <template>
-
-  <div class="w-screen h-screen flex flex-col overflow-hidden bg-base-300 text-base-content/70">
+  <div
+    class="w-screen h-screen flex flex-col overflow-hidden bg-base-300 text-base-content/70"
+  >
     <!-- Title Bar -->
     <TitleBar
       v-if="showDesktopTitleBar"
@@ -16,14 +17,17 @@
       data-tauri-drag-region
     >
       <div class="text-sm font-medium text-base-content/70 truncate">
-        {{ $t('msgbox.image_editor.title') }} - {{ shortenFilename(fileInfo?.name || '', 32) }}
+        {{ $t("msgbox.image_editor.title") }} -
+        {{ shortenFilename(fileInfo?.name || "", 32) }}
       </div>
     </div>
 
     <!-- Main Content -->
     <div v-if="fileInfo" class="flex-1 flex gap-3 p-3 min-h-0 select-none">
       <!-- Left: Image Preview -->
-      <div class="flex-1 min-w-0 flex flex-col items-center justify-center gap-2">
+      <div
+        class="flex-1 min-w-0 flex flex-col items-center justify-center gap-2"
+      >
         <div
           ref="containerRef"
           class="relative w-full flex-1 rounded-box overflow-hidden border border-base-content/5 bg-base-300/30 shadow-sm cursor-default"
@@ -32,337 +36,505 @@
           @pointerleave="handlePreviewPointerUp"
           @pointercancel="handlePreviewPointerUp"
         >
-            <transition name="fade">
-              <div v-if="isProcessing" class="absolute inset-0 z-50 flex items-center justify-center bg-base-100/55 backdrop-blur-sm">
-                <span class="loading loading-dots text-primary"></span>
-              </div>
-            </transition>
-
-            <template v-if="imageSrc">
-              <figure
-                v-if="showDiffPreview && canShowDiffPreview"
-                class="diff absolute inset-0 z-20 h-full w-full"
-                tabindex="0"
-              >
-                <div class="diff-item-1 relative h-full w-full">
-                  <img
-                    :src="imageSrc"
-                    :style="originalImageStyle"
-                    class="block"
-                    draggable="false"
-                  />
-                </div>
-                <div class="diff-item-2 relative h-full w-full">
-                  <img
-                    :src="imageSrc"
-                    :style="adjustedImageStyle"
-                    class="block"
-                    draggable="false"
-                  />
-                </div>
-                <div class="diff-resizer"></div>
-              </figure>
-
-              <div
-                v-if="showDiffPreview && canShowDiffPreview"
-                class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 left-3 top-3"
-              >
-                {{ $t('msgbox.image_editor.original') }}
-              </div>
-              <div
-                v-if="showDiffPreview && canShowDiffPreview"
-                class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 right-3 top-3"
-              >
-                {{ currentPresetLabel || $t('msgbox.image_editor.adjusted') }}
-              </div>
-              <div
-                v-if="imageReady && !(showDiffPreview && canShowDiffPreview) && currentPresetLabel"
-                class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 right-3 top-3"
-              >
-                {{ currentPresetLabel }}
-              </div>
-
-              <img
-                v-show="imageReady && !(showDiffPreview && canShowDiffPreview)"
-                ref="imageRef"
-                :src="imageSrc"
-                :style="imageStyle"
-                class="block"
-                draggable="false"
-                @load="onImageLoad"
-              />
-            </template>
-
-            <div v-if="cropStatus === 1 || cropApplied"
-              :class="[
-                cropStatus === 1 ? 'crop-box-active' : 'crop-box-done',
-                isResizing ? 'no-transition' : '',
-                cropStatus === 1
-                  ? (
-                    cropBoxFixed
-                      ? (isDragging ? 'cursor-grabbing no-transition' : 'cursor-grab')
-                      : (isDragging ? 'cursor-move no-transition' : 'cursor-move')
-                  )
-                  : ''
-              ]"
-              :style="[
-                cropBoxStyle,
-                activeEditorTab === 'adjust' ? { pointerEvents: 'none', zIndex: 30 } : { zIndex: 40 }
-              ]"
-              @mousedown="cropStatus===1 ? startDrag('move', $event) : null"
-              @dblclick="clickDoCrop"
+          <transition name="fade">
+            <div
+              v-if="isProcessing"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-base-100/55 backdrop-blur-sm"
             >
-              <template v-if="cropStatus===1 && isDragging">
-                <div class="crop-dimensions-display">
-                  {{ crop.width }} x {{ crop.height }}
-                </div>
-                <div class="grid-lines">
-                  <div class="grid-line-h grid-line-h-1"></div>
-                  <div class="grid-line-h grid-line-h-2"></div>
-                  <div class="grid-line-v grid-line-v-1"></div>
-                  <div class="grid-line-v grid-line-v-2"></div>
-                </div>
-              </template>
-              <template v-if="cropStatus===1 && !cropBoxFixed">
-                <div class="drag-handle top-left" @mousedown.stop="startDrag('top-left', $event)"></div>
-                <div class="drag-handle top" @mousedown.stop="startDrag('top', $event)"></div>
-                <div class="drag-handle top-right" @mousedown.stop="startDrag('top-right', $event)"></div>
-                <div class="drag-handle left" @mousedown.stop="startDrag('left', $event)"></div>
-                <div class="drag-handle right" @mousedown.stop="startDrag('right', $event)"></div>
-                <div class="drag-handle bottom-left" @mousedown.stop="startDrag('bottom-left', $event)"></div>
-                <div class="drag-handle bottom" @mousedown.stop="startDrag('bottom', $event)"></div>
-                <div class="drag-handle bottom-right" @mousedown.stop="startDrag('bottom-right', $event)"></div>
-              </template>
+              <span class="loading loading-dots text-primary"></span>
             </div>
-        </div>
+          </transition>
 
+          <template v-if="imageSrc">
+            <figure
+              v-if="showDiffPreview && canShowDiffPreview"
+              class="diff absolute inset-0 z-20 h-full w-full"
+              tabindex="0"
+            >
+              <div class="diff-item-1 relative h-full w-full">
+                <img
+                  :src="imageSrc"
+                  :style="originalImageStyle"
+                  class="block"
+                  draggable="false"
+                />
+              </div>
+              <div class="diff-item-2 relative h-full w-full">
+                <img
+                  :src="imageSrc"
+                  :style="adjustedImageStyle"
+                  class="block"
+                  draggable="false"
+                />
+              </div>
+              <div class="diff-resizer"></div>
+            </figure>
+
+            <div
+              v-if="showDiffPreview && canShowDiffPreview"
+              class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 left-3 top-3"
+            >
+              {{ $t("msgbox.image_editor.original") }}
+            </div>
+            <div
+              v-if="showDiffPreview && canShowDiffPreview"
+              class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 right-3 top-3"
+            >
+              {{ currentPresetLabel || $t("msgbox.image_editor.adjusted") }}
+            </div>
+            <div
+              v-if="
+                imageReady &&
+                !(showDiffPreview && canShowDiffPreview) &&
+                currentPresetLabel
+              "
+              class="pointer-events-none absolute z-50 rounded-box bg-base-100/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 right-3 top-3"
+            >
+              {{ currentPresetLabel }}
+            </div>
+
+            <img
+              v-show="imageReady && !(showDiffPreview && canShowDiffPreview)"
+              ref="imageRef"
+              :src="imageSrc"
+              :style="imageStyle"
+              class="block"
+              draggable="false"
+              @load="onImageLoad"
+            />
+          </template>
+
+          <div
+            v-if="cropStatus === 1 || cropApplied"
+            :class="[
+              cropStatus === 1 ? 'crop-box-active' : 'crop-box-done',
+              isResizing ? 'no-transition' : '',
+              cropStatus === 1
+                ? cropBoxFixed
+                  ? isDragging
+                    ? 'cursor-grabbing no-transition'
+                    : 'cursor-grab'
+                  : isDragging
+                    ? 'cursor-move no-transition'
+                    : 'cursor-move'
+                : '',
+            ]"
+            :style="[
+              cropBoxStyle,
+              activeEditorTab === 'adjust'
+                ? { pointerEvents: 'none', zIndex: 30 }
+                : { zIndex: 40 },
+            ]"
+            @mousedown="cropStatus === 1 ? startDrag('move', $event) : null"
+            @dblclick="clickDoCrop"
+          >
+            <template v-if="cropStatus === 1 && isDragging">
+              <div class="crop-dimensions-display">
+                {{ crop.width }} x {{ crop.height }}
+              </div>
+              <div class="grid-lines">
+                <div class="grid-line-h grid-line-h-1"></div>
+                <div class="grid-line-h grid-line-h-2"></div>
+                <div class="grid-line-v grid-line-v-1"></div>
+                <div class="grid-line-v grid-line-v-2"></div>
+              </div>
+            </template>
+            <template v-if="cropStatus === 1 && !cropBoxFixed">
+              <div
+                class="drag-handle top-left"
+                @mousedown.stop="startDrag('top-left', $event)"
+              ></div>
+              <div
+                class="drag-handle top"
+                @mousedown.stop="startDrag('top', $event)"
+              ></div>
+              <div
+                class="drag-handle top-right"
+                @mousedown.stop="startDrag('top-right', $event)"
+              ></div>
+              <div
+                class="drag-handle left"
+                @mousedown.stop="startDrag('left', $event)"
+              ></div>
+              <div
+                class="drag-handle right"
+                @mousedown.stop="startDrag('right', $event)"
+              ></div>
+              <div
+                class="drag-handle bottom-left"
+                @mousedown.stop="startDrag('bottom-left', $event)"
+              ></div>
+              <div
+                class="drag-handle bottom"
+                @mousedown.stop="startDrag('bottom', $event)"
+              ></div>
+              <div
+                class="drag-handle bottom-right"
+                @mousedown.stop="startDrag('bottom-right', $event)"
+              ></div>
+            </template>
+          </div>
+        </div>
       </div>
 
       <div
         class="w-[320px] flex flex-col gap-3 overflow-y-auto"
         :class="isProcessing ? 'pointer-events-none opacity-60' : ''"
       >
-        <div class="sticky top-0 z-10 bg-base-300 border-b border-base-content/5 pb-1">
+        <div
+          class="sticky top-0 z-10 bg-base-300 border-b border-base-content/5 pb-1"
+        >
           <div role="tablist" class="sidebar-header-tabs">
             <button
               role="tab"
               :class="[
                 'sidebar-header-tab',
                 activeEditorTab === 'edit' ? 'tab-active' : '',
-                cropStatus === 1 || isProcessing ? 'opacity-50 cursor-default' : '',
+                cropStatus === 1 || isProcessing
+                  ? 'opacity-50 cursor-default'
+                  : '',
               ]"
               :disabled="cropStatus === 1 || isProcessing"
               @click="setActiveEditorTab('edit')"
-            >{{ $t('msgbox.image_editor.tab_edit') }}</button>
+            >
+              {{ $t("msgbox.image_editor.tab_edit") }}
+            </button>
             <button
               role="tab"
               :class="[
                 'sidebar-header-tab',
                 activeEditorTab === 'adjust' ? 'tab-active' : '',
-                cropStatus === 1 || isProcessing ? 'opacity-50 cursor-default' : '',
+                cropStatus === 1 || isProcessing
+                  ? 'opacity-50 cursor-default'
+                  : '',
               ]"
               :disabled="cropStatus === 1 || isProcessing"
               @click="setActiveEditorTab('adjust')"
-            >{{ $t('msgbox.image_editor.tab_adjust') }}</button>
+            >
+              {{ $t("msgbox.image_editor.tab_adjust") }}
+            </button>
           </div>
         </div>
 
         <template v-if="activeEditorTab === 'edit'">
-        <section class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-          <div class="flex items-center justify-between gap-2">
-            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.transform') }}</div>
-            <TButton
-              buttonSize="small"
-              :icon="IconRestore"
-              :disabled="cropStatus === 1 || !hasEditImageChanges || cropApplied"
-              :tooltip="$t('msgbox.image_editor.reset')"
-              @click="clickRestoreAll"
-            />
-          </div>
-
-          <div class="flex gap-3">
-            <TButton
-              :icon="IconRotateLeft"
-              :disabled="cropStatus === 1 || cropApplied"
-              :tooltip="$t('msgbox.image_editor.rotate_left')"
-              @click="clickRotate(-90)"
-            />
-            <TButton
-              :icon="IconRotateRight"
-              :disabled="cropStatus === 1 || cropApplied"
-              :tooltip="$t('msgbox.image_editor.rotate_right')"
-              @click="clickRotate(90)"
-            />
-            <TButton
-              :icon="IconFlipHorizontal"
-              :disabled="cropStatus === 1 || cropApplied"
-              :tooltip="$t('msgbox.image_editor.flip_horizontal')"
-              @click="clickFlipX"
-            />
-            <TButton
-              :icon="IconFlipVertical"
-              :disabled="cropStatus === 1 || cropApplied"
-              :tooltip="$t('msgbox.image_editor.flip_vertical')"
-              @click="clickFlipY"
-            />
-          </div>
-        </section>
-
-        <section class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-          <div class="flex items-center justify-between gap-2">
-            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.crop') }}</div>
-            <TButton
-              buttonSize="small"
-              :icon="IconRestore"
-              :disabled="cropStatus === 0 && !cropApplied"
-              :tooltip="$t('msgbox.image_editor.reset')"
-              @click="clearCrop"
-            />
-          </div>
-
-          <div v-if="cropStatus === 0" class="flex items-center gap-2">
-            <TButton
-              :icon="IconCrop"
-              :selected="cropApplied"
-              :tooltip="cropApplied ? $t('msgbox.image_editor.restore') : $t('msgbox.image_editor.crop')"
-              @click="toggleCropMode"
-            />
-            <div class="text-xs leading-5 text-base-content/45">
-              {{ cropApplied ? $t('msgbox.image_editor.crop_applied_hint') : $t('msgbox.image_editor.crop_hint') }}
-            </div>
-          </div>
-
-          <div v-else class="space-y-3">
-            <div class="flex items-center gap-1">
+          <section
+            class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+              >
+                {{ $t("msgbox.image_editor.transform") }}
+              </div>
               <TButton
                 buttonSize="small"
-                :icon="IconClose"
-                :selected="true"
-                :tooltip="$t('msgbox.image_editor.cancel_crop')"
-                @click="clickCancelCrop"
-              />
-              
-              <select v-model="config.imageEditor.cropShape" class="select select-bordered select-sm flex-1 min-w-0" :disabled="cropBoxFixed" @change="onChangeCropShape">
-                <option v-for="option in cropShapeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-
-              <TButton
-                buttonSize="small"
-                :icon="IconCropLandscape"
-                :disabled="cropBoxFixed"
-                :tooltip="isPortrait ? $t('msgbox.image_editor.crop_shape_portrait') : $t('msgbox.image_editor.crop_shape_landscape')"
-                :iconStyle="{ transform: `rotate(${isPortrait ? 90 : 0}deg)` }"
-                @click="togglePortraitAndLandscape"
-              />
-              
-              <TButton
-                buttonSize="small"
-                :icon="cropBoxFixed ? IconZoomOut : IconZoomIn"
-                :tooltip="cropBoxFixed ? $t('msgbox.image_editor.zoom') : $t('msgbox.image_editor.zoom')"
-                @click="toggleCropBoxFixed"
-              />
-
-              <TButton
-                buttonSize="small"
-                :icon="IconOk"
-                :selected="true"
-                :tooltip="$t('msgbox.image_editor.confirm_crop')"
-                @click="clickDoCrop"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-          <div class="flex items-center justify-between gap-2">
-            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.resize') }}</div>
-            <TButton
-              buttonSize="small"
-              :icon="IconRestore"
-              :disabled="cropStatus === 1 || !hasResizeChanges"
-              :tooltip="$t('msgbox.image_editor.reset')"
-              @click="resetResize"
-            />
-          </div>
-
-          <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-1">
-            <div class="form-control w-full">
-              <label class="label py-1">
-                <span class="label-text text-xs font-medium opacity-70">{{ $t('msgbox.image_editor.width') }}</span>
-              </label>
-              <input
-                v-model="resizeWidthInput"
-                type="number"
-                min="1"
-                :max="maxResizeWidth"
-                step="1"
-                inputmode="numeric"
-                class="input input-bordered input-sm w-full"
-                :disabled="cropStatus === 1"
-                @input="handleResizeWidthInput"
+                :icon="IconRestore"
+                :disabled="
+                  cropStatus === 1 || !hasEditImageChanges || cropApplied
+                "
+                :tooltip="$t('msgbox.image_editor.reset')"
+                @click="clickRestoreAll"
               />
             </div>
 
-            <div class="pb-0.5">
+            <div class="flex gap-3">
+              <TButton
+                :icon="IconRotateLeft"
+                :disabled="cropStatus === 1 || cropApplied"
+                :tooltip="$t('msgbox.image_editor.rotate_left')"
+                @click="clickRotate(-90)"
+              />
+              <TButton
+                :icon="IconRotateRight"
+                :disabled="cropStatus === 1 || cropApplied"
+                :tooltip="$t('msgbox.image_editor.rotate_right')"
+                @click="clickRotate(90)"
+              />
+              <TButton
+                :icon="IconFlipHorizontal"
+                :disabled="cropStatus === 1 || cropApplied"
+                :tooltip="$t('msgbox.image_editor.flip_horizontal')"
+                @click="clickFlipX"
+              />
+              <TButton
+                :icon="IconFlipVertical"
+                :disabled="cropStatus === 1 || cropApplied"
+                :tooltip="$t('msgbox.image_editor.flip_vertical')"
+                @click="clickFlipY"
+              />
+            </div>
+          </section>
+
+          <section
+            class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+              >
+                {{ $t("msgbox.image_editor.crop") }}
+              </div>
               <TButton
                 buttonSize="small"
-                :icon="keepAspectRatio ? IconLink : IconLinkOff"
-                :disabled="cropStatus === 1"
-                :tooltip="$t('msgbox.image_editor.keep_aspect_ratio')"
-                @click="keepAspectRatio = !keepAspectRatio"
+                :icon="IconRestore"
+                :disabled="cropStatus === 0 && !cropApplied"
+                :tooltip="$t('msgbox.image_editor.reset')"
+                @click="clearCrop"
               />
             </div>
 
-            <div class="form-control w-full">
-              <label class="label py-1">
-                <span class="label-text text-xs font-medium opacity-70">{{ $t('msgbox.image_editor.height') }}</span>
-              </label>
-              <input
-                v-model="resizeHeightInput"
-                type="number"
-                min="1"
-                :max="maxResizeHeight"
-                step="1"
-                inputmode="numeric"
-                class="input input-bordered input-sm w-full"
-                :disabled="cropStatus === 1"
-                @input="handleResizeHeightInput"
+            <div v-if="cropStatus === 0" class="flex items-center gap-2">
+              <TButton
+                :icon="IconCrop"
+                :selected="cropApplied"
+                :tooltip="
+                  cropApplied
+                    ? $t('msgbox.image_editor.restore')
+                    : $t('msgbox.image_editor.crop')
+                "
+                @click="toggleCropMode"
+              />
+              <div class="text-xs leading-5 text-base-content/45">
+                {{
+                  cropApplied
+                    ? $t("msgbox.image_editor.crop_applied_hint")
+                    : $t("msgbox.image_editor.crop_hint")
+                }}
+              </div>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div class="flex items-center gap-1">
+                <TButton
+                  buttonSize="small"
+                  :icon="IconClose"
+                  :selected="true"
+                  :tooltip="$t('msgbox.image_editor.cancel_crop')"
+                  @click="clickCancelCrop"
+                />
+
+                <select
+                  v-model="config.imageEditor.cropShape"
+                  class="select select-bordered select-sm flex-1 min-w-0"
+                  :disabled="cropBoxFixed"
+                  @change="onChangeCropShape"
+                >
+                  <option
+                    v-for="option in cropShapeOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+
+                <TButton
+                  buttonSize="small"
+                  :icon="IconCropLandscape"
+                  :disabled="cropBoxFixed"
+                  :tooltip="
+                    isPortrait
+                      ? $t('msgbox.image_editor.crop_shape_portrait')
+                      : $t('msgbox.image_editor.crop_shape_landscape')
+                  "
+                  :iconStyle="{
+                    transform: `rotate(${isPortrait ? 90 : 0}deg)`,
+                  }"
+                  @click="togglePortraitAndLandscape"
+                />
+
+                <TButton
+                  buttonSize="small"
+                  :icon="cropBoxFixed ? IconZoomOut : IconZoomIn"
+                  :tooltip="
+                    cropBoxFixed
+                      ? $t('msgbox.image_editor.zoom')
+                      : $t('msgbox.image_editor.zoom')
+                  "
+                  @click="toggleCropBoxFixed"
+                />
+
+                <TButton
+                  buttonSize="small"
+                  :icon="IconOk"
+                  :selected="true"
+                  :tooltip="$t('msgbox.image_editor.confirm_crop')"
+                  @click="clickDoCrop"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+              >
+                {{ $t("msgbox.image_editor.resize") }}
+              </div>
+              <TButton
+                buttonSize="small"
+                :icon="IconRestore"
+                :disabled="cropStatus === 1 || !hasResizeChanges"
+                :tooltip="$t('msgbox.image_editor.reset')"
+                @click="resetResize"
               />
             </div>
-          </div>
-        </section>
+
+            <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-1">
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text text-xs font-medium opacity-70">{{
+                    $t("msgbox.image_editor.width")
+                  }}</span>
+                </label>
+                <input
+                  v-model="resizeWidthInput"
+                  type="number"
+                  min="1"
+                  :max="maxResizeWidth"
+                  step="1"
+                  inputmode="numeric"
+                  class="input input-bordered input-sm w-full"
+                  :disabled="cropStatus === 1"
+                  @input="handleResizeWidthInput"
+                />
+              </div>
+
+              <div class="pb-0.5">
+                <TButton
+                  buttonSize="small"
+                  :icon="keepAspectRatio ? IconLink : IconLinkOff"
+                  :disabled="cropStatus === 1"
+                  :tooltip="$t('msgbox.image_editor.keep_aspect_ratio')"
+                  @click="keepAspectRatio = !keepAspectRatio"
+                />
+              </div>
+
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text text-xs font-medium opacity-70">{{
+                    $t("msgbox.image_editor.height")
+                  }}</span>
+                </label>
+                <input
+                  v-model="resizeHeightInput"
+                  type="number"
+                  min="1"
+                  :max="maxResizeHeight"
+                  step="1"
+                  inputmode="numeric"
+                  class="input input-bordered input-sm w-full"
+                  :disabled="cropStatus === 1"
+                  @input="handleResizeHeightInput"
+                />
+              </div>
+            </div>
+          </section>
         </template>
 
         <template v-else>
-        <section class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm">
-          <div class="flex items-center justify-between gap-2">
-            <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.histogram') }}</div>
-          </div>
+          <section
+            class="rounded-box p-3 space-y-2 bg-base-300/30 border border-base-content/5 shadow-sm"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+              >
+                {{ $t("msgbox.image_editor.histogram") }}
+              </div>
+            </div>
 
-          <ImageHistogram
-            ref="histogramRef"
-            :source="histogramSource"
-            :adjustments="histogramAdjustments"
-            :crop="histogramCrop"
-            :rotate="rotate"
-            :flip-horizontal="isFlippedX"
-            :flip-vertical="isFlippedY"
-            :apply-adjustments="true"
-          />
-        </section>
+            <ImageHistogram
+              ref="histogramRef"
+              :source="histogramSource"
+              :adjustments="histogramAdjustments"
+              :crop="histogramCrop"
+              :rotate="rotate"
+              :flip-horizontal="isFlippedX"
+              :flip-vertical="isFlippedY"
+              :apply-adjustments="true"
+            />
+          </section>
 
-        <section class="rounded-box p-3 space-y-2 border border-base-content/5 shadow-sm bg-base-300/30">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.presets.title') }}</span>
-            <div class="flex items-center gap-1">
-              <TButton
-                buttonSize="small"
-                :icon="IconSplitOn"
-                :selected="showDiffPreview && canShowDiffPreview"
-                :disabled="!hasAdjustmentChanges"
-                :tooltip="$t('msgbox.image_editor.compare_view')"
-                @click="toggleDiffPreview"
-              />
+          <section
+            class="rounded-box p-3 space-y-2 border border-base-content/5 shadow-sm bg-base-300/30"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+                >{{ $t("msgbox.image_editor.presets.title") }}</span
+              >
+              <div class="flex items-center gap-1">
+                <TButton
+                  buttonSize="small"
+                  :icon="IconSplitOn"
+                  :selected="showDiffPreview && canShowDiffPreview"
+                  :disabled="!hasAdjustmentChanges"
+                  :tooltip="$t('msgbox.image_editor.compare_view')"
+                  @click="toggleDiffPreview"
+                />
+                <TButton
+                  buttonSize="small"
+                  :icon="IconRestore"
+                  :disabled="!hasAdjustmentChanges"
+                  :tooltip="$t('msgbox.image_editor.reset')"
+                  @click.stop="resetAdjustments"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-1">
+              <div
+                v-for="option in presetOptions"
+                :key="option.value"
+                class="group min-w-0 cursor-pointer"
+                @click="selectedPreset = option.value"
+              >
+                <div
+                  :class="[
+                    'aspect-4/3 rounded-box border-2 transition-all duration-200 flex items-center justify-center overflow-hidden relative',
+                    selectedPreset === option.value
+                      ? 'border-primary ring-2 ring-primary/20'
+                      : 'border-base-content/5 hover:border-base-content/20',
+                  ]"
+                >
+                  <div
+                    class="w-full h-full bg-base-300 flex items-center justify-center overflow-hidden rounded-[inherit]"
+                  >
+                    <img
+                      v-if="fileInfo.thumbnail"
+                      :src="fileInfo.thumbnail"
+                      class="w-full h-full rounded-box object-cover pointer-events-none"
+                      :style="{ filter: presetThumbnailFilter(option.value) }"
+                    />
+                    <IconPalette v-else class="w-4 h-4 text-base-content/10" />
+                  </div>
+                </div>
+                <div
+                  class="mt-1 text-[9px] text-center truncate font-medium transition-colors uppercase tracking-tight"
+                  :class="
+                    selectedPreset === option.value
+                      ? 'text-primary'
+                      : 'text-base-content/50 group-hover:text-base-content'
+                  "
+                >
+                  {{ option.label }}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="rounded-box p-3 space-y-2 border border-base-content/5 shadow-sm bg-base-300/30"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span
+                class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35"
+                >{{ $t("msgbox.image_editor.adjustments") }}</span
+              >
               <TButton
                 buttonSize="small"
                 :icon="IconRestore"
@@ -371,128 +543,151 @@
                 @click.stop="resetAdjustments"
               />
             </div>
-          </div>
 
-          <div class="grid grid-cols-4 gap-1">
-            <div
-              v-for="option in presetOptions"
-              :key="option.value"
-              class="group min-w-0 cursor-pointer"
-              @click="selectedPreset = option.value"
-            >
-              <div
-                :class="[
-                  'aspect-4/3 rounded-box border-2 transition-all duration-200 flex items-center justify-center overflow-hidden relative',
-                  selectedPreset === option.value ? 'border-primary ring-2 ring-primary/20' : 'border-base-content/5 hover:border-base-content/20',
-                ]"
-              >
-                <div class="w-full h-full bg-base-300 flex items-center justify-center overflow-hidden rounded-[inherit]">
-                  <img
-                    v-if="fileInfo.thumbnail"
-                    :src="fileInfo.thumbnail"
-                    class="w-full h-full rounded-box object-cover pointer-events-none"
-                    :style="{ filter: presetThumbnailFilter(option.value) }"
-                  />
-                  <IconPalette v-else class="w-4 h-4 text-base-content/10" />
+            <div class="space-y-4 overflow-hidden">
+              <div class="space-y-3">
+                <div
+                  v-for="adj in lightSliders"
+                  :key="adj.key"
+                  class="grid grid-cols-[80px_minmax(0,1fr)] gap-x-4 items-center"
+                >
+                  <div
+                    class="font-medium text-base-content/40 tracking-wide text-xs"
+                  >
+                    {{ adj.label }}
+                  </div>
+                  <div class="flex items-center gap-2 pr-2 min-w-0">
+                    <SliderInput
+                      v-model="adj.model.value"
+                      :min="adj.min"
+                      :max="adj.max"
+                      :step="adj.step"
+                      class="flex-1 min-w-0 w-full"
+                    />
+                    <span
+                      class="text-[10px] font-mono text-base-content/60 w-8 text-right shrink-0"
+                      >{{ adj.valueDisplay }}</span
+                    >
+                  </div>
                 </div>
               </div>
-              <div
-                class="mt-1 text-[9px] text-center truncate font-medium transition-colors uppercase tracking-tight"
-                :class="selectedPreset === option.value ? 'text-primary' : 'text-base-content/50 group-hover:text-base-content'"
-              >
-                {{ option.label }}
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <section class="rounded-box p-3 space-y-2 border border-base-content/5 shadow-sm bg-base-300/30">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] font-bold uppercase tracking-[0.22em] text-base-content/35">{{ $t('msgbox.image_editor.adjustments') }}</span>
-            <TButton
-              buttonSize="small"
-              :icon="IconRestore"
-              :disabled="!hasAdjustmentChanges"
-              :tooltip="$t('msgbox.image_editor.reset')"
-              @click.stop="resetAdjustments"
-            />
-          </div>
+              <div class="h-px bg-base-content/5 mx-1"></div>
 
-          <div class="space-y-4 overflow-hidden">
-            <div class="space-y-3">
-              <div v-for="adj in lightSliders" :key="adj.key" class="grid grid-cols-[80px_minmax(0,1fr)] gap-x-4 items-center">
-                <div class="font-medium text-base-content/40 tracking-wide text-xs">{{ adj.label }}</div>
-                <div class="flex items-center gap-2 pr-2 min-w-0">
-                  <SliderInput v-model="adj.model.value" :min="adj.min" :max="adj.max" :step="adj.step" class="flex-1 min-w-0 w-full" />
-                  <span class="text-[10px] font-mono text-base-content/60 w-8 text-right shrink-0">{{ adj.valueDisplay }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="h-px bg-base-content/5 mx-1"></div>
-
-            <div class="space-y-3">
-              <div v-for="adj in colorSliders" :key="adj.key" class="grid grid-cols-[80px_minmax(0,1fr)] gap-x-4 items-center">
-                <div class="font-medium text-base-content/40 tracking-wide text-xs">{{ adj.label }}</div>
-                <div class="flex items-center gap-2 pr-2 min-w-0">
-                  <SliderInput v-model="adj.model.value" :min="adj.min" :max="adj.max" :step="adj.step" class="flex-1 min-w-0 w-full" />
-                  <span class="text-[10px] font-mono text-base-content/60 w-8 text-right shrink-0">{{ adj.valueDisplay }}</span>
+              <div class="space-y-3">
+                <div
+                  v-for="adj in colorSliders"
+                  :key="adj.key"
+                  class="grid grid-cols-[80px_minmax(0,1fr)] gap-x-4 items-center"
+                >
+                  <div
+                    class="font-medium text-base-content/40 tracking-wide text-xs"
+                  >
+                    {{ adj.label }}
+                  </div>
+                  <div class="flex items-center gap-2 pr-2 min-w-0">
+                    <SliderInput
+                      v-model="adj.model.value"
+                      :min="adj.min"
+                      :max="adj.max"
+                      :step="adj.step"
+                      class="flex-1 min-w-0 w-full"
+                    />
+                    <span
+                      class="text-[10px] font-mono text-base-content/60 w-8 text-right shrink-0"
+                      >{{ adj.valueDisplay }}</span
+                    >
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
         </template>
       </div>
     </div>
 
     <!-- Bottom Bar -->
-    <div v-if="fileInfo" class="h-14 shrink-0 flex items-center justify-end px-4 gap-2">
+    <div
+      v-if="fileInfo"
+      class="h-14 shrink-0 flex items-center justify-end px-4 gap-2"
+    >
       <button
         class="px-4 py-1 rounded-box hover:bg-base-100 hover:text-base-content cursor-pointer text-sm mr-4"
         @click="clickCancel"
-      >{{ $t('msgbox.image_editor.cancel') }}</button>
+      >
+        {{ $t("msgbox.image_editor.cancel") }}
+      </button>
 
       <template v-if="effectiveSaveAsNew">
-        <select v-model="combinedFormatKey" class="select select-bordered select-xs" :disabled="cropStatus===1">
-          <option v-for="option in combinedFormatOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        <select
+          v-model="combinedFormatKey"
+          class="select select-bordered select-xs"
+          :disabled="cropStatus === 1"
+        >
+          <option
+            v-for="option in combinedFormatOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
         </select>
       </template>
 
-        <div class="join">
+      <div class="join">
+        <button
+          class="btn btn-sm btn-primary join-item px-4"
+          :disabled="cropStatus === 1 || isProcessing"
+          @click="clickSave"
+        >
+          {{
+            effectiveSaveAsNew
+              ? $t("msgbox.image_editor.save_as_new")
+              : $t("msgbox.image_editor.overwrite")
+          }}
+        </button>
+        <div class="dropdown dropdown-top dropdown-end">
           <button
-            class="btn btn-sm btn-primary join-item px-4"
-            :disabled="cropStatus === 1 || isProcessing"
-            @click="clickSave"
-          >{{ effectiveSaveAsNew ? $t('msgbox.image_editor.save_as_new') : $t('msgbox.image_editor.overwrite') }}</button>
-          <div class="dropdown dropdown-top dropdown-end">
-            <button
-              tabindex="0"
-              class="btn btn-sm btn-primary join-item border-l border-primary-content/20 px-1.5"
+            tabindex="0"
+            class="btn btn-sm btn-primary join-item border-l border-primary-content/20 px-1.5"
             :disabled="!canOverwriteOriginal || cropStatus === 1"
-            >
-              <IconArrowDown class="w-3 h-3" />
-            </button>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg mb-1 p-1 text-sm w-32">
-              <li>
-                <a :class="config.imageEditor.saveAs === 0 ? 'active' : ''"
-                   @click="config.imageEditor.saveAs = 0; closeSaveDropdown()">
-                  {{ $t('msgbox.image_editor.overwrite') }}
-                </a>
-              </li>
-              <li>
-                <a :class="config.imageEditor.saveAs === 1 ? 'active' : ''"
-                   @click="config.imageEditor.saveAs = 1; closeSaveDropdown()">
-                  {{ $t('msgbox.image_editor.save_as_new') }}
-                </a>
-              </li>
-            </ul>
-          </div>
+          >
+            <IconArrowDown class="w-3 h-3" />
+          </button>
+          <ul
+            tabindex="0"
+            class="dropdown-content menu bg-base-100 rounded-box shadow-lg mb-1 p-1 text-sm w-32"
+          >
+            <li>
+              <a
+                :class="config.imageEditor.saveAs === 0 ? 'active' : ''"
+                @click="
+                  config.imageEditor.saveAs = 0;
+                  closeSaveDropdown();
+                "
+              >
+                {{ $t("msgbox.image_editor.overwrite") }}
+              </a>
+            </li>
+            <li>
+              <a
+                :class="config.imageEditor.saveAs === 1 ? 'active' : ''"
+                @click="
+                  config.imageEditor.saveAs = 1;
+                  closeSaveDropdown();
+                "
+              >
+                {{ $t("msgbox.image_editor.save_as_new") }}
+              </a>
+            </li>
+          </ul>
         </div>
+      </div>
     </div>
   </div>
 
-  <MessageBox v-if="showOverwriteConfirm"
+  <MessageBox
+    v-if="showOverwriteConfirm"
     :title="$t('msgbox.image_editor.overwrite')"
     :message="$t('msgbox.image_editor.overwrite_confirm')"
     :warningOk="true"
@@ -501,25 +696,48 @@
     @ok="handleOverwriteConfirm"
     @cancel="handleOverwriteCancel"
   />
-
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, type CSSProperties } from 'vue';
-import { useRouter } from 'vue-router';
-import { useUIStore } from '@/stores/uiStore';
-import { useI18n } from 'vue-i18n';
-import { config } from '@/common/config';
-import { isWin, isMac, isLinux, setTheme, SCALE_VALUES, getFolderPath, getFileExtension, shortenFilename, getFullPath, combineFileName, getSelectOptions, getAssetSrc, getPreviewUrl, getThumbUrl, shouldUseBackendPreview } from '@/common/utils';
-import { editImage, checkFileExists, getFileInfo } from '@/common/api';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { emit as tauriEmit, listen } from '@tauri-apps/api/event';
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  watch,
+  type CSSProperties,
+} from "vue";
+import { useRouter } from "vue-router";
+import { useUIStore } from "@/stores/uiStore";
+import { useI18n } from "vue-i18n";
+import { config } from "@/common/config";
+import {
+  isWin,
+  isMac,
+  isLinux,
+  setTheme,
+  SCALE_VALUES,
+  getFolderPath,
+  getFileExtension,
+  shortenFilename,
+  getFullPath,
+  combineFileName,
+  getSelectOptions,
+  getAssetSrc,
+  getPreviewUrl,
+  getThumbUrl,
+  shouldUseBackendPreview,
+} from "@/common/utils";
+import { editImage, checkFileExists, getFileInfo } from "@/common/api";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { emit as tauriEmit, listen } from "@tauri-apps/api/event";
 
-import TitleBar from '@/components/TitleBar.vue';
-import MessageBox from '@/components/MessageBox.vue';
-import TButton from '@/components/TButton.vue';
-import SliderInput from '@/components/SliderInput.vue';
-import ImageHistogram from '@/components/ImageHistogram.vue';
+import TitleBar from "@/components/TitleBar.vue";
+import MessageBox from "@/components/MessageBox.vue";
+import TButton from "@/components/TButton.vue";
+import SliderInput from "@/components/SliderInput.vue";
+import ImageHistogram from "@/components/ImageHistogram.vue";
 
 import {
   IconCrop,
@@ -538,11 +756,11 @@ import {
   IconArrowDown,
   IconPalette,
   IconSplitOn,
-} from '@/common/icons';
+} from "@/common/icons";
 
 const router = useRouter();
 const fileInfo = ref<any>(null);
-const initialImageSrc = ref('');
+const initialImageSrc = ref("");
 
 const { locale, messages } = useI18n();
 const localeMsg = computed(() => messages.value[locale.value] as any);
@@ -552,8 +770,8 @@ const appWindow = getCurrentWebviewWindow();
 const showDesktopTitleBar = isWin || isLinux;
 
 function sendToParent(payload: Record<string, any>) {
-  void tauriEmit('message-from-image-editor', payload).catch((error) => {
-    console.error('Failed to notify parent from image editor:', error);
+  void tauriEmit("message-from-image-editor", payload).catch((error) => {
+    console.error("Failed to notify parent from image editor:", error);
   });
 }
 
@@ -564,12 +782,16 @@ async function closeEditorWindow() {
     try {
       await appWindow.destroy();
     } catch (destroyError) {
-      console.error('Failed to close image editor window:', error, destroyError);
+      console.error(
+        "Failed to close image editor window:",
+        error,
+        destroyError,
+      );
     }
     return;
   }
 
-  await new Promise(resolve => window.setTimeout(resolve, 100));
+  await new Promise((resolve) => window.setTimeout(resolve, 100));
   try {
     if (await appWindow.isVisible()) {
       await appWindow.destroy();
@@ -586,9 +808,54 @@ async function loadFileInfo(fileId: number) {
     if (file) {
       file.thumbnail = getThumbUrl(file.id);
       fileInfo.value = file;
-      newFileName.value = file.name?.substring(0, file.name.lastIndexOf('.')) || file.name || '';
-      const src = getPreviewUrl(file);
-      initialImageSrc.value = typeof src === 'string' ? src : '';
+      newFileName.value =
+        file.name?.substring(0, file.name.lastIndexOf(".")) || file.name || "";
+      const src = getPreviewUrl(file.id, file.file_path);
+      initialImageSrc.value = typeof src === "string" ? src : "";
+    }
+  } catch {
+    await closeEditorWindow();
+  }
+}
+
+async function loadExplorerFileInfo(filePath: string) {
+  try {
+    imageReady.value = false;
+    const file = await invoke("get_file_entry", { path: filePath });
+    if (file) {
+      const extension = String(file.extension || "").toLowerCase();
+      const isRaw = [
+        "cr2",
+        "cr3",
+        "nef",
+        "arw",
+        "dng",
+        "raf",
+        "rw2",
+        "orf",
+        "raw",
+      ].includes(extension);
+      const normalizedFile = {
+        ...file,
+        id: 0,
+        file_id: 0,
+        file_path: file.path,
+        file_type: isRaw ? 3 : 1,
+        rotate: 0,
+        e_orientation: 1,
+        width: Number(file.resolution?.width || 0),
+        height: Number(file.resolution?.height || 0),
+        thumbnail: "",
+      };
+      fileInfo.value = normalizedFile;
+      newFileName.value =
+        normalizedFile.name?.substring(
+          0,
+          normalizedFile.name.lastIndexOf("."),
+        ) ||
+        normalizedFile.name ||
+        "";
+      initialImageSrc.value = getAssetSrc(normalizedFile.file_path);
     }
   } catch {
     await closeEditorWindow();
@@ -597,7 +864,7 @@ async function loadFileInfo(fileId: number) {
 
 const isProcessing = ref(false);
 const imageReady = ref(false);
-const activeEditorTab = ref<'edit' | 'adjust'>('edit');
+const activeEditorTab = ref<"edit" | "adjust">("edit");
 
 const containerRef = ref<HTMLElement | null>(null);
 const containerRect = ref<DOMRect | null>(null);
@@ -607,7 +874,7 @@ const containerPadding = 5;
 const imageRef = ref<HTMLImageElement | null>(null);
 const imageRect = ref<DOMRect | null>(null);
 const imageRectOriginal = ref<DOMRect | null>(null);
-const imageSrc = ref('');
+const imageSrc = ref("");
 const imageWidth = ref(0);
 const imageHeight = ref(0);
 const isRawFile = computed(() => Number(fileInfo.value?.file_type || 0) === 3);
@@ -615,16 +882,22 @@ const normalizeRotate = (value: number) => {
   const normalized = Number(value || 0) % 360;
   return normalized < 0 ? normalized + 360 : normalized;
 };
-const initialDisplayRotate = computed(() => normalizeRotate(Number(fileInfo.value?.rotate || 0)));
-const isPortraitForRotation = (width: number, height: number, rotation: number) => {
+const initialDisplayRotate = computed(() =>
+  normalizeRotate(Number(fileInfo.value?.rotate || 0)),
+);
+const isPortraitForRotation = (
+  width: number,
+  height: number,
+  rotation: number,
+) => {
   const normalized = normalizeRotate(rotation);
   return normalized % 180 !== 0 ? width > height : height > width;
 };
 const usesBackendPreview = computed(() =>
   shouldUseBackendPreview(
-    fileInfo.value?.name || fileInfo.value?.file_path || '',
-    Number(fileInfo.value?.file_type || 0)
-  )
+    fileInfo.value?.name || fileInfo.value?.file_path || "",
+    Number(fileInfo.value?.file_type || 0),
+  ),
 );
 
 const enableTransition = ref(false);
@@ -640,8 +913,8 @@ const contrast = ref(0);
 const saturation = ref(100);
 const hue = ref(0);
 const blur = ref(0);
-const selectedFilter = ref('');
-const selectedPreset = ref('natural');
+const selectedFilter = ref("");
+const selectedPreset = ref("natural");
 const autoPresetValues = ref<AdjustmentValues | null>(null);
 let isApplyingPreset = false;
 let skipNextCustomPresetLoad = false;
@@ -660,17 +933,19 @@ type AdjustmentValues = {
 };
 
 const histogramRef = ref<InstanceType<typeof ImageHistogram> | null>(null);
-const histogramSource = computed(() => imageSrc.value || fileInfo.value?.thumbnail || '');
-const histogramCrop = computed(() => (
+const histogramSource = computed(
+  () => imageSrc.value || fileInfo.value?.thumbnail || "",
+);
+const histogramCrop = computed(() =>
   cropApplied.value && crop.value.width > 0 && crop.value.height > 0
     ? {
-      x: crop.value.left,
-      y: crop.value.top,
-      width: crop.value.width,
-      height: crop.value.height,
-    }
-    : null
-));
+        x: crop.value.left,
+        y: crop.value.top,
+        width: crop.value.width,
+        height: crop.value.height,
+      }
+    : null,
+);
 const histogramAdjustments = computed<AdjustmentValues>(() => ({
   brightness: brightness.value,
   contrast: contrast.value,
@@ -687,46 +962,54 @@ function buildAdjustmentFilter(values: AdjustmentValues) {
     blur(${values.blur}px)
     hue-rotate(${values.hue}deg)
     saturate(${values.saturation}%)
-    ${values.filter === 'grayscale' ? 'grayscale(100%)' : ''}
-    ${values.filter === 'sepia' ? 'sepia(100%)' : ''}
-    ${values.filter === 'invert' ? 'invert(100%)' : ''}
+    ${values.filter === "grayscale" ? "grayscale(100%)" : ""}
+    ${values.filter === "sepia" ? "sepia(100%)" : ""}
+    ${values.filter === "invert" ? "invert(100%)" : ""}
   `;
 }
 
-const imageStyle = computed((): CSSProperties => ({
-  display: 'block',
-  width: `${imageWidth.value}px`,
-  height: `${imageHeight.value}px`,
-  maxWidth: 'none',
-  maxHeight: 'none',
-  position: 'absolute',
-  filter: showOriginalWhilePressed.value ? 'none' : adjustmentFilter.value,
-  transform: `
+const imageStyle = computed(
+  (): CSSProperties => ({
+    display: "block",
+    width: `${imageWidth.value}px`,
+    height: `${imageHeight.value}px`,
+    maxWidth: "none",
+    maxHeight: "none",
+    position: "absolute",
+    filter: showOriginalWhilePressed.value ? "none" : adjustmentFilter.value,
+    transform: `
     translate(${position.value.left}px, ${position.value.top}px)
     rotate(${rotate.value}deg)
     scaleX(${isFlippedX.value ? -1 : 1})
     scaleY(${isFlippedY.value ? -1 : 1})
     scale(${scale.value})
   `,
-  transition: enableTransition.value ? 'transform 0.3s ease' : 'none',
-  backfaceVisibility: 'hidden',
-  willChange: 'transform, filter',
-}));
-const originalImageStyle = computed((): CSSProperties => ({
-  ...imageStyle.value,
-  filter: 'none',
-}));
-const adjustedImageStyle = computed((): CSSProperties => ({
-  ...imageStyle.value,
-  filter: adjustmentFilter.value,
-}));
-const canShowDiffPreview = computed(() => activeEditorTab.value === 'adjust' && hasAdjustmentChanges.value);
+    transition: enableTransition.value ? "transform 0.3s ease" : "none",
+    backfaceVisibility: "hidden",
+    willChange: "transform, filter",
+  }),
+);
+const originalImageStyle = computed(
+  (): CSSProperties => ({
+    ...imageStyle.value,
+    filter: "none",
+  }),
+);
+const adjustedImageStyle = computed(
+  (): CSSProperties => ({
+    ...imageStyle.value,
+    filter: adjustmentFilter.value,
+  }),
+);
+const canShowDiffPreview = computed(
+  () => activeEditorTab.value === "adjust" && hasAdjustmentChanges.value,
+);
 const currentPresetLabel = computed(() => {
   if (showOriginalWhilePressed.value) {
-    return presetOptions.value.find(o => o.value === 'natural')?.label || '';
+    return presetOptions.value.find((o) => o.value === "natural")?.label || "";
   }
   const key = resolvePresetKey(getCurrentAdjustmentValues());
-  return presetOptions.value.find(o => o.value === key)?.label || '';
+  return presetOptions.value.find((o) => o.value === key)?.label || "";
 });
 const adjustmentFilter = computed(() => {
   return buildAdjustmentFilter({
@@ -748,7 +1031,7 @@ const cropBox = ref({ left: 0, top: 0, width: 0, height: 0 });
 const crop = ref({ left: 0, top: 0, width: 0, height: 0 });
 
 const isDragging = ref(false);
-const dragHandle = ref('');
+const dragHandle = ref("");
 const dragStartX = ref(0);
 const dragStartY = ref(0);
 
@@ -771,8 +1054,8 @@ const baseOutputHeight = computed(() => {
   }
   return rotate.value % 180 !== 0 ? imageWidth.value : imageHeight.value;
 });
-const resizeWidthInput = ref('');
-const resizeHeightInput = ref('');
+const resizeWidthInput = ref("");
+const resizeHeightInput = ref("");
 const keepAspectRatio = ref(true);
 const resizeAspectRatio = computed(() => {
   if (!baseOutputWidth.value || !baseOutputHeight.value) return 1;
@@ -817,48 +1100,151 @@ const resizeOutput = computed(() => {
       return buildResizeResult(widthInput, heightInput);
     }
     if (widthInput) {
-      return buildResizeResult(widthInput, Math.max(1, Math.round(widthInput / ratio)));
+      return buildResizeResult(
+        widthInput,
+        Math.max(1, Math.round(widthInput / ratio)),
+      );
     }
     if (heightInput) {
-      return buildResizeResult(Math.max(1, Math.round(heightInput * ratio)), heightInput);
+      return buildResizeResult(
+        Math.max(1, Math.round(heightInput * ratio)),
+        heightInput,
+      );
     }
   }
 
   return buildResizeResult(widthInput || baseWidth, heightInput || baseHeight);
 });
-const hasEditImageChanges = computed(() =>
-  normalizeRotate(rotate.value) !== initialDisplayRotate.value ||
-  isFlippedX.value ||
-  isFlippedY.value
+const hasEditImageChanges = computed(
+  () =>
+    normalizeRotate(rotate.value) !== initialDisplayRotate.value ||
+    isFlippedX.value ||
+    isFlippedY.value,
 );
 const presets: Record<string, AdjustmentValues> = {
-  natural: { brightness: 0, contrast: 0, saturation: 100, hue: 0, blur: 0, filter: '' },
-  vivid: { brightness: 0, contrast: 10, saturation: 120, hue: 0, blur: 0, filter: '' },
-  muted: { brightness: 0, contrast: -10, saturation: 80, hue: 0, blur: 0, filter: '' },
-  warm: { brightness: 5, contrast: 0, saturation: 100, hue: 5, blur: 0, filter: '' },
-  cool: { brightness: 5, contrast: 0, saturation: 100, hue: -5, blur: 0, filter: '' },
-  bw: { brightness: 0, contrast: 0, saturation: 0, hue: 0, blur: 0, filter: 'grayscale' },
-  vintage: { brightness: 10, contrast: -10, saturation: 60, hue: 0, blur: 0, filter: 'sepia' },
-  invert: { brightness: 0, contrast: 0, saturation: 100, hue: 0, blur: 0, filter: 'invert' },
-  kodak: { brightness: 10, contrast: 15, saturation: 120, hue: -5, blur: 0, filter: '' },
-  toyo: { brightness: 5, contrast: 0, saturation: 110, hue: 5, blur: 0, filter: '' },
-  cinematic: { brightness: 0, contrast: 20, saturation: 80, hue: 0, blur: 0, filter: '' },
-  dramatic: { brightness: 0, contrast: 30, saturation: 110, hue: 0, blur: 0, filter: '' },
-  cyberpunk: { brightness: 10, contrast: 20, saturation: 130, hue: -15, blur: 0, filter: '' },
+  natural: {
+    brightness: 0,
+    contrast: 0,
+    saturation: 100,
+    hue: 0,
+    blur: 0,
+    filter: "",
+  },
+  vivid: {
+    brightness: 0,
+    contrast: 10,
+    saturation: 120,
+    hue: 0,
+    blur: 0,
+    filter: "",
+  },
+  muted: {
+    brightness: 0,
+    contrast: -10,
+    saturation: 80,
+    hue: 0,
+    blur: 0,
+    filter: "",
+  },
+  warm: {
+    brightness: 5,
+    contrast: 0,
+    saturation: 100,
+    hue: 5,
+    blur: 0,
+    filter: "",
+  },
+  cool: {
+    brightness: 5,
+    contrast: 0,
+    saturation: 100,
+    hue: -5,
+    blur: 0,
+    filter: "",
+  },
+  bw: {
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    hue: 0,
+    blur: 0,
+    filter: "grayscale",
+  },
+  vintage: {
+    brightness: 10,
+    contrast: -10,
+    saturation: 60,
+    hue: 0,
+    blur: 0,
+    filter: "sepia",
+  },
+  invert: {
+    brightness: 0,
+    contrast: 0,
+    saturation: 100,
+    hue: 0,
+    blur: 0,
+    filter: "invert",
+  },
+  kodak: {
+    brightness: 10,
+    contrast: 15,
+    saturation: 120,
+    hue: -5,
+    blur: 0,
+    filter: "",
+  },
+  toyo: {
+    brightness: 5,
+    contrast: 0,
+    saturation: 110,
+    hue: 5,
+    blur: 0,
+    filter: "",
+  },
+  cinematic: {
+    brightness: 0,
+    contrast: 20,
+    saturation: 80,
+    hue: 0,
+    blur: 0,
+    filter: "",
+  },
+  dramatic: {
+    brightness: 0,
+    contrast: 30,
+    saturation: 110,
+    hue: 0,
+    blur: 0,
+    filter: "",
+  },
+  cyberpunk: {
+    brightness: 10,
+    contrast: 20,
+    saturation: 130,
+    hue: -15,
+    blur: 0,
+    filter: "",
+  },
 };
 
 function sameAdjustmentValues(a: AdjustmentValues, b: AdjustmentValues) {
-  return a.brightness === b.brightness
-    && a.contrast === b.contrast
-    && a.saturation === b.saturation
-    && a.hue === b.hue
-    && a.blur === b.blur
-    && a.filter === b.filter;
+  return (
+    a.brightness === b.brightness &&
+    a.contrast === b.contrast &&
+    a.saturation === b.saturation &&
+    a.hue === b.hue &&
+    a.blur === b.blur &&
+    a.filter === b.filter
+  );
 }
 
 function resolvePresetKey(values: AdjustmentValues) {
-  if (autoPresetValues.value && sameAdjustmentValues(autoPresetValues.value, values)) {
-    return 'auto';
+  if (
+    autoPresetValues.value &&
+    sameAdjustmentValues(autoPresetValues.value, values)
+  ) {
+    return "auto";
   }
 
   for (const [key, preset] of Object.entries(presets)) {
@@ -867,7 +1253,7 @@ function resolvePresetKey(values: AdjustmentValues) {
     }
   }
 
-  return 'custom';
+  return "custom";
 }
 
 function getCurrentAdjustmentValues() {
@@ -888,7 +1274,7 @@ function getConfiguredCustomPreset() {
     saturation: Number(config.imageEditor.custom?.saturation ?? 100),
     hue: Number(config.imageEditor.custom?.hue ?? 0),
     blur: Number(config.imageEditor.custom?.blur ?? 0),
-    filter: String(config.imageEditor.custom?.filter ?? ''),
+    filter: String(config.imageEditor.custom?.filter ?? ""),
   };
 }
 
@@ -913,45 +1299,66 @@ function applyAdjustmentValues(values: AdjustmentValues) {
 }
 
 const presetOptions = computed(() => [
-  { value: 'auto', label: localeMsg.value.msgbox.image_editor.presets.auto },
-  { value: 'natural', label: localeMsg.value.msgbox.image_editor.presets.natural },
-  { value: 'vivid', label: localeMsg.value.msgbox.image_editor.presets.vivid },
-  { value: 'muted', label: localeMsg.value.msgbox.image_editor.presets.muted },
-  { value: 'warm', label: localeMsg.value.msgbox.image_editor.presets.warm },
-  { value: 'cool', label: localeMsg.value.msgbox.image_editor.presets.cool },
-  { value: 'bw', label: localeMsg.value.msgbox.image_editor.presets.bw },
-  { value: 'vintage', label: localeMsg.value.msgbox.image_editor.presets.vintage },
-  { value: 'kodak', label: localeMsg.value.msgbox.image_editor.presets.kodak },
-  { value: 'toyo', label: localeMsg.value.msgbox.image_editor.presets.toyo },
-  { value: 'cinematic', label: localeMsg.value.msgbox.image_editor.presets.cinematic },
-  { value: 'dramatic', label: localeMsg.value.msgbox.image_editor.presets.dramatic },
-  { value: 'cyberpunk', label: localeMsg.value.msgbox.image_editor.presets.cyberpunk },
-  { value: 'invert', label: localeMsg.value.msgbox.image_editor.presets.invert },
-  { value: 'custom', label: localeMsg.value.msgbox.image_editor.presets.custom },
+  { value: "auto", label: localeMsg.value.msgbox.image_editor.presets.auto },
+  {
+    value: "natural",
+    label: localeMsg.value.msgbox.image_editor.presets.natural,
+  },
+  { value: "vivid", label: localeMsg.value.msgbox.image_editor.presets.vivid },
+  { value: "muted", label: localeMsg.value.msgbox.image_editor.presets.muted },
+  { value: "warm", label: localeMsg.value.msgbox.image_editor.presets.warm },
+  { value: "cool", label: localeMsg.value.msgbox.image_editor.presets.cool },
+  { value: "bw", label: localeMsg.value.msgbox.image_editor.presets.bw },
+  {
+    value: "vintage",
+    label: localeMsg.value.msgbox.image_editor.presets.vintage,
+  },
+  { value: "kodak", label: localeMsg.value.msgbox.image_editor.presets.kodak },
+  { value: "toyo", label: localeMsg.value.msgbox.image_editor.presets.toyo },
+  {
+    value: "cinematic",
+    label: localeMsg.value.msgbox.image_editor.presets.cinematic,
+  },
+  {
+    value: "dramatic",
+    label: localeMsg.value.msgbox.image_editor.presets.dramatic,
+  },
+  {
+    value: "cyberpunk",
+    label: localeMsg.value.msgbox.image_editor.presets.cyberpunk,
+  },
+  {
+    value: "invert",
+    label: localeMsg.value.msgbox.image_editor.presets.invert,
+  },
+  {
+    value: "custom",
+    label: localeMsg.value.msgbox.image_editor.presets.custom,
+  },
 ]);
 const lightSliders = computed(() => [
   {
-    key: 'brightness',
+    key: "brightness",
     label: localeMsg.value.msgbox.image_editor.brightness,
     model: brightness,
     min: -100,
     max: 100,
     step: 1,
-    valueDisplay: `${brightness.value > 0 ? '+' : ''}${brightness.value}`,
+    valueDisplay: `${brightness.value > 0 ? "+" : ""}${brightness.value}`,
   },
   {
-    key: 'contrast',
+    key: "contrast",
     label: localeMsg.value.msgbox.image_editor.contrast,
     model: contrast,
     min: -100,
     max: 100,
     step: 1,
-    valueDisplay: `${contrast.value > 0 ? '+' : ''}${contrast.value}`,
+    valueDisplay: `${contrast.value > 0 ? "+" : ""}${contrast.value}`,
   },
 ]);
 const colorSliders = computed(() => [
   {
-    key: 'saturation',
+    key: "saturation",
     label: localeMsg.value.msgbox.image_editor.saturation,
     model: saturation,
     min: 0,
@@ -960,16 +1367,16 @@ const colorSliders = computed(() => [
     valueDisplay: `${saturation.value}%`,
   },
   {
-    key: 'hue',
+    key: "hue",
     label: localeMsg.value.msgbox.image_editor.hue_rotate,
     model: hue,
     min: -180,
     max: 180,
     step: 1,
-    valueDisplay: `${hue.value > 0 ? '+' : ''}${hue.value}`,
+    valueDisplay: `${hue.value > 0 ? "+" : ""}${hue.value}`,
   },
   {
-    key: 'blur',
+    key: "blur",
     label: localeMsg.value.msgbox.image_editor.blur,
     model: blur,
     min: 0,
@@ -993,32 +1400,42 @@ const hasAdjustmentChanges = computed(() => {
 const cropShapeOptions = computed(() => {
   if (isPortrait.value) {
     return [
-      { value: '0', label: localeMsg.value.msgbox.image_editor.crop_shape_custom },
-      { value: '1', label: '1:1' },
-      { value: '2', label: '3:4' },
-      { value: '3', label: '2:3' },
-      { value: '4', label: '10:16' },
-      { value: '5', label: '9:16' },
-      { value: '6', label: '1:2' },
+      {
+        value: "0",
+        label: localeMsg.value.msgbox.image_editor.crop_shape_custom,
+      },
+      { value: "1", label: "1:1" },
+      { value: "2", label: "3:4" },
+      { value: "3", label: "2:3" },
+      { value: "4", label: "10:16" },
+      { value: "5", label: "9:16" },
+      { value: "6", label: "1:2" },
     ];
   }
 
   return [
-    { value: '0', label: localeMsg.value.msgbox.image_editor.crop_shape_custom },
-    { value: '1', label: '1:1' },
-    { value: '2', label: '4:3' },
-    { value: '3', label: '3:2' },
-    { value: '4', label: '16:10' },
-    { value: '5', label: '16:9' },
-    { value: '6', label: '2:1' },
+    {
+      value: "0",
+      label: localeMsg.value.msgbox.image_editor.crop_shape_custom,
+    },
+    { value: "1", label: "1:1" },
+    { value: "2", label: "4:3" },
+    { value: "3", label: "3:2" },
+    { value: "4", label: "16:10" },
+    { value: "5", label: "16:9" },
+    { value: "6", label: "2:1" },
   ];
 });
 
-const newFileName = ref('');
+const newFileName = ref("");
 
-const fileFormatOptions = computed(() => getSelectOptions(localeMsg.value.msgbox.image_editor.format_options));
-const fileQualityOptions = computed(() => getSelectOptions(localeMsg.value.msgbox.image_editor.quality_options));
-const outputFormatValues = ['jpg', 'png', 'webp'] as const;
+const fileFormatOptions = computed(() =>
+  getSelectOptions(localeMsg.value.msgbox.image_editor.format_options),
+);
+const fileQualityOptions = computed(() =>
+  getSelectOptions(localeMsg.value.msgbox.image_editor.quality_options),
+);
+const outputFormatValues = ["jpg", "png", "webp"] as const;
 
 function getSelectedOutputFormat() {
   return outputFormatValues[config.imageEditor.format] || outputFormatValues[0];
@@ -1026,12 +1443,13 @@ function getSelectedOutputFormat() {
 
 const combinedFormatKey = computed({
   get: () => {
-    if (config.imageEditor.format !== 0) return String(config.imageEditor.format);
+    if (config.imageEditor.format !== 0)
+      return String(config.imageEditor.format);
     return `0-${config.imageEditor.quality}`;
   },
   set: (key: string) => {
-    if (key.includes('-')) {
-      const [f, q] = key.split('-').map(Number);
+    if (key.includes("-")) {
+      const [f, q] = key.split("-").map(Number);
       config.imageEditor.format = f;
       config.imageEditor.quality = q;
     } else {
@@ -1046,9 +1464,9 @@ const combinedFormatOptions = computed(() => {
   const qual = fileQualityOptions.value;
   const items: { value: string; label: string }[] = [];
   // JPEG with quality levels
-  items.push({ value: '0-0', label: `${fmt[0].label} (${qual[0].label})` });
-  items.push({ value: '0-1', label: `${fmt[0].label} (${qual[1].label})` });
-  items.push({ value: '0-2', label: `${fmt[0].label} (${qual[2].label})` });
+  items.push({ value: "0-0", label: `${fmt[0].label} (${qual[0].label})` });
+  items.push({ value: "0-1", label: `${fmt[0].label} (${qual[1].label})` });
+  items.push({ value: "0-2", label: `${fmt[0].label} (${qual[2].label})` });
   // PNG, WebP — no quality variants
   for (let i = 1; i < fmt.length; i++) {
     items.push({ value: String(i), label: fmt[i].label });
@@ -1057,10 +1475,14 @@ const combinedFormatOptions = computed(() => {
 });
 
 const canOverwriteOriginal = computed(() => {
-  const ext = getFileExtension(fileInfo.value?.name || fileInfo.value?.file_path || '').toLowerCase();
-  return ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+  const ext = getFileExtension(
+    fileInfo.value?.name || fileInfo.value?.file_path || "",
+  ).toLowerCase();
+  return ["jpg", "jpeg", "png", "webp"].includes(ext);
 });
-const effectiveSaveAsNew = computed(() => config.imageEditor.saveAs === 1 || !canOverwriteOriginal.value);
+const effectiveSaveAsNew = computed(
+  () => config.imageEditor.saveAs === 1 || !canOverwriteOriginal.value,
+);
 
 const showOverwriteConfirm = ref(false);
 
@@ -1073,7 +1495,7 @@ const handleOverwriteConfirm = () => {
 
   const originalPath = fileInfo.value.file_path;
   const ext = getFileExtension(fileInfo.value.name).toLowerCase();
-  const outputFormat = (ext === 'jpg' || ext === 'jpeg') ? 'jpg' : ext;
+  const outputFormat = ext === "jpg" || ext === "jpeg" ? "jpg" : ext;
 
   executeSave({
     destFilePath: originalPath,
@@ -1096,7 +1518,12 @@ const handleResizeWidthInput = () => {
   }
 
   if (!keepAspectRatio.value) return;
-  resizeHeightInput.value = String(Math.min(maxResizeHeight.value, Math.max(1, Math.round(clampedWidth / resizeAspectRatio.value))));
+  resizeHeightInput.value = String(
+    Math.min(
+      maxResizeHeight.value,
+      Math.max(1, Math.round(clampedWidth / resizeAspectRatio.value)),
+    ),
+  );
 };
 
 const handleResizeHeightInput = () => {
@@ -1109,7 +1536,12 @@ const handleResizeHeightInput = () => {
   }
 
   if (!keepAspectRatio.value) return;
-  resizeWidthInput.value = String(Math.min(maxResizeWidth.value, Math.max(1, Math.round(clampedHeight * resizeAspectRatio.value))));
+  resizeWidthInput.value = String(
+    Math.min(
+      maxResizeWidth.value,
+      Math.max(1, Math.round(clampedHeight * resizeAspectRatio.value)),
+    ),
+  );
 };
 
 const resetResize = () => {
@@ -1121,22 +1553,27 @@ const resetResize = () => {
 watch(
   () => [baseOutputWidth.value, baseOutputHeight.value],
   ([width, height]) => {
-    resizeWidthInput.value = width > 0 ? String(width) : '';
-    resizeHeightInput.value = height > 0 ? String(height) : '';
+    resizeWidthInput.value = width > 0 ? String(width) : "";
+    resizeHeightInput.value = height > 0 ? String(height) : "";
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 watch(
   () => keepAspectRatio.value,
   (enabled) => {
     if (!enabled || !parsedResizeWidth.value) return;
-    resizeHeightInput.value = String(Math.max(1, Math.round(parsedResizeWidth.value / resizeAspectRatio.value)));
-  }
+    resizeHeightInput.value = String(
+      Math.max(
+        1,
+        Math.round(parsedResizeWidth.value / resizeAspectRatio.value),
+      ),
+    );
+  },
 );
 
 watch(selectedPreset, () => {
-  if (selectedPreset.value === 'custom') {
+  if (selectedPreset.value === "custom") {
     autoPresetRequestId++;
     if (skipNextCustomPresetLoad) {
       skipNextCustomPresetLoad = false;
@@ -1152,7 +1589,7 @@ watch(selectedPreset, () => {
     return;
   }
 
-  if (selectedPreset.value === 'auto') {
+  if (selectedPreset.value === "auto") {
     applyAutoPreset();
     return;
   }
@@ -1168,7 +1605,7 @@ watch(selectedPreset, () => {
 });
 
 watch(activeEditorTab, (tab) => {
-  if (tab !== 'adjust') {
+  if (tab !== "adjust") {
     showDiffPreview.value = false;
     showOriginalWhilePressed.value = false;
     return;
@@ -1179,44 +1616,52 @@ watch(histogramSource, () => {
   autoPresetValues.value = null;
 });
 
-
 watch([brightness, contrast, saturation, hue, blur, selectedFilter], () => {
   if (isApplyingPreset) return;
 
   const currentValues = getCurrentAdjustmentValues();
   const resolvedPreset = resolvePresetKey(currentValues);
 
-  if (resolvedPreset === 'natural') {
+  if (resolvedPreset === "natural") {
     showDiffPreview.value = false;
   }
 
-  if (resolvedPreset === 'custom') {
+  if (resolvedPreset === "custom") {
     persistCustomPreset(currentValues);
   }
 
-  if (selectedPreset.value !== 'custom') {
+  if (selectedPreset.value !== "custom") {
     const p = presets[selectedPreset.value];
     if (!p) {
       skipNextCustomPresetLoad = true;
-      selectedPreset.value = 'custom';
+      selectedPreset.value = "custom";
       return;
     }
     if (
-      (brightness.value !== p.brightness ||
-        contrast.value !== p.contrast ||
-        saturation.value !== p.saturation ||
-        hue.value !== p.hue ||
-        blur.value !== p.blur ||
-        selectedFilter.value !== p.filter)
+      brightness.value !== p.brightness ||
+      contrast.value !== p.contrast ||
+      saturation.value !== p.saturation ||
+      hue.value !== p.hue ||
+      blur.value !== p.blur ||
+      selectedFilter.value !== p.filter
     ) {
       skipNextCustomPresetLoad = true;
-      selectedPreset.value = 'custom';
+      selectedPreset.value = "custom";
     }
   }
 });
 
 watch(
-  [brightness, contrast, saturation, hue, blur, selectedFilter, () => resizeOutput.value.width, () => resizeOutput.value.height],
+  [
+    brightness,
+    contrast,
+    saturation,
+    hue,
+    blur,
+    selectedFilter,
+    () => resizeOutput.value.width,
+    () => resizeOutput.value.height,
+  ],
   () => {
     if (!fileInfo.value?.file_path) return;
     uiStore.setActiveAdjustments(fileInfo.value.file_path, {
@@ -1226,45 +1671,71 @@ watch(
       hue: hue.value,
       blur: blur.value,
       filter: selectedFilter.value || null,
-      resize: resizeOutput.value.hasResize ? {
-        width: resizeOutput.value.width,
-        height: resizeOutput.value.height,
-      } : null,
+      resize: resizeOutput.value.hasResize
+        ? {
+            width: resizeOutput.value.width,
+            height: resizeOutput.value.height,
+          }
+        : null,
     });
   },
-  { immediate: true }
+  { immediate: true },
 );
 
-watch(() => config.settings.language, (newLanguage) => {
-  locale.value = newLanguage;
-});
+watch(
+  () => config.settings.language,
+  (newLanguage) => {
+    locale.value = newLanguage;
+  },
+);
 
-watch(() => config.settings.appearance, (newAppearance) => {
-  setTheme(newAppearance, newAppearance === 0 ? config.settings.lightTheme : config.settings.darkTheme);
-});
+watch(
+  () => config.settings.appearance,
+  (newAppearance) => {
+    setTheme(
+      newAppearance,
+      newAppearance === 0
+        ? config.settings.lightTheme
+        : config.settings.darkTheme,
+    );
+  },
+);
 
-watch(() => config.settings.lightTheme, (newLightTheme) => {
-  setTheme(config.settings.appearance, newLightTheme);
-});
+watch(
+  () => config.settings.lightTheme,
+  (newLightTheme) => {
+    setTheme(config.settings.appearance, newLightTheme);
+  },
+);
 
-watch(() => config.settings.darkTheme, (newDarkTheme) => {
-  setTheme(config.settings.appearance, newDarkTheme);
-});
+watch(
+  () => config.settings.darkTheme,
+  (newDarkTheme) => {
+    setTheme(config.settings.appearance, newDarkTheme);
+  },
+);
 
-watch(() => Number(config.settings.scale || 1), (newScale) => {
-  const normalizedScale = SCALE_VALUES.find((item) => item === newScale) ?? 1;
-  document.documentElement.style.fontSize = `${normalizedScale * 16}px`;
-});
+watch(
+  () => Number(config.settings.scale || 1),
+  (newScale) => {
+    const normalizedScale = SCALE_VALUES.find((item) => item === newScale) ?? 1;
+    document.documentElement.style.fontSize = `${normalizedScale * 16}px`;
+  },
+);
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleKeyDown);
-  uiStore.pushInputHandler('EditImage');
-  activeEditorTab.value = config.imageEditor.tab === 'adjust' ? 'adjust' : 'edit';
+  window.addEventListener("keydown", handleKeyDown);
+  uiStore.pushInputHandler("EditImage");
+  activeEditorTab.value =
+    config.imageEditor.tab === "adjust" ? "adjust" : "edit";
 
   const query = router.currentRoute.value.query;
   const fileId = Number(query.fileId || 0);
+  const filePath = typeof query.filePath === "string" ? query.filePath : "";
   if (fileId > 0) {
     await loadFileInfo(fileId);
+  } else if (filePath) {
+    await loadExplorerFileInfo(filePath);
   }
 
   if (!fileInfo.value) {
@@ -1275,10 +1746,19 @@ onMounted(async () => {
   isProcessing.value = true;
   initEditImage();
 
-  unlistenUpdateFile = await listen('update-file', async (event: any) => {
+  unlistenUpdateFile = await listen("update-file", async (event: any) => {
     const newFileId = Number(event?.payload?.fileId || 0);
+    const newFilePath = String(event?.payload?.filePath || "");
     if (newFileId > 0 && newFileId !== Number(fileInfo.value?.id || 0)) {
       await loadFileInfo(newFileId);
+      if (fileInfo.value) {
+        initEditImage();
+      }
+    } else if (
+      newFilePath &&
+      newFilePath !== String(fileInfo.value?.file_path || "")
+    ) {
+      await loadExplorerFileInfo(newFilePath);
       if (fileInfo.value) {
         initEditImage();
       }
@@ -1301,7 +1781,8 @@ onMounted(async () => {
     }
     if (cropStatus.value === 1 || cropApplied.value) {
       requestAnimationFrame(() => {
-        imageRectOriginal.value = imageRef.value?.getBoundingClientRect() || null;
+        imageRectOriginal.value =
+          imageRef.value?.getBoundingClientRect() || null;
         updateCropBoxFromCrop();
         enableTransition.value = true;
         isResizing.value = false;
@@ -1317,8 +1798,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown);
-  uiStore.removeInputHandler('EditImage');
+  window.removeEventListener("keydown", handleKeyDown);
+  uiStore.removeInputHandler("EditImage");
   if (containerResizeObserver) {
     containerResizeObserver.disconnect();
     containerResizeObserver = null;
@@ -1332,10 +1813,18 @@ onUnmounted(() => {
 const onImageLoad = async () => {
   await nextTick();
 
-  if (imageRef.value && imageRef.value.naturalWidth > 0 && imageRef.value.naturalHeight > 0) {
+  if (
+    imageRef.value &&
+    imageRef.value.naturalWidth > 0 &&
+    imageRef.value.naturalHeight > 0
+  ) {
     imageWidth.value = imageRef.value.naturalWidth;
     imageHeight.value = imageRef.value.naturalHeight;
-    isPortrait.value = isPortraitForRotation(imageWidth.value, imageHeight.value, rotate.value);
+    isPortrait.value = isPortraitForRotation(
+      imageWidth.value,
+      imageHeight.value,
+      rotate.value,
+    );
   }
 
   autoFitVisualArea();
@@ -1363,7 +1852,10 @@ const initEditImage = async () => {
     void (async () => {
       try {
         if (loadingId !== initEditImageLoadingId.value) return;
-        const previewSrc = getPreviewUrl(fileInfo.value.id, fileInfo.value.file_path);
+        const previewSrc = getPreviewUrl(
+          fileInfo.value.id,
+          fileInfo.value.file_path,
+        );
         if (previewSrc) {
           imageSrc.value = previewSrc;
         }
@@ -1377,7 +1869,11 @@ const initEditImage = async () => {
 
   imageWidth.value = fileInfo.value.width;
   imageHeight.value = fileInfo.value.height;
-  isPortrait.value = isPortraitForRotation(imageWidth.value, imageHeight.value, initialDisplayRotate.value);
+  isPortrait.value = isPortraitForRotation(
+    imageWidth.value,
+    imageHeight.value,
+    initialDisplayRotate.value,
+  );
   if (isRawFile.value || !canOverwriteOriginal.value) {
     config.imageEditor.saveAs = 1;
   }
@@ -1404,7 +1900,7 @@ const initEditImage = async () => {
     saturation.value = adj.saturation ?? 100;
     hue.value = adj.hue || 0;
     blur.value = adj.blur || 0;
-    selectedFilter.value = adj.filter || '';
+    selectedFilter.value = adj.filter || "";
     const restoredPreset = resolvePresetKey({
       brightness: brightness.value,
       contrast: contrast.value,
@@ -1413,7 +1909,7 @@ const initEditImage = async () => {
       blur: blur.value,
       filter: selectedFilter.value,
     });
-    if (restoredPreset === 'custom') {
+    if (restoredPreset === "custom") {
       skipNextCustomPresetLoad = true;
     }
     selectedPreset.value = restoredPreset;
@@ -1423,12 +1919,12 @@ const initEditImage = async () => {
     isFlippedY.value = false;
     resetAdjustments();
   }
-
 };
 
 async function getAutoPresetValues() {
   if (autoPresetValues.value) return autoPresetValues.value;
-  autoPresetValues.value = await histogramRef.value?.getAutoPresetValues() || presets.natural;
+  autoPresetValues.value =
+    (await histogramRef.value?.getAutoPresetValues()) || presets.natural;
   return autoPresetValues.value;
 }
 
@@ -1436,7 +1932,8 @@ async function applyAutoPreset() {
   const requestId = ++autoPresetRequestId;
   try {
     const values = await getAutoPresetValues();
-    if (requestId !== autoPresetRequestId || selectedPreset.value !== 'auto') return;
+    if (requestId !== autoPresetRequestId || selectedPreset.value !== "auto")
+      return;
     isApplyingPreset = true;
     applyAdjustmentValues(values);
   } finally {
@@ -1449,16 +1946,25 @@ async function applyAutoPreset() {
 }
 
 function presetThumbnailFilter(presetKey: string) {
-  const p = presetKey === 'custom'
-    ? getConfiguredCustomPreset()
-    : presetKey === 'auto'
-      ? (autoPresetValues.value || presets.natural)
-      : presets[presetKey];
-  if (!p) return '';
+  const p =
+    presetKey === "custom"
+      ? getConfiguredCustomPreset()
+      : presetKey === "auto"
+        ? autoPresetValues.value || presets.natural
+        : presets[presetKey];
+  if (!p) return "";
   return buildAdjustmentFilter(
-    presetKey === 'custom'
-      ? { ...p, brightness: brightness.value, contrast: contrast.value, saturation: saturation.value, hue: hue.value, blur: blur.value, filter: selectedFilter.value }
-      : p
+    presetKey === "custom"
+      ? {
+          ...p,
+          brightness: brightness.value,
+          contrast: contrast.value,
+          saturation: saturation.value,
+          hue: hue.value,
+          blur: blur.value,
+          filter: selectedFilter.value,
+        }
+      : p,
   );
 }
 
@@ -1470,19 +1976,24 @@ const resetAdjustments = () => {
   hue.value = p.hue;
   blur.value = p.blur;
   selectedFilter.value = p.filter;
-  selectedPreset.value = 'natural';
+  selectedPreset.value = "natural";
   showDiffPreview.value = false;
   showOriginalWhilePressed.value = false;
 };
 
-function setActiveEditorTab(tab: 'edit' | 'adjust') {
+function setActiveEditorTab(tab: "edit" | "adjust") {
   if (cropStatus.value === 1) return;
   activeEditorTab.value = tab;
   config.imageEditor.tab = tab;
 }
 
 function handlePreviewPointerDown() {
-  if (activeEditorTab.value !== 'adjust' || showDiffPreview.value || !hasAdjustmentChanges.value) return;
+  if (
+    activeEditorTab.value !== "adjust" ||
+    showDiffPreview.value ||
+    !hasAdjustmentChanges.value
+  )
+    return;
   showOriginalWhilePressed.value = true;
 }
 
@@ -1535,7 +2046,11 @@ const clickRestoreAll = () => {
   rotate.value = initialDisplayRotate.value;
   isFlippedX.value = false;
   isFlippedY.value = false;
-  isPortrait.value = isPortraitForRotation(imageWidth.value, imageHeight.value, initialDisplayRotate.value);
+  isPortrait.value = isPortraitForRotation(
+    imageWidth.value,
+    imageHeight.value,
+    initialDisplayRotate.value,
+  );
   autoFitVisualArea();
 };
 
@@ -1588,9 +2103,13 @@ const initCropBox = () => {
   imageRect.value = imageRef.value?.getBoundingClientRect() || null;
   if (!imageRect.value || !containerRect.value) return;
 
-  const selectedShape = cropShapeOptions.value.find(option => option.value === String(config.imageEditor.cropShape) && option.value !== '0');
+  const selectedShape = cropShapeOptions.value.find(
+    (option) =>
+      option.value === String(config.imageEditor.cropShape) &&
+      option.value !== "0",
+  );
   if (selectedShape && selectedShape.label) {
-    const parts = selectedShape.label.split(':');
+    const parts = selectedShape.label.split(":");
     const aspectRatio = parseInt(parts[0]) / parseInt(parts[1]);
 
     let newWidth;
@@ -1634,15 +2153,23 @@ const updateCropFromCropBox = () => {
   imageRect.value = imageRef.value?.getBoundingClientRect() || null;
   if (!imageRect.value || !containerRect.value) return;
 
-  const imgWidth = rotate.value % 180 === 0 ? imageWidth.value : imageHeight.value;
-  const imgHeight = rotate.value % 180 === 0 ? imageHeight.value : imageWidth.value;
+  const imgWidth =
+    rotate.value % 180 === 0 ? imageWidth.value : imageHeight.value;
+  const imgHeight =
+    rotate.value % 180 === 0 ? imageHeight.value : imageWidth.value;
 
   const scaleX = imgWidth / imageRect.value.width;
   const scaleY = imgHeight / imageRect.value.height;
 
   crop.value = {
-    left: Math.round(scaleX * (cropBox.value.left + containerRect.value.left - imageRect.value.left)),
-    top: Math.round(scaleY * (cropBox.value.top + containerRect.value.top - imageRect.value.top)),
+    left: Math.round(
+      scaleX *
+        (cropBox.value.left + containerRect.value.left - imageRect.value.left),
+    ),
+    top: Math.round(
+      scaleY *
+        (cropBox.value.top + containerRect.value.top - imageRect.value.top),
+    ),
     width: Math.round(scaleX * cropBox.value.width),
     height: Math.round(scaleY * cropBox.value.height),
   };
@@ -1657,8 +2184,10 @@ const updateCropBoxFromCrop = () => {
   imageRect.value = imageRectOriginal.value;
   if (!imageRect.value || !containerRect.value) return;
 
-  const imgWidth = rotate.value % 180 === 0 ? imageWidth.value : imageHeight.value;
-  const imgHeight = rotate.value % 180 === 0 ? imageHeight.value : imageWidth.value;
+  const imgWidth =
+    rotate.value % 180 === 0 ? imageWidth.value : imageHeight.value;
+  const imgHeight =
+    rotate.value % 180 === 0 ? imageHeight.value : imageWidth.value;
 
   const scaleX = imgWidth / imageRect.value.width;
   const scaleY = imgHeight / imageRect.value.height;
@@ -1666,15 +2195,22 @@ const updateCropBoxFromCrop = () => {
   if (scaleX === 0 || scaleY === 0) return;
 
   cropBox.value = {
-    left: (crop.value.left / scaleX) - containerRect.value.left + imageRect.value.left,
-    top: (crop.value.top / scaleY) - containerRect.value.top + imageRect.value.top,
+    left:
+      crop.value.left / scaleX -
+      containerRect.value.left +
+      imageRect.value.left,
+    top:
+      crop.value.top / scaleY - containerRect.value.top + imageRect.value.top,
     width: crop.value.width / scaleX,
     height: crop.value.height / scaleY,
   };
 };
 
 const scaleFit = (imgWidth: number, imgHeight: number) => {
-  scale.value = Math.min(containerBounds.value.width / imgWidth, containerBounds.value.height / imgHeight);
+  scale.value = Math.min(
+    containerBounds.value.width / imgWidth,
+    containerBounds.value.height / imgHeight,
+  );
 };
 
 const fitImageToContainer = () => {
@@ -1705,12 +2241,22 @@ const fitCropBoxToContainer = () => {
   );
 
   position.value = {
-    left: position.value.left + (containerRect.value.width / 2 - (cropBox.value.left + cropBox.value.width / 2)) * scale.value / oldScale,
-    top: position.value.top + (containerRect.value.height / 2 - (cropBox.value.top + cropBox.value.height / 2)) * scale.value / oldScale,
+    left:
+      position.value.left +
+      ((containerRect.value.width / 2 -
+        (cropBox.value.left + cropBox.value.width / 2)) *
+        scale.value) /
+        oldScale,
+    top:
+      position.value.top +
+      ((containerRect.value.height / 2 -
+        (cropBox.value.top + cropBox.value.height / 2)) *
+        scale.value) /
+        oldScale,
   };
 
-  const newCropBoxWidth = cropBox.value.width * scale.value / oldScale;
-  const newCropBoxHeight = cropBox.value.height * scale.value / oldScale;
+  const newCropBoxWidth = (cropBox.value.width * scale.value) / oldScale;
+  const newCropBoxHeight = (cropBox.value.height * scale.value) / oldScale;
   cropBox.value = {
     left: (containerRect.value.width - newCropBoxWidth) / 2,
     top: (containerRect.value.height - newCropBoxHeight) / 2,
@@ -1718,7 +2264,9 @@ const fitCropBoxToContainer = () => {
     height: newCropBoxHeight,
   };
 
-  imageRef.value?.addEventListener('transitionend', updateCropFromCropBox, { once: true });
+  imageRef.value?.addEventListener("transitionend", updateCropFromCropBox, {
+    once: true,
+  });
 };
 
 const clickRotate = (degree: number) => {
@@ -1732,14 +2280,14 @@ const clickRotate = (degree: number) => {
 
 const clickFlipX = () => {
   rotate.value % 180 !== 0
-    ? isFlippedY.value = !isFlippedY.value
-    : isFlippedX.value = !isFlippedX.value;
+    ? (isFlippedY.value = !isFlippedY.value)
+    : (isFlippedX.value = !isFlippedX.value);
 };
 
 const clickFlipY = () => {
   rotate.value % 180 !== 0
-    ? isFlippedX.value = !isFlippedX.value
-    : isFlippedY.value = !isFlippedY.value;
+    ? (isFlippedX.value = !isFlippedX.value)
+    : (isFlippedY.value = !isFlippedY.value);
 };
 
 const startDrag = (handle: string, event: MouseEvent) => {
@@ -1748,7 +2296,7 @@ const startDrag = (handle: string, event: MouseEvent) => {
   dragStartX.value = event.clientX;
   dragStartY.value = event.clientY;
 
-  if (cropBoxFixed.value && dragHandle.value === 'move') {
+  if (cropBoxFixed.value && dragHandle.value === "move") {
     enableTransition.value = false;
   }
 
@@ -1762,22 +2310,24 @@ const startDrag = (handle: string, event: MouseEvent) => {
     const dx = e.clientX - dragStartX.value;
     const dy = e.clientY - dragStartY.value;
 
-    if (cropBoxFixed.value && dragHandle.value === 'move') {
+    if (cropBoxFixed.value && dragHandle.value === "move") {
       const initialImageLeft = initialImageRect.left - containerRect.value.left;
       const initialImageRight = initialImageLeft + initialImageRect.width;
       const maxDx = cropBox.value.left - initialImageLeft;
-      const minDx = (cropBox.value.left + cropBox.value.width) - initialImageRight;
+      const minDx =
+        cropBox.value.left + cropBox.value.width - initialImageRight;
       const clampedDx = Math.max(minDx, Math.min(dx, maxDx));
 
       const initialImageTop = initialImageRect.top - containerRect.value.top;
       const initialImageBottom = initialImageTop + initialImageRect.height;
       const maxDy = cropBox.value.top - initialImageTop;
-      const minDy = (cropBox.value.top + cropBox.value.height) - initialImageBottom;
+      const minDy =
+        cropBox.value.top + cropBox.value.height - initialImageBottom;
       const clampedDy = Math.max(minDy, Math.min(dy, maxDy));
 
       position.value.left = initialImagePosition.left + clampedDx;
       position.value.top = initialImagePosition.top + clampedDy;
-    } else if (dragHandle.value === 'move') {
+    } else if (dragHandle.value === "move") {
       if (!imageRect.value) return;
       const imageLeft = imageRect.value.left - containerRect.value.left;
       const imageTop = imageRect.value.top - containerRect.value.top;
@@ -1789,8 +2339,10 @@ const startDrag = (handle: string, event: MouseEvent) => {
 
       if (newLeft < imageLeft) newLeft = imageLeft;
       if (newTop < imageTop) newTop = imageTop;
-      if (newLeft + initialCropBoxData.width > imageRight) newLeft = imageRight - initialCropBoxData.width;
-      if (newTop + initialCropBoxData.height > imageBottom) newTop = imageBottom - initialCropBoxData.height;
+      if (newLeft + initialCropBoxData.width > imageRight)
+        newLeft = imageRight - initialCropBoxData.width;
+      if (newTop + initialCropBoxData.height > imageBottom)
+        newTop = imageBottom - initialCropBoxData.height;
 
       cropBox.value.left = newLeft;
       cropBox.value.top = newTop;
@@ -1802,34 +2354,43 @@ const startDrag = (handle: string, event: MouseEvent) => {
       const imageBottom = imageTop + imageRect.value.height;
       let proposedBox = { ...initialCropBoxData };
 
-      if (dragHandle.value.includes('right')) proposedBox.width += dx;
-      if (dragHandle.value.includes('left')) {
+      if (dragHandle.value.includes("right")) proposedBox.width += dx;
+      if (dragHandle.value.includes("left")) {
         proposedBox.width -= dx;
         proposedBox.left += dx;
       }
-      if (dragHandle.value.includes('bottom')) proposedBox.height += dy;
-      if (dragHandle.value.includes('top')) {
+      if (dragHandle.value.includes("bottom")) proposedBox.height += dy;
+      if (dragHandle.value.includes("top")) {
         proposedBox.height -= dy;
         proposedBox.top += dy;
       }
 
       const shape = String(config.imageEditor.cropShape);
-      if (shape !== '0') {
-        const selectedShape = cropShapeOptions.value.find(o => o.value === shape);
+      if (shape !== "0") {
+        const selectedShape = cropShapeOptions.value.find(
+          (o) => o.value === shape,
+        );
         if (selectedShape && selectedShape.label) {
-          const parts = selectedShape.label.split(':');
+          const parts = selectedShape.label.split(":");
           const aspectRatio = parseInt(parts[0]) / parseInt(parts[1]);
 
-          if (dragHandle.value.includes('left') || dragHandle.value.includes('right')) {
+          if (
+            dragHandle.value.includes("left") ||
+            dragHandle.value.includes("right")
+          ) {
             proposedBox.height = proposedBox.width / aspectRatio;
           } else {
             proposedBox.width = proposedBox.height * aspectRatio;
           }
-          if (dragHandle.value.includes('top')) {
-            proposedBox.top = initialCropBoxData.top + (initialCropBoxData.height - proposedBox.height);
+          if (dragHandle.value.includes("top")) {
+            proposedBox.top =
+              initialCropBoxData.top +
+              (initialCropBoxData.height - proposedBox.height);
           }
-          if (dragHandle.value.includes('left')) {
-            proposedBox.left = initialCropBoxData.left + (initialCropBoxData.width - proposedBox.width);
+          if (dragHandle.value.includes("left")) {
+            proposedBox.left =
+              initialCropBoxData.left +
+              (initialCropBoxData.width - proposedBox.width);
           }
         }
       }
@@ -1850,37 +2411,45 @@ const startDrag = (handle: string, event: MouseEvent) => {
   };
 
   const stopDrag = () => {
-    if (cropBoxFixed.value && dragHandle.value === 'move') {
+    if (cropBoxFixed.value && dragHandle.value === "move") {
       enableTransition.value = true;
     }
     isDragging.value = false;
-    window.removeEventListener('mousemove', doDrag);
-    window.removeEventListener('mouseup', stopDrag);
+    window.removeEventListener("mousemove", doDrag);
+    window.removeEventListener("mouseup", stopDrag);
   };
 
-  window.addEventListener('mousemove', doDrag);
-  window.addEventListener('mouseup', stopDrag);
+  window.addEventListener("mousemove", doDrag);
+  window.addEventListener("mouseup", stopDrag);
 };
 
 function handleKeyDown(event: KeyboardEvent) {
-  if (!uiStore.isInputActive('EditImage')) return;
+  if (!uiStore.isInputActive("EditImage")) return;
 
   switch (event.key) {
-    case 'ArrowLeft':
-      if (activeEditorTab.value === 'adjust' && !isProcessing.value && cropStatus.value !== 1) {
+    case "ArrowLeft":
+      if (
+        activeEditorTab.value === "adjust" &&
+        !isProcessing.value &&
+        cropStatus.value !== 1
+      ) {
         movePresetSelection(-1);
         event.preventDefault();
         event.stopPropagation();
       }
       break;
-    case 'ArrowRight':
-      if (activeEditorTab.value === 'adjust' && !isProcessing.value && cropStatus.value !== 1) {
+    case "ArrowRight":
+      if (
+        activeEditorTab.value === "adjust" &&
+        !isProcessing.value &&
+        cropStatus.value !== 1
+      ) {
         movePresetSelection(1);
         event.preventDefault();
         event.stopPropagation();
       }
       break;
-    case 'Enter':
+    case "Enter":
       if (isProcessing.value) break;
       if (cropStatus.value === 1) {
         clickDoCrop();
@@ -1890,7 +2459,7 @@ function handleKeyDown(event: KeyboardEvent) {
       event.preventDefault();
       event.stopPropagation();
       break;
-    case 'Escape':
+    case "Escape":
       if (showDiffPreview.value) {
         showDiffPreview.value = false;
       } else if (cropStatus.value === 1) {
@@ -1901,7 +2470,7 @@ function handleKeyDown(event: KeyboardEvent) {
       event.preventDefault();
       event.stopPropagation();
       break;
-    case ' ':
+    case " ":
       if (cropStatus.value === 1) {
         toggleCropBoxFixed();
         event.preventDefault();
@@ -1925,19 +2494,33 @@ function closeSaveDropdown() {
 }
 
 function movePresetSelection(direction: number) {
-  const currentIndex = presetOptions.value.findIndex(option => option.value === selectedPreset.value);
+  const currentIndex = presetOptions.value.findIndex(
+    (option) => option.value === selectedPreset.value,
+  );
   if (currentIndex === -1) return;
-  const nextIndex = Math.max(0, Math.min(presetOptions.value.length - 1, currentIndex + direction));
+  const nextIndex = Math.max(
+    0,
+    Math.min(presetOptions.value.length - 1, currentIndex + direction),
+  );
   selectedPreset.value = presetOptions.value[nextIndex].value;
 }
 
-const setEditParams = (overrides: { fileName?: string; destFilePath?: string; outputFormat?: string } = {}) => {
+const setEditParams = (
+  overrides: {
+    fileName?: string;
+    destFilePath?: string;
+    outputFormat?: string;
+  } = {},
+) => {
   let name = overrides.fileName || newFileName.value;
   let outputFormat = overrides.outputFormat || getSelectedOutputFormat();
 
   let destFilePath = overrides.destFilePath;
   if (!destFilePath) {
-    destFilePath = getFullPath(getFolderPath(fileInfo.value.file_path), combineFileName(name, outputFormat));
+    destFilePath = getFullPath(
+      getFolderPath(fileInfo.value.file_path),
+      combineFileName(name, outputFormat),
+    );
   }
 
   return {
@@ -1968,7 +2551,13 @@ const setEditParams = (overrides: { fileName?: string; destFilePath?: string; ou
   };
 };
 
-const executeSave = async (overrides: { fileName?: string; destFilePath?: string; outputFormat?: string } = {}) => {
+const executeSave = async (
+  overrides: {
+    fileName?: string;
+    destFilePath?: string;
+    outputFormat?: string;
+  } = {},
+) => {
   isProcessing.value = true;
   let success = false;
   const savedFilePath = overrides.destFilePath || fileInfo.value.file_path;
@@ -1985,9 +2574,9 @@ const executeSave = async (overrides: { fileName?: string; destFilePath?: string
       if (uiStore.activeAdjustments.filePath === fileInfo.value.file_path) {
         uiStore.clearActiveAdjustments();
       }
-      sendToParent({ type: 'success', saveAsNew, filePath: savedFilePath });
+      sendToParent({ type: "success", saveAsNew, filePath: savedFilePath });
     } else {
-      sendToParent({ type: 'failed' });
+      sendToParent({ type: "failed" });
     }
   }
 };
@@ -2004,12 +2593,18 @@ const clickSave = async () => {
 
       let counter = 1;
       let candidateName = `${baseName}_${counter}`;
-      let candidatePath = getFullPath(folderPath, combineFileName(candidateName, ext));
+      let candidatePath = getFullPath(
+        folderPath,
+        combineFileName(candidateName, ext),
+      );
 
       while (await checkFileExists(candidatePath)) {
         counter++;
         candidateName = `${baseName}_${counter}`;
-        candidatePath = getFullPath(folderPath, combineFileName(candidateName, ext));
+        candidatePath = getFullPath(
+          folderPath,
+          combineFileName(candidateName, ext),
+        );
       }
 
       await executeSave({
@@ -2018,20 +2613,20 @@ const clickSave = async () => {
       });
     } catch {
       isProcessing.value = false;
-      sendToParent({ type: 'failed' });
+      sendToParent({ type: "failed" });
     }
   } else {
     showOverwriteConfirm.value = true;
   }
 };
-
 </script>
 
 <style scoped>
 .crop-box-active {
   position: absolute;
   border: 1px solid #fff;
-  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--color-base-200) 80%, transparent);
+  box-shadow: 0 0 0 9999px
+    color-mix(in srgb, var(--color-base-200) 80%, transparent);
   box-sizing: border-box;
   will-change: transform;
   transition: all 0.3s ease;
