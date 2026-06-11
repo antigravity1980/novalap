@@ -24,7 +24,16 @@ strip = true
 [profile.dev.package."*"]
 opt-level = 3
 
-[target.'cfg(target_os = "windows")'.dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt", "directml"] }\n\n[target.'cfg(target_os = "macos")'.dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "coreml"] }\n\n[target.'cfg(target_os = "linux")'.dependencies]\nort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt"] }\n\n[dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt", "directml"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "coreml"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs", "cuda", "tensorrt"] }
+
+[dependencies]
 tauri = { version = "2", features = [
     "macos-private-api",
     "protocol-asset",

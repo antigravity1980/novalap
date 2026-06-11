@@ -14,7 +14,8 @@ use tauri::command;
 
 use super::batch::BatchResult;
 
-#[allow(dead_code)]\nfn get_writable_optimizers_dir() -> PathBuf {
+#[allow(dead_code)]
+fn get_writable_optimizers_dir() -> PathBuf {
     // Try current_exe dir/optimizers first
     if let Ok(mut current_exe) = env::current_exe() {
         if current_exe.pop() {

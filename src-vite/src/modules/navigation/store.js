@@ -19,6 +19,7 @@ export const useNavigationStore = defineStore("navigation", {
     selectedFiles: [], // выбранные файлы в текущей директории
     navigatedCount: 0,
     pendingTreeRenamePath: "",
+    watchUnlisten: null, // unlisten fn для watch_directory (Tauri)
   }),
 
   getters: {
@@ -39,6 +40,31 @@ export const useNavigationStore = defineStore("navigation", {
   },
 
   actions: {
+    async _stopWatching() {
+      try {
+        if (typeof this.watchUnlisten === "function") {
+          this.watchUnlisten();
+        }
+      } catch (e) {
+        console.warn("Failed to unwatch directory:", e);
+      } finally {
+        this.watchUnlisten = null;
+      }
+    },
+
+    async _startWatching(path) {
+      // Точка invoke watch_directory должна вернуть unlisten fn (если реализация такова).
+      // Если бэкенд возвращает void, мы просто логируем.
+      try {
+        const unlisten = await invoke("watch_directory", { path });
+        if (typeof unlisten === "function") {
+          this.watchUnlisten = unlisten;
+        }
+      } catch (err) {
+        console.error("Failed to watch directory:", err);
+      }
+    },
+
     async navigateTo(path) {
       clearThumbnailCache();
       this.navigatedCount++;
@@ -64,10 +90,9 @@ export const useNavigationStore = defineStore("navigation", {
         const treeData = await invoke("expand_folder", { path });
         this.treeFolders[path] = treeData;
 
-        // Начинаем отслеживание изменений
-        await invoke("watch_directory", { path }).catch((err) =>
-          console.error("Failed to watch directory:", err),
-        );
+        // Перезапускаем наблюдение (убираем дубликаты подписчиков)
+        await this._stopWatching();
+        await this._startWatching(path);
 
         this.selectedFiles = [];
       } catch (error) {
@@ -151,6 +176,9 @@ export const useNavigationStore = defineStore("navigation", {
           },
         ];
 
+        const galleryStore = useGalleryStore();
+        galleryStore.setFiles(this.folders);
+
         this.treeFolders[path] = [
           {
             name: "Documents",
@@ -185,11 +213,11 @@ export const useNavigationStore = defineStore("navigation", {
         this.isLoading = true;
         try {
           this.folders = await invoke("list_directory", { path });
-        const galleryStore = useGalleryStore();
-        galleryStore.setFiles(this.folders);
-          await invoke("watch_directory", { path }).catch((err) =>
-            console.error("Failed to watch directory:", err),
-          );
+          const galleryStore = useGalleryStore();
+          galleryStore.setFiles(this.folders);
+
+          await this._stopWatching();
+          await this._startWatching(path);
         } catch (error) {
           if (typeof window !== "undefined" && window.__tauri_ipc__) {
             throw error;
@@ -229,6 +257,9 @@ export const useNavigationStore = defineStore("navigation", {
               resolution: { width: 1024, height: 1024 },
             },
           ];
+
+          const galleryStore = useGalleryStore();
+          galleryStore.setFiles(this.folders);
         } finally {
           this.isLoading = false;
         }
@@ -244,11 +275,11 @@ export const useNavigationStore = defineStore("navigation", {
         this.isLoading = true;
         try {
           this.folders = await invoke("list_directory", { path });
-        const galleryStore = useGalleryStore();
-        galleryStore.setFiles(this.folders);
-          await invoke("watch_directory", { path }).catch((err) =>
-            console.error("Failed to watch directory:", err),
-          );
+          const galleryStore = useGalleryStore();
+          galleryStore.setFiles(this.folders);
+
+          await this._stopWatching();
+          await this._startWatching(path);
         } catch (error) {
           if (typeof window !== "undefined" && window.__tauri_ipc__) {
             throw error;
