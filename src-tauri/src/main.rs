@@ -43,7 +43,6 @@ mod t_sqlite;
 mod t_storage;
 mod t_utils;
 mod t_video;
-mod t_http;
 
 /// The main function is the entry point for the Tauri application.
 #[tokio::main]
