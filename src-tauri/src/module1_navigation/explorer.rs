@@ -6,7 +6,6 @@
  * - get_drives() — список дисков (Windows) / mount points (Linux/macOS)
  * - get_file_info(path) — детальная информация о файле
  */
-
 extern crate imagesize;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -51,6 +50,16 @@ pub struct DriveInfo {
     pub is_removable: bool,
 }
 
+/// Счётчики / AI-источник, возвращаемые при ленивой догрузке видимых строк.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct EntryEnrichment {
+    pub path: String,
+    pub dir_count: Option<u32>,
+    pub file_count: Option<u32>,
+    pub ai_source: Option<String>,
+}
+
 /// Список файлов и директорий по пути
 #[command]
 pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
@@ -65,7 +74,8 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
         }
 
         let mut entries: Vec<FileEntry> = Vec::new();
-        let read_dir = fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
+        let read_dir =
+            fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
         for entry in read_dir {
             let entry = match entry {
@@ -95,56 +105,25 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
                 })
                 .unwrap_or_default();
 
-            let created = metadata
-                .created()
-                .ok()
-                .and_then(|t| {
-                    let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
-                    chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
-                        .map(|dt| dt.to_rfc3339())
-                });
+            let created = metadata.created().ok().and_then(|t| {
+                let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
+                chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
+                    .map(|dt| dt.to_rfc3339())
+            });
 
             let extension = entry_path
                 .extension()
                 .map(|ext| ext.to_string_lossy().to_lowercase());
 
-            let resolution = if is_file {
-                get_file_resolution(&entry_path, extension.as_deref())
-            } else {
-                None
-            };
+            let resolution = None;
 
             let (dir_count, file_count) = if is_dir {
-                if let Ok(read_subdir) = fs::read_dir(&entry_path) {
-                    let mut dc = 0;
-                    let mut fc = 0;
-                    for sub_entry in read_subdir {
-                        if let Ok(se) = sub_entry {
-                            if let Ok(meta) = se.metadata() {
-                                if meta.is_dir() {
-                                    dc += 1;
-                                } else if meta.is_file() {
-                                    fc += 1;
-                                }
-                            }
-                        }
-                    }
-                    (Some(dc), Some(fc))
-                } else {
-                    (Some(0), Some(0))
-                }
+                (Some(0), Some(0))
             } else {
                 (None, None)
             };
 
-            let ai_source = if is_file {
-                match crate::module4_backend::detect_ai_source(path_str.clone()) {
-                    Ok(src) => if src == "Unknown" { None } else { Some(src) },
-                    Err(_) => None,
-                }
-            } else {
-                None
-            };
+            let ai_source = None;
 
             entries.push(FileEntry {
                 name: file_name,
@@ -180,55 +159,282 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
 #[cfg(target_os = "windows")]
 #[command]
 pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
+    use win32_imports::{
+        DRIVE_CDROM, DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+        GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW,
+    };
+
+    let buffer_len = unsafe { GetLogicalDriveStringsW(0, core::ptr::null_mut()) };
+    if buffer_len == 0 {
+        return Err("Failed to enumerate logical drives".to_string());
+    }
+
+    let mut buffer = vec![0u16; buffer_len as usize + 1];
+    let written = unsafe { GetLogicalDriveStringsW(buffer.len() as u32, buffer.as_mut_ptr()) };
+    if written == 0 {
+        return Err("Failed to read logical drive strings".to_string());
+    }
+
     let mut drives = Vec::new();
-    for letter in 'A'..='Z' {
-        let path = format!("{}:\\", letter);
-        let path_obj = Path::new(&path);
-        if path_obj.exists() {
+    let mut start = 0usize;
+
+    while start < written as usize {
+        let end = match buffer[start..].iter().position(|&c| c == 0) {
+            Some(pos) => start + pos,
+            None => break,
+        };
+
+        if end == start {
+            break;
+        }
+
+        let drive_wide = &buffer[start..end];
+        let path = String::from_utf16_lossy(drive_wide);
+        let drive_type = unsafe { GetDriveTypeW(buffer[start..=end].as_ptr()) };
+
+        if matches!(
+            drive_type,
+            DRIVE_FIXED | DRIVE_REMOVABLE | DRIVE_REMOTE | DRIVE_CDROM | DRIVE_RAMDISK
+        ) {
+            let mut free_space = 0u64;
+            let mut total_space = 0u64;
+
+            let _ = unsafe {
+                GetDiskFreeSpaceExW(
+                    buffer[start..=end].as_ptr(),
+                    core::ptr::null_mut(),
+                    &mut total_space,
+                    &mut free_space,
+                )
+            };
+
+            let name = path.trim_end_matches(['\\', '/']).to_string();
             drives.push(DriveInfo {
-                name: format!("{}:", letter),
+                name,
                 path,
-                total_space: 0,
-                free_space: 0,
-                is_removable: letter == 'A' || letter == 'B',
+                total_space,
+                free_space,
+                is_removable: matches!(drive_type, DRIVE_REMOVABLE | DRIVE_CDROM),
+            });
+        }
+
+        start = end + 1;
+    }
+
+    drives.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(drives)
+}
+
+/// Ленивая догрузка метаданных для видимых папок/файлов.
+/// Возвращает `dir_count`/`file_count` для директорий и лёгкое
+/// определение `ai_source` по пути для файлов (без парсинга метаданных).
+#[command]
+pub fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, String> {
+    let mut out = Vec::with_capacity(paths.len());
+    for raw in paths {
+        if raw.is_empty() {
+            continue;
+        }
+        let path = Path::new(&raw);
+        if !path.exists() {
+            out.push(EntryEnrichment {
+                path: raw,
+                dir_count: None,
+                file_count: None,
+                ai_source: None,
+            });
+            continue;
+        }
+
+        let metadata = match fs::metadata(&raw) {
+            Ok(m) => m,
+            Err(_) => {
+                out.push(EntryEnrichment {
+                    path: raw,
+                    dir_count: None,
+                    file_count: None,
+                    ai_source: None,
+                });
+                continue;
+            }
+        };
+
+        if metadata.is_dir() {
+            let (dir_count, file_count) = count_children(path);
+            out.push(EntryEnrichment {
+                path: raw,
+                dir_count: Some(dir_count),
+                file_count: Some(file_count),
+                ai_source: None,
+            });
+        } else if metadata.is_file() {
+            let ai_source = quick_ai_source(&raw);
+            out.push(EntryEnrichment {
+                path: raw,
+                dir_count: None,
+                file_count: None,
+                ai_source,
+            });
+        } else {
+            out.push(EntryEnrichment {
+                path: raw,
+                dir_count: None,
+                file_count: None,
+                ai_source: None,
             });
         }
     }
-    Ok(drives)
+    Ok(out)
+}
+
+fn count_children(path: &Path) -> (u32, u32) {
+    let read_dir = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(_) => return (0, 0),
+    };
+    let mut dc = 0u32;
+    let mut fc = 0u32;
+    for entry in read_dir.flatten() {
+        if let Ok(meta) = entry.metadata() {
+            if meta.is_dir() {
+                dc += 1;
+            } else if meta.is_file() {
+                fc += 1;
+            }
+        }
+    }
+    (dc, fc)
+}
+
+fn quick_ai_source(path: &str) -> Option<String> {
+    let lowered = path.to_lowercase();
+    if lowered.contains("comfyui") {
+        Some("ComfyUI".to_string())
+    } else if lowered.contains("midjourney") {
+        Some("Midjourney".to_string())
+    } else if lowered.contains("stable_diffusion") || lowered.contains("stablediffusion") {
+        Some("Stable Diffusion".to_string())
+    } else if lowered.contains("dall-e") || lowered.contains("dalle") {
+        Some("DALL-E".to_string())
+    } else {
+        None
+    }
 }
 
 /// Получить список mount points (Unix)
 #[cfg(target_family = "unix")]
 #[command]
 pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
-    let mount_paths = vec![
-        "/".to_string(),
-        "/media".to_string(),
-        "/mnt".to_string(),
-        "/Volumes".to_string(),
-        "/run/media".to_string(),
-    ];
-    let drives = mount_paths
-        .into_iter()
-        .filter(|p| Path::new(p).exists())
-        .map(|p| {
-            let is_rem = p.contains("media") || p.contains("Volumes") || p == "/mnt";
-            DriveInfo {
-                name: p.clone(),
-                path: p,
-                total_space: 0,
-                free_space: 0,
-                is_removable: is_rem,
-            }
-        })
-        .collect();
+    let mut drives = vec![DriveInfo {
+        name: "/".to_string(),
+        path: "/".to_string(),
+        total_space: 0,
+        free_space: 0,
+        is_removable: false,
+    }];
+
+    collect_unix_mounts("/Volumes", 1, true, &mut drives);
+    collect_unix_mounts("/media", 2, true, &mut drives);
+    collect_unix_mounts("/run/media", 2, true, &mut drives);
+    collect_unix_mounts("/mnt", 2, true, &mut drives);
+
+    drives.sort_by(|a, b| {
+        if a.path == "/" {
+            std::cmp::Ordering::Less
+        } else if b.path == "/" {
+            std::cmp::Ordering::Greater
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+    drives.dedup_by(|a, b| a.path == b.path);
+
     Ok(drives)
+}
+
+#[cfg(target_family = "unix")]
+fn collect_unix_mounts(
+    base_path: &str,
+    depth: usize,
+    is_removable: bool,
+    drives: &mut Vec<DriveInfo>,
+) {
+    let base = Path::new(base_path);
+    if !base.exists() || !base.is_dir() {
+        return;
+    }
+
+    collect_unix_mount_entries(base, depth, is_removable, drives);
+}
+
+#[cfg(target_family = "unix")]
+fn collect_unix_mount_entries(
+    dir: &Path,
+    depth: usize,
+    is_removable: bool,
+    drives: &mut Vec<DriveInfo>,
+) {
+    if depth == 0 {
+        return;
+    }
+
+    let read_dir = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let path_str = path.to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| path_str.clone());
+
+        drives.push(DriveInfo {
+            name,
+            path: path_str,
+            total_space: 0,
+            free_space: 0,
+            is_removable,
+        });
+
+        collect_unix_mount_entries(&path, depth - 1, is_removable, drives);
+    }
 }
 
 #[cfg(not(any(target_os = "windows", target_family = "unix")))]
 #[command]
 pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
     Ok(Vec::new())
+}
+
+#[cfg(target_os = "windows")]
+mod win32_imports {
+    #![allow(non_camel_case_types, non_snake_case, unused)]
+
+    pub const DRIVE_REMOVABLE: u32 = 2;
+    pub const DRIVE_FIXED: u32 = 3;
+    pub const DRIVE_REMOTE: u32 = 4;
+    pub const DRIVE_CDROM: u32 = 5;
+    pub const DRIVE_RAMDISK: u32 = 6;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        pub fn GetLogicalDriveStringsW(nBufferLength: u32, lpBuffer: *mut u16) -> u32;
+        pub fn GetDriveTypeW(lpRootPathName: *const u16) -> u32;
+        pub fn GetDiskFreeSpaceExW(
+            lpDirectoryName: *const u16,
+            lpFreeBytesAvailableToCaller: *mut u64,
+            lpTotalNumberOfBytes: *mut u64,
+            lpTotalNumberOfFreeBytes: *mut u64,
+        ) -> i32;
+    }
 }
 
 /// Получить информацию о файле
@@ -257,8 +463,7 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
         .ok()
         .and_then(|t| {
             let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
-            chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
-                .map(|dt| dt.to_rfc3339())
+            chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0).map(|dt| dt.to_rfc3339())
         })
         .unwrap_or_default();
 
@@ -292,7 +497,13 @@ pub fn get_file_entry(path: String) -> Result<FileEntry, String> {
 
     let ai_source = if is_file {
         match crate::module4_backend::detect_ai_source(file_path.to_string_lossy().to_string()) {
-            Ok(src) => if src == "Unknown" { None } else { Some(src) },
+            Ok(src) => {
+                if src == "Unknown" {
+                    None
+                } else {
+                    Some(src)
+                }
+            }
             Err(_) => None,
         }
     } else {
@@ -355,11 +566,14 @@ pub async fn get_explorer_thumbnail(path: String, size: u32) -> Result<String, S
 
         // --- 3. Кеш холодный — декодируем и масштабируем ---
         let p = Path::new(&path_clone);
-        let is_raw = crate::t_libraw::is_tiff_path(&path_clone) ||
-            p.extension()
+        let is_raw = crate::t_libraw::is_tiff_path(&path_clone)
+            || p.extension()
                 .map(|e| e.to_string_lossy().to_lowercase())
                 .map(|ext| {
-                    matches!(ext.as_str(), "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf")
+                    matches!(
+                        ext.as_str(),
+                        "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf"
+                    )
                 })
                 .unwrap_or(false);
 
@@ -409,7 +623,9 @@ fn get_file_resolution(path: &Path, extension: Option<&str>) -> Option<Resolutio
     None
 }
 
-static GLOBAL_WATCHER: std::sync::OnceLock<std::sync::Mutex<Option<(String, notify::RecommendedWatcher)>>> = std::sync::OnceLock::new();
+static GLOBAL_WATCHER: std::sync::OnceLock<
+    std::sync::Mutex<Option<(String, notify::RecommendedWatcher)>>,
+> = std::sync::OnceLock::new();
 
 fn get_global_watcher() -> &'static std::sync::Mutex<Option<(String, notify::RecommendedWatcher)>> {
     GLOBAL_WATCHER.get_or_init(|| std::sync::Mutex::new(None))
@@ -435,18 +651,21 @@ pub fn watch_directory(app: tauri::AppHandle, path: String) -> Result<(), String
     let app_clone = app.clone();
 
     // Создаем новый вотчер
-    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-        if let Ok(event) = res {
-            // Если произошло изменение (создание, удаление, изменение файлов)
-            if event.kind.is_create() || event.kind.is_remove() || event.kind.is_modify() {
-                use tauri::Emitter;
-                let _ = app_clone.emit("directory-changed", path_clone.clone());
+    let mut watcher =
+        notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+            if let Ok(event) = res {
+                // Если произошло изменение (создание, удаление, изменение файлов)
+                if event.kind.is_create() || event.kind.is_remove() || event.kind.is_modify() {
+                    use tauri::Emitter;
+                    let _ = app_clone.emit("directory-changed", path_clone.clone());
+                }
             }
-        }
-    }).map_err(|e| format!("Failed to create watcher: {}", e))?;
+        })
+        .map_err(|e| format!("Failed to create watcher: {}", e))?;
 
     // Начинаем отслеживание папки (нерекурсивно)
-    watcher.watch(Path::new(&path), notify::RecursiveMode::NonRecursive)
+    watcher
+        .watch(Path::new(&path), notify::RecursiveMode::NonRecursive)
         .map_err(|e| format!("Failed to watch directory: {}", e))?;
 
     // Сохраняем вотчер

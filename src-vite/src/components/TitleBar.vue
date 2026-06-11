@@ -1,10 +1,9 @@
 <template>
-
   <!-- Custom Title Bar -->
-  <div 
+  <div
     :class="[
       'w-full flex items-center justify-between select-none cursor-default',
-      viewName==='ImageViewer' ? 'h-12' : 'h-10',
+      viewName === 'ImageViewer' ? 'h-12' : 'h-10',
     ]"
     @contextmenu.prevent
     data-tauri-drag-region
@@ -12,24 +11,24 @@
     <!-- Title Name -->
     <!-- Icon & Title Container -->
     <div v-if="isMac" class="flex-1" data-tauri-drag-region></div>
-    <div 
+    <div
       :class="[
         'flex items-center overflow-hidden',
         showDesktopWindowControls ? 'ml-2' : '',
-        isMac ? 'justify-center text-center' : ''
+        isMac ? 'justify-center text-center' : '',
       ]"
       data-tauri-drag-region
     >
       <!-- Icon -->
-      <img 
-        v-if="icon" 
-        :src="icon" 
-        class="w-5 h-5 mr-2 select-none rounded" 
-        data-tauri-drag-region 
+      <img
+        v-if="icon"
+        :src="icon"
+        class="w-5 h-5 mr-2 select-none rounded"
+        data-tauri-drag-region
       />
-      
+
       <!-- Title Name -->
-      <span 
+      <span
         class="text-nowrap text-base-content/70 overflow-hidden whitespace-pre text-ellipsis"
         data-tauri-drag-region
       >
@@ -40,49 +39,52 @@
 
     <!-- Center Slot -->
     <div
-      :class="[
-        isMac ? 'hidden' : 'flex-1 flex items-center justify-center'
-      ]"
+      :class="[isMac ? 'hidden' : 'flex-1 flex items-center justify-center']"
       data-tauri-drag-region
     >
       <slot></slot>
     </div>
 
     <!-- Window Control Buttons -->
-    <div v-if="showDesktopWindowControls" class="h-10 mb-auto flex items-center" @mousedown.stop>
-      <IconWinMinus v-if="resizable" 
-        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-base-100 transition-colors duration-300" 
-        @click.stop="minimizeWindow" 
+    <div
+      v-if="showDesktopWindowControls"
+      class="h-10 mb-auto flex items-center"
+      @mousedown.stop
+    >
+      <IconWinMinus
+        v-if="resizable"
+        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-base-100 transition-colors duration-300"
+        @click.stop="minimizeWindow"
       />
-      <component v-if="resizable" :is="isMaximized ? IconWinRestore : IconWinMaximize" 
-        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-base-100 transition-colors duration-300" 
-        @click.stop="toggleMaximizeWindow" 
+      <component
+        v-if="resizable"
+        :is="isMaximized ? IconWinRestore : IconWinMaximize"
+        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-base-100 transition-colors duration-300"
+        @click.stop="toggleMaximizeWindow"
       />
-      <IconClose 
-        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-red-500 transition-colors duration-300" 
+      <IconClose
+        class="p-3 w-12 h-full text-base-content/70 hover:text-base-content hover:bg-red-500 transition-colors duration-300"
         @mousedown.stop="closeWindow"
-        @click.stop="closeWindow" 
+        @click.stop="closeWindow"
       />
     </div>
-
   </div>
-
 </template>
 
 <script setup>
+import { ref, watch } from "vue";
+import { emit } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isTauri } from "@tauri-apps/api/core";
+import { isWin, isMac, isLinux } from "@/common/utils";
+import { useRouter } from "vue-router";
 
-import { ref, watch } from 'vue';
-import { emit } from '@tauri-apps/api/event';
-import { getCurrentWindow  } from '@tauri-apps/api/window';
-import { isWin, isMac, isLinux } from '@/common/utils';
-import { useRouter } from 'vue-router';
-
-import { 
+import {
   IconWinMinus,
   IconWinMaximize,
   IconWinRestore,
-  IconClose 
-} from '@/common/icons';
+  IconClose,
+} from "@/common/icons";
 
 const router = useRouter();
 
@@ -101,33 +103,37 @@ const props = defineProps({
   },
   icon: {
     type: String,
-    default: '',
-  }
+    default: "",
+  },
 });
 
-const searchValue = ref('');
+const searchValue = ref("");
 
 let appWindow;
 try {
   appWindow = getCurrentWindow();
 } catch (e) {
   appWindow = {
-    minimize: () => console.log('minimize'),
+    minimize: () => console.log("minimize"),
     isMaximized: () => Promise.resolve(false),
-    maximize: () => console.log('maximize'),
-    unmaximize: () => console.log('unmaximize'),
-    close: () => console.log('close'),
+    maximize: () => console.log("maximize"),
+    unmaximize: () => console.log("unmaximize"),
+    close: () => console.log("close"),
   };
 }
 const isMaximized = ref(false);
 const showDesktopWindowControls = isWin || isLinux;
-// Detect if running inside Tauri
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-watch(() => searchValue.value, (newValue) => { 
-  console.log('searchValue:', newValue);
-  emit('message-from-titlebar', { message: 'search', search: searchValue.value });
-});
+watch(
+  () => searchValue.value,
+  (newValue) => {
+    console.log("searchValue:", newValue);
+    emit("message-from-titlebar", {
+      message: "search",
+      search: searchValue.value,
+    });
+  },
+);
 
 // drag window
 // const onMousedown = (e) => {
@@ -153,7 +159,7 @@ const toggleMaximizeWindow = () => {
 };
 
 const closeWindow = () => {
-  if (props.viewName === 'Home') {
+  if (props.viewName === "Home") {
     if (isTauri) {
       appWindow.close();
     } else {
@@ -163,11 +169,10 @@ const closeWindow = () => {
     if (window.history.length > 1) {
       router.go(-1);
     } else {
-      router.push('/');
+      router.push("/");
     }
   }
 };
-
 </script>
 
 <style>

@@ -98,12 +98,9 @@ import { useI18n } from 'vue-i18n';
 import { getPackageInfo, getBuildTime } from '@/common/api';
 import { useAppUpdater } from '@/common/updater';
 import { IconGithub, IconLink, IconLock, IconFocus } from '@/common/icons';
-import { getAssetSrc } from '@/common/utils';
 import iconLogo from '@/assets/images/icon.png';
 
-const logoSrc = computed(() => {
-  return getAssetSrc('D:\\NovaLAP\\icon.png') || iconLogo;
-});
+const logoSrc = computed(() => iconLogo);
 
 const packageInfo = ref<any>({
   name: '',

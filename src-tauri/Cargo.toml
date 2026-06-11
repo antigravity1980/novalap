@@ -78,6 +78,12 @@ notify = "6.1.1"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
-default = ["custom-protocol"]
+default = ["custom-protocol", "media"]
 custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]
+
+# Media: отвечает за модули, которые занимают много CPU при старте приложения.
+# - image / jpeg / jxl / lens / libraw — декодирование превью
+# - video / heif — метаданные и эскизы видео / HEIC
+# Отключив фичу, можно ускорить холодный старт на больших библиотеках.
+media = []

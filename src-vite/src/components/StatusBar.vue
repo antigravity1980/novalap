@@ -6,52 +6,115 @@
     >
       <div class="flex items-center shink-0">
         <IconFileSearch class="t-icon-size-xs mr-1" />
-        <span v-if="selectedItemIndex >= 0">{{ (selectedItemIndex + 1).toLocaleString() + '/' }}</span>
-        <span>{{ $t('statusbar.files_summary', { count: totalFileCount.toLocaleString(), size: formatFileSize(totalFileSize) }) }}</span>
+        <span v-if="selectedItemIndex >= 0">{{
+          (selectedItemIndex + 1).toLocaleString() + "/"
+        }}</span>
+        <span>{{
+          $t("statusbar.files_summary", {
+            count: totalFileCount.toLocaleString(),
+            size: formatFileSize(totalFileSize),
+          })
+        }}</span>
       </div>
 
       <template v-if="selectedItemIndex >= 0 && hasRealSelectedFile">
         <div class="flex items-center gap-1 shink-0">
-          <component :is="selectMode ? IconCheckAll : IconChecked" class="t-icon-size-xs" />
+          <component
+            :is="selectMode ? IconCheckAll : IconChecked"
+            class="t-icon-size-xs"
+          />
           <span>
-            {{ selectMode
-              ? $t('toolbar.filter.select_count', { count: selectedCount.toLocaleString() }) + ' (' + formatFileSize(selectedSize) + ')'
-              : shortenFilename(currentFile?.name, 32) + ' (' + formatFileSize(currentFile?.size || 0) + ')'
+            {{
+              selectMode
+                ? $t("toolbar.filter.select_count", {
+                    count: selectedCount.toLocaleString(),
+                  }) +
+                  " (" +
+                  formatFileSize(selectedSize) +
+                  ")"
+                : shortenFilename(currentFile?.name, 32) +
+                  " (" +
+                  formatFileSize(currentFile?.size || 0) +
+                  ")"
             }}
           </span>
         </div>
 
         <div class="flex items-center gap-1 shink-0">
-          <component :is="currentFile?.file_type === 1 || currentFile?.file_type === 3 ? IconPhoto : IconVideo" class="t-icon-size-xs" />
-          <span>{{ formatDimensionText(currentFile?.width, currentFile?.height, true) }}</span>
-        </div>
-
-        <div v-if="showFilmStrip || showQuickView || showScale" class="flex items-center gap-1 shink-0">
-          <component :is="imageScale >= 1 ? IconZoomIn : IconZoomOut" class="t-icon-size-xs" />
-          <span>{{ (imageScale * 100).toFixed(0) }}%</span>
-        </div>
-
-        <div v-if="currentFile?.e_model" class="flex items-center gap-1 shink-0">
-          <IconCamera class="t-icon-size-xs" />
-          <span>{{ currentFile?.e_model }} {{ currentFile?.e_lens_model ? ' (' + currentFile?.e_lens_model + ')' : '' }}</span>
+          <component
+            :is="
+              currentFile?.file_type === 1 || currentFile?.file_type === 3
+                ? IconPhoto
+                : IconVideo
+            "
+            class="t-icon-size-xs"
+          />
+          <span>{{
+            formatDimensionText(currentFile?.width, currentFile?.height, true)
+          }}</span>
         </div>
 
         <div
-          v-if="currentFile?.e_focal_length || currentFile?.e_exposure_time || currentFile?.e_f_number || currentFile?.e_iso_speed || currentFile?.e_exposure_bias"
+          v-if="showFilmStrip || showQuickView || showScale"
+          class="flex items-center gap-1 shink-0"
+        >
+          <component
+            :is="imageScale >= 1 ? IconZoomIn : IconZoomOut"
+            class="t-icon-size-xs"
+          />
+          <span>{{ (imageScale * 100).toFixed(0) }}%</span>
+        </div>
+
+        <div
+          v-if="currentFile?.e_model"
+          class="flex items-center gap-1 shink-0"
+        >
+          <IconCamera class="t-icon-size-xs" />
+          <span
+            >{{ currentFile?.e_model }}
+            {{
+              currentFile?.e_lens_model
+                ? " (" + currentFile?.e_lens_model + ")"
+                : ""
+            }}</span
+          >
+        </div>
+
+        <div
+          v-if="
+            currentFile?.e_focal_length ||
+            currentFile?.e_exposure_time ||
+            currentFile?.e_f_number ||
+            currentFile?.e_iso_speed ||
+            currentFile?.e_exposure_bias
+          "
           class="flex items-center gap-1 shink-0"
         >
           <IconCameraAperture class="t-icon-size-xs" />
-          <span>{{ formatCaptureSettings(currentFile?.e_focal_length, currentFile?.e_exposure_time, currentFile?.e_f_number, currentFile?.e_iso_speed, currentFile?.e_exposure_bias) }}</span>
+          <span>{{
+            formatCaptureSettings(
+              currentFile?.e_focal_length,
+              currentFile?.e_exposure_time,
+              currentFile?.e_f_number,
+              currentFile?.e_iso_speed,
+              currentFile?.e_exposure_bias,
+            )
+          }}</span>
         </div>
 
-        <div v-if="currentFile?.geo_name" class="flex items-center gap-1 shink-0">
+        <div
+          v-if="currentFile?.geo_name"
+          class="flex items-center gap-1 shink-0"
+        >
           <IconLocation class="t-icon-size-xs" />
           <span>{{ currentFile?.geo_name }}</span>
         </div>
 
         <div class="flex items-center gap-1 shink-0">
           <IconClock class="t-icon-size-xs" />
-          <span>{{ formatTimestamp(currentFile?.taken_date, $t('format.date_time')) }}</span>
+          <span>{{
+            formatTimestamp(currentFile?.taken_date, $t("format.date_time"))
+          }}</span>
         </div>
       </template>
     </div>
@@ -59,21 +122,44 @@
       v-if="showUpdateIcon"
       class="absolute right-1 shrink-0 px-1 py-1 flex items-center gap-1 rounded-full bg-base-300 text-primary/70 text-[11px] font-mono"
     >
-      <component :is="updateIconComponent" class="t-icon-size-xs shrink-0" :class="{ 'animate-spin': isUpdateAnimating }" />
+      <component
+        :is="updateIconComponent"
+        class="t-icon-size-xs shrink-0"
+        :class="{ 'animate-spin': isUpdateAnimating }"
+      />
       <span v-if="scanText" class="truncate text-right">{{ scanText }}</span>
+    </div>
+    <div
+      v-if="enrichTotal > 0 || compareStackSize > 0"
+      class="absolute right-1 top-1 shrink-0 px-1.5 py-0.5 flex items-center gap-2 rounded-full bg-base-200/80 text-base-content/80 text-[10px] font-mono"
+      :class="{ 'top-6': showUpdateIcon }"
+    >
+      <span
+        v-if="enrichTotal > 0"
+        class="flex items-center gap-1"
+        :title="$t('statusbar.enriching') || 'считаю…'"
+      >
+        <span
+          class="inline-block w-2 h-2 rounded-full border border-primary border-t-transparent animate-spin"
+        ></span>
+        enriching {{ enrichTotal }}
+      </span>
+      <span v-if="compareStackSize > 0" class="flex items-center gap-1">
+        ⚖️ compare {{ compareStackSize }}/6
+      </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 import {
   formatFileSize,
   shortenFilename,
   formatDimensionText,
   formatCaptureSettings,
   formatTimestamp,
-} from '@/common/utils';
+} from "@/common/utils";
 import {
   IconCheckAll,
   IconChecked,
@@ -88,7 +174,7 @@ import {
   IconZoomOut,
   IconUpdate,
   IconUpdateDot,
-} from '@/common/icons';
+} from "@/common/icons";
 
 const props = defineProps({
   fileList: {
@@ -152,20 +238,30 @@ const props = defineProps({
     default: false,
   },
   updateIcon: {
-    type: String as () => 'update' | 'dot',
-    default: 'update',
+    type: String as () => "update" | "dot",
+    default: "update",
   },
   scanText: {
     type: String,
-    default: '',
+    default: "",
+  },
+  enrichTotal: {
+    type: Number,
+    default: 0,
+  },
+  compareStackSize: {
+    type: Number,
+    default: 0,
   },
 });
 
 const updateIconComponent = computed(() =>
-  props.updateIcon === 'dot' ? IconUpdateDot : IconUpdate
+  props.updateIcon === "dot" ? IconUpdateDot : IconUpdate,
 );
 
-const hasData = computed(() => props.fileList.length > 0 || !!props.selectedFile);
+const hasData = computed(
+  () => props.fileList.length > 0 || !!props.selectedFile,
+);
 const currentFile = computed(() => {
   if (props.selectedFile) return props.selectedFile;
   return props.fileList[props.selectedItemIndex];
@@ -175,7 +271,8 @@ const hasRealSelectedFile = computed(() => {
   return !!file && !file.isPlaceholder;
 });
 const containerClass = computed(() => {
-  const base = 'px-2 h-8 flex items-center justify-between text-sm cursor-default bg-base-300/80 backdrop-blur-md';
+  const base =
+    "px-2 h-8 flex items-center justify-between text-sm cursor-default bg-base-300/80 backdrop-blur-md";
   if (props.isEmbedded) return base;
   return `${base} absolute bottom-0 left-0 right-0 z-30`;
 });

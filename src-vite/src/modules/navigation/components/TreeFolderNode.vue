@@ -54,6 +54,7 @@
         placeholder="Имя папки"
         @keydown.enter.prevent="confirmNewFolder"
         @keydown.escape="cancelNewFolder"
+        @blur="confirmNewFolder"
       />
       <button
         class="px-2 py-1 text-xs bg-primary/20 hover:bg-primary/30 rounded border border-primary/30"
@@ -77,9 +78,23 @@ import { useNavigationStore } from '../store'
 import { useClipboardStore } from '../stores/clipboardStore'
 import { useGalleryStore } from '../../gallery/store'
 import { useConfigStore } from '@/stores/configStore'
-import { getAssetSrc } from '@/common/utils'
 import { invoke } from '@tauri-apps/api/core'
 import ContextMenu from '@/components/ContextMenu.vue'
+import icon01 from '@/assets/folder-icons/01.ico'
+import icon02 from '@/assets/folder-icons/02.ico'
+import icon03 from '@/assets/folder-icons/03.ico'
+import icon04 from '@/assets/folder-icons/04.ico'
+import icon05 from '@/assets/folder-icons/05.ico'
+import icon06 from '@/assets/folder-icons/06.ico'
+import icon07 from '@/assets/folder-icons/07.ico'
+import icon08 from '@/assets/folder-icons/08.ico'
+import icon09 from '@/assets/folder-icons/09.ico'
+import icon10 from '@/assets/folder-icons/10.ico'
+import icon11 from '@/assets/folder-icons/11.ico'
+import icon12 from '@/assets/folder-icons/12.ico'
+import icon14 from '@/assets/folder-icons/14.ico'
+import icon15 from '@/assets/folder-icons/15.ico'
+import iconI1 from '@/assets/folder-icons/I1.ico'
 
 const props = defineProps({
   folder: { type: Object, required: true },
@@ -101,6 +116,22 @@ const dragOverFolderPath = ref('')
 const showNewFolderInput = ref(false)
 const newFolderName = ref('')
 const newFolderInputRef = ref(null)
+const isPendingInlineRename = computed(() => navigationStore.pendingTreeRenamePath === props.folder.path)
+
+watch(isPendingInlineRename, (shouldRename) => {
+  if (!shouldRename) return
+  showNewFolderInput.value = false
+  newFolderName.value = props.folder.name
+  nextTick(() => {
+    navigationStore.pendingTreeRenamePath = ''
+    contextMenuRef.value?.close?.()
+    const input = newFolderInputRef.value
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  })
+})
 
 async function handleFolderDrop(e, destPath) {
   dragOverFolderPath.value = ''
@@ -127,13 +158,45 @@ async function handleFolderDrop(e, destPath) {
   }
 }
 
+const FOLDER_ICON_URLS = {
+  '01.ico': icon01,
+  '02.ico': icon02,
+  '03.ico': icon03,
+  '04.ico': icon04,
+  '05.ico': icon05,
+  '06.ico': icon06,
+  '07.ico': icon07,
+  '08.ico': icon08,
+  '09.ico': icon09,
+  '10.ico': icon10,
+  '11.ico': icon11,
+  '12.ico': icon12,
+  '14.ico': icon14,
+  '15.ico': icon15,
+  'I1.ico': iconI1,
+}
+
+const FOLDER_ICON_MENU_ITEMS = [
+  { iconName: null, iconUrl: FOLDER_ICON_URLS['14.ico'], tooltip: 'По умолчанию' },
+  { iconName: 'I1.ico', iconUrl: FOLDER_ICON_URLS['I1.ico'], tooltip: 'Важная (Звезда)' },
+  { iconName: '01.ico', iconUrl: FOLDER_ICON_URLS['01.ico'], tooltip: 'Папка 01' },
+  { iconName: '02.ico', iconUrl: FOLDER_ICON_URLS['02.ico'], tooltip: 'Папка 02' },
+  { iconName: '03.ico', iconUrl: FOLDER_ICON_URLS['03.ico'], tooltip: 'Папка 03' },
+  { iconName: '04.ico', iconUrl: FOLDER_ICON_URLS['04.ico'], tooltip: 'Папка 04' },
+  { iconName: '05.ico', iconUrl: FOLDER_ICON_URLS['05.ico'], tooltip: 'Папка 05' },
+  { iconName: '06.ico', iconUrl: FOLDER_ICON_URLS['06.ico'], tooltip: 'Папка 06' },
+  { iconName: '07.ico', iconUrl: FOLDER_ICON_URLS['07.ico'], tooltip: 'Папка 07' },
+  { iconName: '08.ico', iconUrl: FOLDER_ICON_URLS['08.ico'], tooltip: 'Папка 08' },
+  { iconName: '09.ico', iconUrl: FOLDER_ICON_URLS['09.ico'], tooltip: 'Папка 09' },
+  { iconName: '10.ico', iconUrl: FOLDER_ICON_URLS['10.ico'], tooltip: 'Папка 10' },
+  { iconName: '11.ico', iconUrl: FOLDER_ICON_URLS['11.ico'], tooltip: 'Папка 11' },
+  { iconName: '12.ico', iconUrl: FOLDER_ICON_URLS['12.ico'], tooltip: 'Папка 12' },
+  { iconName: '15.ico', iconUrl: FOLDER_ICON_URLS['15.ico'], tooltip: 'Папка 15' },
+]
+
 const folderIconUrl = computed(() => {
   const customIcon = configStore.folderIcons?.[props.folder.path]
-  if (customIcon) {
-    return getAssetSrc(`D:\\NovaLAP\\Folder\\${customIcon}`)
-  }
-  const defaultIcon = '14.ico'
-  return getAssetSrc(`D:\\NovaLAP\\Folder\\${defaultIcon}`)
+  return FOLDER_ICON_URLS[customIcon] || FOLDER_ICON_URLS['14.ico']
 })
 
 const recolorMenuItems = computed(() => {
@@ -153,23 +216,11 @@ const recolorMenuItems = computed(() => {
     {
       label: 'Перекрасить папку',
       grid: true,
-      children: [
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\14.ico'), tooltip: 'По умолчанию', action: () => setFolderIcon(null) },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\I1.ico'), tooltip: 'Важная (Звезда)', action: () => setFolderIcon('I1.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\01.ico'), tooltip: 'Папка 01', action: () => setFolderIcon('01.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\02.ico'), tooltip: 'Папка 02', action: () => setFolderIcon('02.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\03.ico'), tooltip: 'Папка 03', action: () => setFolderIcon('03.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\04.ico'), tooltip: 'Папка 04', action: () => setFolderIcon('04.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\05.ico'), tooltip: 'Папка 05', action: () => setFolderIcon('05.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\06.ico'), tooltip: 'Папка 06', action: () => setFolderIcon('06.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\07.ico'), tooltip: 'Папка 07', action: () => setFolderIcon('07.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\08.ico'), tooltip: 'Папка 08', action: () => setFolderIcon('08.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\09.ico'), tooltip: 'Папка 09', action: () => setFolderIcon('09.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\10.ico'), tooltip: 'Папка 10', action: () => setFolderIcon('10.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\11.ico'), tooltip: 'Папка 11', action: () => setFolderIcon('11.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\12.ico'), tooltip: 'Папка 12', action: () => setFolderIcon('12.ico') },
-        { iconUrl: getAssetSrc('D:\\NovaLAP\\Folder\\15.ico'), tooltip: 'Папка 15', action: () => setFolderIcon('15.ico') },
-      ]
+      children: FOLDER_ICON_MENU_ITEMS.map(({ iconName, iconUrl, tooltip }) => ({
+        iconUrl,
+        tooltip,
+        action: () => setFolderIcon(iconName)
+      }))
     },
     {
       label: '-',

@@ -26,15 +26,13 @@
       }
     ],
     "security": {
-      "capabilities": [
-        "default"
-      ],
+      "capabilities": ["default"],
       "assetProtocol": {
         "enable": true,
         "scope": [
           "$HOME/**",
-          "$PICTURES/**",
-          "$VIDEOS/**",
+          "$PICTURE/**",
+          "$VIDEO/**",
           "$DOCUMENT/**",
           "$DESKTOP/**",
           "$DOWNLOAD/**",
@@ -43,12 +41,7 @@
           "/media/**",
           "/mnt/**",
           "/run/media/**",
-          "C:\\**",
-          "D:\\**",
-          "E:\\**",
-          "F:\\**",
-          "G:\\**",
-          "H:\\**"
+          "*:/**"
         ]
       }
     }
@@ -58,11 +51,7 @@
     "category": "Graphics and Design",
     "targets": "all",
     "createUpdaterArtifacts": true,
-    "icon": [
-      "icons/icon.png",
-      "icons/icon.ico",
-      "icons/icon.icns"
-    ],
+    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
     "resources": {}
   },
   "plugins": {

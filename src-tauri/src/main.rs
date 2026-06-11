@@ -13,7 +13,8 @@
 use tauri::Manager;
 use tauri_plugin_aptabase::EventTracker;
 
-mod t_storage;
+mod module1_navigation;
+mod module4_backend;
 mod t_ai;
 mod t_cluster;
 mod t_cmds;
@@ -21,23 +22,28 @@ mod t_common;
 mod t_config;
 mod t_dedup;
 mod t_face;
-mod t_image;
-#[cfg(all(not(target_os = "macos"), lap_has_libheif))]
+#[cfg(feature = "media")]
 mod t_heif;
+mod t_http;
+#[cfg(feature = "media")]
+mod t_image;
+#[cfg(feature = "media")]
 mod t_jpeg;
+#[cfg(feature = "media")]
 mod t_jxl;
+#[cfg(feature = "media")]
 mod t_lens;
+#[cfg(feature = "media")]
 mod t_libraw;
 mod t_menu;
 mod t_migration;
 mod t_pasteboard;
 mod t_protocol;
 mod t_sqlite;
+mod t_storage;
 mod t_utils;
-mod t_http;
 mod t_video;
-mod module1_navigation;
-mod module4_backend;
+mod t_http;
 
 /// The main function is the entry point for the Tauri application.
 #[tokio::main]
@@ -206,6 +212,7 @@ async fn main() {
             module1_navigation::cross_copy,
             module1_navigation::cross_move,
             module1_navigation::mkdir_folder,
+            module1_navigation::enrich_entries,
             module1_navigation::delete_file_system,
             module1_navigation::open_in_explorer,
             // Module 4: AI Parsing & Batch Operations

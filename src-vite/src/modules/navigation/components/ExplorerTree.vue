@@ -85,6 +85,18 @@ import { invoke } from '@tauri-apps/api/core'
 import TreeFolderNode from './TreeFolderNode.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 
+function buildNewFolderEntry(path) {
+  const normalizedPath = path.replace(/[\\/]+$/, '')
+  const lastSlash = Math.max(normalizedPath.lastIndexOf('\\'), normalizedPath.lastIndexOf('/'))
+  const name = lastSlash >= 0 ? normalizedPath.substring(lastSlash + 1) : normalizedPath
+  return {
+    name,
+    path,
+    is_dir: true,
+    has_subfolders: false,
+  }
+}
+
 const navigationStore = useNavigationStore()
 const clipboardStore = useClipboardStore()
 const galleryStore = useGalleryStore()
@@ -153,13 +165,13 @@ function handleEmptySpaceContextMenu(e) {
 async function createFolderInCurrentDir() {
   if (!navigationStore.currentPath) return
   const separator = navigationStore.currentPath.includes('/') ? '/' : '\\'
-  
+
   let name = 'Новая папка'
   let counter = 1
   const checkNameExists = (n) => {
     return navigationStore.folders.some(f => f.name.toLowerCase() === n.toLowerCase())
   }
-  
+
   while (checkNameExists(name)) {
     counter++
     name = `Новая папка (${counter})`
@@ -168,14 +180,33 @@ async function createFolderInCurrentDir() {
   const newPath = navigationStore.currentPath.endsWith(separator)
     ? navigationStore.currentPath + name
     : navigationStore.currentPath + separator + name
-  
+
   try {
     await invoke('mkdir_folder', { path: newPath })
-    await navigationStore.refreshTreeFolder(navigationStore.currentPath)
+
+    const newFolder = {
+      name,
+      path: newPath,
+      is_dir: true,
+      is_file: false,
+      size: 0,
+      modified: new Date().toISOString(),
+      created: new Date().toISOString(),
+      extension: null,
+      resolution: null,
+      dir_count: 0,
+      file_count: 0,
+      ai_source: null,
+    }
+
+    navigationStore.folders = [newFolder, ...navigationStore.folders.filter(f => f.path !== newPath)]
+    galleryStore.upsertFile(newFolder, { pinToTop: true })
+
+    const treeEntry = buildNewFolderEntry(newPath)
+    const currentChildren = navigationStore.treeFolders[navigationStore.currentPath] || []
+    navigationStore.treeFolders[navigationStore.currentPath] = [treeEntry, ...currentChildren.filter(f => f.path !== newPath)]
     expandedNodes[navigationStore.currentPath] = true
-    
-    await navigationStore.navigateTo(navigationStore.currentPath)
-    galleryStore.setFiles(navigationStore.folders)
+    navigationStore.pendingTreeRenamePath = newPath
     galleryStore.renamingPath = newPath
   } catch (err) {
     console.error('Failed to create folder from sidebar tree:', err)
@@ -189,7 +220,7 @@ async function handlePasteInCurrentDir() {
     await clipboardStore.paste(destPath)
     await navigationStore.refreshTreeFolder(destPath)
     expandedNodes[destPath] = true
-    
+
     if (clipboardStore.mode === 'cut' && clipboardStore.items.length) {
       for (const src of clipboardStore.items) {
         const parentSrc = src.substring(0, src.lastIndexOf('\\'))
@@ -198,7 +229,7 @@ async function handlePasteInCurrentDir() {
         }
       }
     }
-    
+
     await navigationStore.navigateTo(destPath)
     galleryStore.setFiles(navigationStore.folders)
   } catch (err) {
@@ -224,9 +255,32 @@ async function confirmNewFolderOnDrive() {
       ? currentContextDrivePath.value + name
       : currentContextDrivePath.value + '\\' + name
     await invoke('mkdir_folder', { path: folderPath })
-    // Принудительно перезагружаем кеш диска
-    await navigationStore.refreshTreeFolder(currentContextDrivePath.value)
+
+    const treeEntry = buildNewFolderEntry(folderPath)
+    const currentChildren = navigationStore.treeFolders[currentContextDrivePath.value] || []
+    navigationStore.treeFolders[currentContextDrivePath.value] = [treeEntry, ...currentChildren.filter(f => f.path !== folderPath)]
     expandedNodes[currentContextDrivePath.value] = true
+    navigationStore.pendingTreeRenamePath = folderPath
+
+    if (navigationStore.currentPath === currentContextDrivePath.value) {
+      const newFolder = {
+        name,
+        path: folderPath,
+        is_dir: true,
+        is_file: false,
+        size: 0,
+        modified: new Date().toISOString(),
+        created: new Date().toISOString(),
+        extension: null,
+        resolution: null,
+        dir_count: 0,
+        file_count: 0,
+        ai_source: null,
+      }
+      navigationStore.folders = [newFolder, ...navigationStore.folders.filter(f => f.path !== folderPath)]
+      galleryStore.upsertFile(newFolder, { pinToTop: true })
+      galleryStore.renamingPath = folderPath
+    }
   } catch (err) {
     console.error('Failed to create folder on drive:', err)
   }
