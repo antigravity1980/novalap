@@ -206,6 +206,8 @@ export const useGalleryStore = defineStore("gallery", {
     // Обновляется через $patch / прямое присваивание, реактивность по длине/идентичности.
     files: shallowRef([]),
     filteredFiles: shallowRef([]),
+    isLoading: false,
+    isLoading: false,
 
     // Стек сравнения (выживает между папками)
     compareStack: [], // array of { path, name, extension, is_dir }
@@ -273,8 +275,8 @@ export const useGalleryStore = defineStore("gallery", {
     // Работает только при реальном изменении ссылок или фильтров/сортировки/группировки.
     displayedFiles: (state) => {
       // alias для читаемости + одиночная точка входа
-      const files = state.files;
-      if (!files || files.length === 0) return [];
+      const allFiles = (state.files && state.files.value) ? state.files.value : (state.files || []);
+      if (!allFiles || allFiles.length === 0) return [];
 
       const f = state.filters;
       const hasActiveFilter =
@@ -285,15 +287,15 @@ export const useGalleryStore = defineStore("gallery", {
       const sortBy = state.sortBy;
       const sortOrder = state.sortOrder;
       // Используем копию только когда нужна сортировка/фильтрация
-      let result = hasActiveFilter || hasGrouping ? files.slice() : files;
+      let result = [...allFiles];
 
       if (hasActiveFilter) {
         const q = f.search ? f.search.toLowerCase() : null;
         const fromTime = f.dateFrom ? new Date(f.dateFrom).getTime() : null;
         const toTime = f.dateTo ? new Date(f.dateTo).getTime() : null;
-        result = result.filter((f) => {
-          if (f.format && f.extension !== f.format) return false;
-          if (f.aiSource && f.ai_source !== f.aiSource) return false;
+        result = result.filter((file) => {
+          if (filters.format && file.extension !== filters.format) return false;
+          if (filters.aiSource && file.ai_source !== filters.aiSource) return false;
           if (fromTime != null && (f._modifiedTime || 0) < fromTime)
             return false;
           if (toTime != null && (f._modifiedTime || 0) > toTime) return false;

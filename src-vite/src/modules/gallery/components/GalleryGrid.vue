@@ -1,7 +1,7 @@
 <template>
   <div class="gallery-container w-full h-full relative" @wheel="onWheel">
     <div
-      v-if="galleryStore.isLoading"
+      v-if="navigationStore.isLoading"
       class="flex items-center justify-center h-full"
     >
       <span class="loading loading-spinner loading-lg text-primary"></span>
@@ -66,9 +66,11 @@
 
 <script setup>
 import { useGalleryStore } from "../store";
+import { useNavigationStore } from "../../navigation/store";
 import VirtualScrollGallery from "./VirtualScrollGallery.vue";
 
 const galleryStore = useGalleryStore();
+const navigationStore = useNavigationStore();
 
 const emit = defineEmits(["openQuickLook"]);
 
