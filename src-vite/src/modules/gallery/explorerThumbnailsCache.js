@@ -48,6 +48,15 @@ export function clearCachedThumbnail(filePath) {
 }
 
 /**
+ * Clear cached thumbnail URL by full cache key.
+ * @param {string} cacheKey
+ */
+export function clearCachedThumbnailByKey(cacheKey) {
+  if (!cacheKey) return;
+  _cache.delete(cacheKey);
+}
+
+/**
  * Clear all cached thumbnail URLs.
  * Call this when the user navigates to a new directory.
  */

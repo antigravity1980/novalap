@@ -189,6 +189,7 @@ import { getAssetSrc } from "@/common/utils";
 import {
   getCachedThumbnail,
   setCachedThumbnail,
+  clearCachedThumbnailByKey,
 } from "@/modules/gallery/explorerThumbnailsCache";
 import { useConfigStore } from "@/stores/configStore";
 import { useNavigationStore } from "@/modules/navigation/store";
@@ -322,6 +323,7 @@ async function loadThumbnail() {
 
   const currentPath = props.file.path;
   const cacheKey = `${currentPath}__${props.size}`;
+  clearCachedThumbnailByKey(cacheKey);
 
   // --- 1. Мгновенная загрузка из кеша в памяти ---
   const cached = getCachedThumbnail(cacheKey);
@@ -382,6 +384,7 @@ watch(
     () => props.file.path,
     () => props.size,
     () => uiStore.fileVersions[props.file.path],
+    () => uiStore.thumbnailVersions[props.file.path],
   ],
   loadThumbnail,
   { immediate: true },

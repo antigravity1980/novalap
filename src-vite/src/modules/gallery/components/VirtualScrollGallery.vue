@@ -1,9 +1,8 @@
 <template>
   <div
-    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden relative focus:outline-none"
     ref="containerRef"
+    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden focus:outline-none px-2 py-4"
     tabindex="0"
-    @scroll="onScroll"
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
@@ -13,61 +12,39 @@
     style="user-select: none"
   >
     <div
-      class="virtual-scroll-spacer"
-      :style="{ height: totalHeight + topPadding * 2 + 'px' }"
+      class="grid"
+      :style="{
+        gridTemplateColumns: `repeat(${colsPerRow}, minmax(0, ${thumbnailSize}px))`,
+        gap: galleryStore.thumbnailGap + 'px',
+        alignContent: 'start',
+      }"
     >
-      <!-- Visible items -->
-      <template v-for="row in visibleRows" :key="row.index">
-        <!-- Group Header -->
+      <template v-for="row in renderedRows" :key="row.key">
         <div
           v-if="row.type === 'header'"
-          class="group-header flex items-center justify-between px-4 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
+          class="group-header col-span-full flex items-center justify-between px-4 h-12 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
           @click="onGroupHeaderClick($event, row)"
-          :style="{
-            position: 'absolute',
-            top: row.top + topPadding + 'px',
-            left: '8px',
-            right: '8px',
-            height: row.height + 'px',
-          }"
         >
           <span>{{ row.title }} ({{ row.filePaths.length }})</span>
           <span class="text-[9px] opacity-40 font-normal">выбрать группу</span>
         </div>
 
-        <!-- Row of thumbnails -->
-        <div
-          v-else-if="row.type === 'row'"
-          class="gallery-row flex px-2"
-          :style="{
-            position: 'absolute',
-            top: row.top + topPadding + 'px',
-            left: 0,
-            right: 0,
-            height: row.height + 'px',
-            gap: galleryStore.thumbnailGap + 'px',
-          }"
-        >
-          <ThumbnailCard
-            v-for="file in row.files"
-            :key="file.path"
-            :file="file"
-            :size="thumbnailSize"
-            :selected="galleryStore.selectedIds.includes(file.path)"
-            @click.stop="onCardClick($event, file)"
-            @dblclick.stop="onCardDblClick(file)"
-            class="flex-shrink-0"
-            :style="{ width: thumbnailSize + 'px' }"
-            :data-path="file.path"
-          />
-        </div>
+        <ThumbnailCard
+          v-else
+          :file="row.file"
+          :size="thumbnailSize"
+          :selected="galleryStore.selectedIds.includes(row.file.path)"
+          @click.stop="onCardClick($event, row.file)"
+          @dblclick.stop="onCardDblClick(row.file)"
+          class="shrink-0"
+          :style="{ width: thumbnailSize + 'px' }"
+          :data-path="row.file.path"
+        />
       </template>
     </div>
 
-    <!-- Rubber-band selection rectangle -->
     <div v-if="isDragging" class="rubber-band" :style="rubberBandStyle" />
 
-    <!-- Context menu on empty space -->
     <ContextMenu
       ref="contextMenuRef"
       :menuItems="contextMenuItems"
@@ -78,7 +55,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  reactive,
+  watch,
+  nextTick,
+} from "vue";
 import { useGalleryStore, groupFilesHelper } from "../store";
 import { useNavigationStore } from "../../navigation/store";
 import { invoke } from "@tauri-apps/api/core";
@@ -88,7 +73,6 @@ import ContextMenu from "@/components/ContextMenu.vue";
 const props = defineProps({
   files: { type: Array, default: () => [] },
   thumbnailSize: { type: Number, default: 200 },
-  overscan: { type: Number, default: 3 },
 });
 
 const emit = defineEmits(["openQuickLook"]);
@@ -97,114 +81,59 @@ const galleryStore = useGalleryStore();
 const navigationStore = useNavigationStore();
 const containerRef = ref(null);
 const contextMenuRef = ref(null);
-const scrollTop = ref(0);
-const containerHeight = ref(800);
 const containerWidth = ref(1200);
 const gap = computed(() => galleryStore.thumbnailGap ?? 11);
-const topPadding = 16;
 
-// Row dimensions
-const rowHeight = computed(() => props.thumbnailSize * 0.75 + 64 + gap.value);
 const colsPerRow = computed(() => {
-  const width = containerWidth.value || 1200;
+  const width = Math.max(320, containerWidth.value || 1200);
   return Math.max(
     1,
-    Math.floor((width + gap.value) / (props.thumbnailSize + gap.value)),
+    Math.floor((width - 16 + gap.value) / (props.thumbnailSize + gap.value)),
   );
 });
 
-// Group files into rows/headers
-const rows = computed(() => {
-  const cols = Math.max(1, colsPerRow.value || 1);
-  const result = [];
-
+const renderedRows = computed(() => {
   if (!galleryStore.groupBy || galleryStore.groupBy === "none") {
-    for (let i = 0; i < props.files.length; i += cols) {
-      result.push({
-        type: "row",
-        index: result.length,
-        files: props.files.slice(i, i + cols),
-        height: rowHeight.value,
-      });
-    }
-    return result;
+    return props.files.map((file) => ({
+      type: "file",
+      key: file.path,
+      file,
+    }));
   }
 
-  // Grouping is active
+  const rows = [];
   const groups = groupFilesHelper(props.files, galleryStore.groupBy);
   for (const group of groups) {
-    if (group.files.length === 0) continue;
-
-    result.push({
+    if (!group.files.length) continue;
+    rows.push({
       type: "header",
-      index: result.length,
+      key: `header:${group.title}`,
       title: group.title,
       filePaths: group.files.map((f) => f.path),
-      height: 48,
     });
-
-    for (let i = 0; i < group.files.length; i += cols) {
-      result.push({
-        type: "row",
-        index: result.length,
-        files: group.files.slice(i, i + cols),
-        height: rowHeight.value,
+    for (const file of group.files) {
+      rows.push({
+        type: "file",
+        key: file.path,
+        file,
       });
     }
   }
-  return result;
+  return rows;
 });
 
-const rowsWithTop = computed(() => {
-  let currentTop = 0;
-  return rows.value.map((row) => {
-    const top = currentTop;
-    currentTop += row.height;
-    return {
-      ...row,
-      top,
-    };
-  });
-});
-
-const totalHeight = computed(() => {
-  if (rowsWithTop.value.length === 0) return 0;
-  const last = rowsWithTop.value[rowsWithTop.value.length - 1];
-  return last.top + last.height;
-});
-
-// Visible rows based on scroll position
-const visibleRows = computed(() => {
-  const start = scrollTop.value - props.overscan * rowHeight.value;
-  const end =
-    scrollTop.value + containerHeight.value + props.overscan * rowHeight.value;
-
-  return rowsWithTop.value.filter((row) => {
-    const rowBottom = row.top + row.height;
-    return rowBottom >= start && row.top <= end;
-  });
-});
-
-// ─── Lazy enrichment (counts / AI source) for visible rows ─────────────────
 async function loadEnrichments() {
-  const paths = [];
-  for (const row of visibleRows.value) {
-    if (row.type !== "row") continue;
-    for (const file of row.files) {
-      if (!galleryStore.needsEnrichment(file)) continue;
-      paths.push(file.path);
-    }
-    if (paths.length >= 60) break;
-  }
-  if (paths.length === 0) return;
-  await galleryStore.requestEnrichments(paths);
+  const visibleFiles = props.files.filter((file) =>
+    galleryStore.needsEnrichment(file),
+  );
+  if (visibleFiles.length === 0) return;
+  await galleryStore.requestEnrichments(
+    visibleFiles.slice(0, 60).map((f) => f.path),
+  );
 }
 
-watch(visibleRows, loadEnrichments, { immediate: false });
-watch(() => props.files, loadEnrichments, { immediate: false });
-onMounted(loadEnrichments);
+watch(() => props.files, loadEnrichments, { immediate: true });
 
-// Prime enrichment for the entire current selection (e.g. after Ctrl+A).
 let primeDebounce = null;
 watch(
   () => galleryStore.selectedIds.slice().sort().join("|"),
@@ -217,11 +146,11 @@ watch(
   },
 );
 
-// ─── Rubber-band selection ───────────────────────────────────────────────────
 const isDragging = ref(false);
-const dragStart = reactive({ x: 0, y: 0 }); // relative to container (incl. scroll)
+const dragStart = reactive({ x: 0, y: 0 });
 const dragCurrent = reactive({ x: 0, y: 0 });
 let selectionBeforeDrag = [];
+let cardRects = [];
 
 const rubberBandStyle = computed(() => {
   const left = Math.min(dragStart.x, dragCurrent.x);
@@ -236,35 +165,22 @@ const rubberBandStyle = computed(() => {
   };
 });
 
-let cardRects = [];
-let isCardRectsDirty = true;
-watch([rows, gap, () => props.thumbnailSize], () => {
-  isCardRectsDirty = true;
-});
-
 function cacheCardRects() {
-  cardRects = [];
-  const cols = Math.max(1, colsPerRow.value || 1);
-  let currentTop = 0;
-
-  for (const row of rows.value) {
-    if (row.type === "header") {
-      currentTop += row.height;
-    } else if (row.type === "row") {
-      const rowTop = currentTop + topPadding;
-      row.files.forEach((file, colIndex) => {
-        const px = 8 + colIndex * (props.thumbnailSize + gap.value);
-        cardRects.push({
-          path: file.path,
-          left: px,
-          top: rowTop,
-          right: px + props.thumbnailSize,
-          bottom: rowTop + (props.thumbnailSize * 0.75 + 64),
-        });
-      });
-      currentTop += row.height;
-    }
-  }
+  const container = containerRef.value;
+  if (!container) return;
+  const containerRect = container.getBoundingClientRect();
+  cardRects = Array.from(
+    container.querySelectorAll(".thumbnail-card[data-path]"),
+  ).map((el) => {
+    const rect = el.getBoundingClientRect();
+    return {
+      path: el.dataset.path,
+      left: rect.left - containerRect.left,
+      top: rect.top - containerRect.top + container.scrollTop,
+      right: rect.right - containerRect.left,
+      bottom: rect.bottom - containerRect.top + container.scrollTop,
+    };
+  });
 }
 
 function getFilesInRect(rx1, ry1, rx2, ry2) {
@@ -274,16 +190,14 @@ function getFilesInRect(rx1, ry1, rx2, ry2) {
   const bottom = Math.max(ry1, ry2);
 
   return cardRects
-    .filter((r) => {
-      return (
-        r.right > left && r.left < right && r.bottom > top && r.top < bottom
-      );
-    })
+    .filter(
+      (r) =>
+        r.right > left && r.left < right && r.bottom > top && r.top < bottom,
+    )
     .map((r) => r.path);
 }
 
 function onMouseDown(e) {
-  // Only start rubber-band on the background (not on a card or group header)
   if (e.button !== 0) return;
   const target = e.target;
   if (target.closest(".thumbnail-card") || target.closest(".group-header"))
@@ -291,7 +205,7 @@ function onMouseDown(e) {
 
   const rect = containerRef.value.getBoundingClientRect();
   const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top + scrollTop.value;
+  const y = e.clientY - rect.top + containerRef.value.scrollTop;
 
   cacheCardRects();
 
@@ -301,7 +215,6 @@ function onMouseDown(e) {
   dragCurrent.x = x;
   dragCurrent.y = y;
 
-  // Save current selection for Shift/Ctrl combination (extend)
   if (!e.ctrlKey && !e.shiftKey) {
     galleryStore.clearSelection();
     selectionBeforeDrag = [];
@@ -314,32 +227,24 @@ function onMouseMove(e) {
   if (!isDragging.value) return;
   const rect = containerRef.value.getBoundingClientRect();
   dragCurrent.x = e.clientX - rect.left;
-  dragCurrent.y = e.clientY - rect.top + scrollTop.value;
-
-  // Update selection
+  dragCurrent.y = e.clientY - rect.top + containerRef.value.scrollTop;
   const inRect = getFilesInRect(
     dragStart.x,
     dragStart.y,
     dragCurrent.x,
     dragCurrent.y,
   );
-  const merged = [...new Set([...selectionBeforeDrag, ...inRect])];
-  galleryStore.selectedIds = merged;
+  galleryStore.selectedIds = [...new Set([...selectionBeforeDrag, ...inRect])];
 }
 
-function onMouseUp(e) {
-  if (isDragging.value) {
-    isDragging.value = false;
-  }
+function onMouseUp() {
+  if (isDragging.value) isDragging.value = false;
 }
 
-function onMouseLeave(e) {
-  if (isDragging.value) {
-    isDragging.value = false;
-  }
+function onMouseLeave() {
+  if (isDragging.value) isDragging.value = false;
 }
 
-// ─── Card click with Ctrl/Shift support ─────────────────────────────────────
 const anchorIndex = ref(-1);
 
 function onCardClick(e, file) {
@@ -347,11 +252,9 @@ function onCardClick(e, file) {
   containerRef.value?.focus();
 
   if (galleryStore.selectionMode || e.ctrlKey || e.metaKey) {
-    // Toggle single item
     galleryStore.toggleSelection(file.path);
     anchorIndex.value = clickedIndex;
   } else if (e.shiftKey && galleryStore.selectedIds.length > 0) {
-    // Range selection from anchor to clicked
     if (anchorIndex.value === -1) {
       const lastPath = galleryStore.selectedIds[0];
       anchorIndex.value = props.files.findIndex((f) => f.path === lastPath);
@@ -359,11 +262,11 @@ function onCardClick(e, file) {
     if (anchorIndex.value >= 0 && clickedIndex >= 0) {
       const from = Math.min(anchorIndex.value, clickedIndex);
       const to = Math.max(anchorIndex.value, clickedIndex);
-      const rangeIds = props.files.slice(from, to + 1).map((f) => f.path);
-      galleryStore.selectedIds = rangeIds;
+      galleryStore.selectedIds = props.files
+        .slice(from, to + 1)
+        .map((f) => f.path);
     }
   } else {
-    // Single select (clear others)
     galleryStore.selectedIds = [file.path];
     anchorIndex.value = clickedIndex;
   }
@@ -382,7 +285,6 @@ async function onCardDblClick(file) {
   }
 }
 
-// ─── Context Menu for empty space ──────────────────────────────────────────
 const contextMenuItems = computed(() => {
   const items = [];
   if (galleryStore.clipboard.paths.length > 0) {
@@ -403,7 +305,6 @@ const contextMenuItems = computed(() => {
 });
 
 function handleContextMenu(e) {
-  // Only open empty space menu if not clicking inside a card
   if (e.target.closest(".thumbnail-card")) return;
   contextMenuRef.value?.open(e.clientX, e.clientY);
 }
@@ -411,25 +312,20 @@ function handleContextMenu(e) {
 async function createFolderInCurrentDir() {
   if (!navigationStore.currentPath) return;
   const separator = navigationStore.currentPath.includes("/") ? "/" : "\\";
-
   let name = "Новая папка";
   let counter = 1;
-  const checkNameExists = (n) => {
-    return props.files.some((f) => f.name.toLowerCase() === n.toLowerCase());
-  };
-
+  const checkNameExists = (n) =>
+    props.files.some((f) => f.name.toLowerCase() === n.toLowerCase());
   while (checkNameExists(name)) {
     counter++;
     name = `Новая папка (${counter})`;
   }
-
   const newPath = navigationStore.currentPath.endsWith(separator)
     ? navigationStore.currentPath + name
     : navigationStore.currentPath + separator + name;
 
   try {
     await invoke("mkdir_folder", { path: newPath });
-
     const newFolder = {
       name,
       path: newPath,
@@ -445,30 +341,21 @@ async function createFolderInCurrentDir() {
       ai_source: null,
       _newlyCreated: true,
     };
-
     navigationStore.folders = [
       newFolder,
       ...navigationStore.folders.filter((f) => f.path !== newPath),
     ];
     galleryStore.upsertFile(newFolder, { pinToTop: true });
-
     await nextTick();
-    if (containerRef.value) {
-      containerRef.value.scrollTop = 0;
-      containerRef.value.focus();
-    }
-
-    // Trigger inline-rename immediately
+    containerRef.value?.focus();
     galleryStore.renamingPath = newPath;
   } catch (e) {
     alert("Не удалось создать папку: " + e);
   }
 }
 
-// ─── Keyboard Navigation ─────────────────────────────────────────────────────
 function onGroupHeaderClick(e, row) {
   if (e.ctrlKey || e.metaKey) {
-    // Toggle selection for group files
     const allSelected = row.filePaths.every((path) =>
       galleryStore.selectedIds.includes(path),
     );
@@ -482,39 +369,21 @@ function onGroupHeaderClick(e, row) {
       ];
     }
   } else {
-    // Set selection to only group files
     galleryStore.selectedIds = [...row.filePaths];
   }
 }
 
 function scrollToIndex(index) {
-  if (props.files.length === 0 || index < 0 || index >= props.files.length)
-    return;
-  const file = props.files[index];
-
-  const row = rowsWithTop.value.find(
-    (r) => r.type === "row" && r.files.some((f) => f.path === file.path),
-  );
-  if (!row) return;
-
-  const rowTop = row.top + topPadding;
-  const rowBottom = rowTop + row.height;
-
   const container = containerRef.value;
-  if (!container) return;
-
-  const curScrollTop = container.scrollTop;
-  const viewHeight = containerHeight.value;
-
-  if (rowTop < curScrollTop) {
-    container.scrollTop = rowTop;
-  } else if (rowBottom > curScrollTop + viewHeight) {
-    container.scrollTop = rowBottom - viewHeight;
-  }
+  if (!container || index < 0 || index >= props.files.length) return;
+  const path = props.files[index]?.path;
+  const el = container.querySelector(
+    `.thumbnail-card[data-path="${CSS.escape(path)}"]`,
+  );
+  el?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 function onKeyDown(e) {
-  // Ctrl+A Select All
   if (
     e.ctrlKey &&
     (e.code === "KeyA" ||
@@ -537,37 +406,28 @@ function onKeyDown(e) {
         galleryStore.selectedIds[galleryStore.selectedIds.length - 1];
       currentIndex = props.files.findIndex((f) => f.path === lastSelectedPath);
     }
-
-    if (currentIndex === -1) {
-      currentIndex = 0;
-    }
+    if (currentIndex === -1) currentIndex = 0;
 
     const cols = Math.max(1, colsPerRow.value || 1);
     let nextIndex = currentIndex;
-
-    if (e.key === "ArrowLeft") {
-      nextIndex = Math.max(0, currentIndex - 1);
-    } else if (e.key === "ArrowRight") {
+    if (e.key === "ArrowLeft") nextIndex = Math.max(0, currentIndex - 1);
+    else if (e.key === "ArrowRight")
       nextIndex = Math.min(props.files.length - 1, currentIndex + 1);
-    } else if (e.key === "ArrowUp") {
-      nextIndex = Math.max(0, currentIndex - cols);
-    } else if (e.key === "ArrowDown") {
+    else if (e.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - cols);
+    else if (e.key === "ArrowDown")
       nextIndex = Math.min(props.files.length - 1, currentIndex + cols);
-    }
 
     if (e.shiftKey) {
-      if (anchorIndex.value === -1) {
-        anchorIndex.value = currentIndex;
-      }
+      if (anchorIndex.value === -1) anchorIndex.value = currentIndex;
       const from = Math.min(anchorIndex.value, nextIndex);
       const to = Math.max(anchorIndex.value, nextIndex);
-      const rangeIds = props.files.slice(from, to + 1).map((f) => f.path);
-      galleryStore.selectedIds = rangeIds;
+      galleryStore.selectedIds = props.files
+        .slice(from, to + 1)
+        .map((f) => f.path);
     } else {
       anchorIndex.value = nextIndex;
       galleryStore.selectedIds = [props.files[nextIndex].path];
     }
-
     scrollToIndex(nextIndex);
   } else if (e.key === " ") {
     e.preventDefault();
@@ -575,23 +435,17 @@ function onKeyDown(e) {
       const lastSelectedPath =
         galleryStore.selectedIds[galleryStore.selectedIds.length - 1];
       const file = props.files.find((f) => f.path === lastSelectedPath);
-      if (file) {
-        onCardDblClick(file);
-      }
+      if (file) onCardDblClick(file);
     }
   }
 }
 
-// ─── Resize observer ─────────────────────────────────────────────────────────
 let resizeObserver = null;
-
 onMounted(() => {
   if (containerRef.value) {
-    containerHeight.value = containerRef.value.clientHeight || 800;
     containerWidth.value = containerRef.value.clientWidth || 1200;
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        containerHeight.value = entry.contentRect.height;
         containerWidth.value = entry.contentRect.width;
       }
     });
@@ -602,14 +456,6 @@ onMounted(() => {
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect();
 });
-
-function onScroll() {
-  scrollTop.value = containerRef.value?.scrollTop || 0;
-}
-
-function openQuickLook(file) {
-  emit("openQuickLook", file);
-}
 </script>
 
 <style scoped>
@@ -619,20 +465,12 @@ function openQuickLook(file) {
   overflow-x: hidden;
   cursor: default;
 }
-.virtual-scroll-spacer {
-  position: relative;
-}
-.gallery-row {
-  display: flex;
-  align-items: flex-start;
-}
-/* Rubber-band selection rectangle */
+
 .rubber-band {
   position: absolute;
+  border: 1px solid rgba(59, 130, 246, 0.9);
+  background: rgba(59, 130, 246, 0.15);
   pointer-events: none;
-  border: 1.5px solid rgba(59, 130, 246, 0.8) !important;
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border-radius: 2px;
-  z-index: 99999 !important;
+  z-index: 30;
 }
 </style>

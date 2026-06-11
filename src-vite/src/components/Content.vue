@@ -4972,22 +4972,22 @@ const onFileSaved = async (
       clearCachedThumbnail(payload.filePath);
 
       if (payload.saveAsNew) {
+        uiStore.updateThumbnailVersion(payload.filePath);
         await navigationStore.navigateTo(navigationStore.currentPath);
       } else {
         const updatedEntry = await invoke("get_file_entry", {
           path: payload.filePath,
         });
-        if (updatedEntry) {
-          updatedEntry._modifiedTime = updatedEntry.modified
-            ? new Date(updatedEntry.modified).getTime()
-            : Date.now();
+        try {
+          updatedEntry._forceThumbRefresh = Date.now();
+        } catch {}
 
-          const galleryStore = useGalleryStore();
-          galleryStore.upsertFile(updatedEntry);
-          navigationStore.folders = navigationStore.folders.map((entry) =>
-            entry.path === payload.filePath ? updatedEntry : entry,
-          );
-        }
+        const galleryStore = useGalleryStore();
+        galleryStore.upsertFile(updatedEntry);
+        navigationStore.folders = navigationStore.folders.map((entry) =>
+          entry.path === payload.filePath ? updatedEntry : entry,
+        );
+        uiStore.updateThumbnailVersion(payload.filePath);
       }
     }
 
