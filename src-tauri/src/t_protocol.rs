@@ -140,17 +140,20 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
         .register_asynchronous_uri_scheme_protocol("preview", |_ctx, request, responder| {
             use std::io::Write;
             let log_msg = |msg: &str| {
-                if let Ok(mut file) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("debug_protocol.log")
-                {
-                    let _ = writeln!(
-                        file,
-                        "[{}] {}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        msg
-                    );
+                if let Ok(cache_dir) = crate::t_config::get_app_cache_dir() {
+                    let log_path = cache_dir.join("debug_protocol.log");
+                    if let Ok(mut file) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(log_path)
+                    {
+                        let _ = writeln!(
+                            file,
+                            "[{}] {}",
+                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                            msg
+                        );
+                    }
                 }
                 println!("[preview_protocol] {}", msg);
             };
