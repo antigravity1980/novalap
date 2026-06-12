@@ -495,23 +495,29 @@ export function getPreviewUrl(
   filePath?: string | null,
   bustCache = false,
 ): string {
-  if (!fileId || fileId <= 0) return '';
   const scheme = isWin ? 'http://preview.localhost' : 'preview://localhost';
-  const base = `${scheme}/${_thumbLibraryId}/${fileId}`;
 
-  if (bustCache) {
-    return `${base}?t=${Date.now()}`;
+  if (fileId && fileId > 0) {
+    const base = `${scheme}/${_thumbLibraryId}/${fileId}`;
+    if (filePath) {
+      const uiStore = useUIStore();
+      const version = uiStore.getFileVersion(filePath);
+      if (version > 0) {
+        return bustCache ? `${base}?v=${version}&t=${Date.now()}` : `${base}?v=${version}`;
+      }
+    }
+    return bustCache ? `${base}?t=${Date.now()}` : base;
   }
 
   if (filePath) {
-    const uiStore = useUIStore();
-    const version = uiStore.getFileVersion(filePath);
-    if (version > 0) {
-      return `${base}?v=${version}`;
-    }
+    const hexPath = Array.from(new TextEncoder().encode(filePath))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    const base = `${scheme}/${_thumbLibraryId}/hex_${hexPath}`;
+    return bustCache ? `${base}?t=${Date.now()}` : base;
   }
 
-  return base;
+  return '';
 }
 
 export function shouldUseBackendPreview(filePath = '', fileType = 0): boolean {

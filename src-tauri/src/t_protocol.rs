@@ -78,6 +78,19 @@ fn image_response(data: Vec<u8>) -> http::Response<Vec<u8>> {
         .unwrap()
 }
 
+fn decode_hex(s: &str) -> Result<String, String> {
+    if s.len() % 2 != 0 {
+        return Err("Odd number of hexadecimal digits".to_string());
+    }
+    let mut bytes = Vec::with_capacity(s.len() / 2);
+    for i in (0..s.len()).step_by(2) {
+        let byte = u8::from_str_radix(&s[i..i + 2], 16)
+            .map_err(|e| format!("Invalid hex digit: {}", e))?;
+        bytes.push(byte);
+    }
+    String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))
+}
+
 pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
     builder
         .register_asynchronous_uri_scheme_protocol("thumb", |_ctx, request, responder| {
@@ -129,32 +142,45 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
             // library_id is for browser cache isolation only; file_id is the last segment
             let path = request.uri().path();
             let file_id_str = path.rsplit('/').next().unwrap_or("");
-            let file_id: i64 = file_id_str.parse().unwrap_or(0);
 
-            if file_id <= 0 {
-                responder.respond(text_response(
-                    http::StatusCode::BAD_REQUEST,
-                    "invalid file_id",
-                ));
-                return;
-            }
-
-            let file = match t_sqlite::AFile::get_file_info(file_id) {
-                Ok(Some(file)) => file,
-                _ => {
-                    responder.respond(text_response(http::StatusCode::NOT_FOUND, "file not found"));
-                    return;
+            let file_path = if file_id_str.starts_with("hex_") {
+                match decode_hex(&file_id_str[4..]) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        responder.respond(text_response(
+                            http::StatusCode::BAD_REQUEST,
+                            &format!("invalid hex path: {}", e),
+                        ));
+                        return;
+                    }
                 }
-            };
-
-            let file_path = match file.file_path {
-                Some(path) if !path.is_empty() => path,
-                _ => {
+            } else {
+                let file_id: i64 = file_id_str.parse().unwrap_or(0);
+                if file_id <= 0 {
                     responder.respond(text_response(
-                        http::StatusCode::NOT_FOUND,
-                        "file path not found",
+                        http::StatusCode::BAD_REQUEST,
+                        "invalid file_id",
                     ));
                     return;
+                }
+
+                let file = match t_sqlite::AFile::get_file_info(file_id) {
+                    Ok(Some(file)) => file,
+                    _ => {
+                        responder.respond(text_response(http::StatusCode::NOT_FOUND, "file not found"));
+                        return;
+                    }
+                };
+
+                match file.file_path {
+                    Some(path) if !path.is_empty() => path,
+                    _ => {
+                        responder.respond(text_response(
+                            http::StatusCode::NOT_FOUND,
+                            "file path not found",
+                        ));
+                        return;
+                    }
                 }
             };
 
