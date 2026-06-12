@@ -97,7 +97,7 @@ import { ref, reactive, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
-import { getAssetSrc } from '@/common/utils'
+import { getPreviewUrl } from '@/common/utils'
 import { useUIStore } from '@/stores/uiStore'
 
 const props = defineProps({
@@ -110,7 +110,7 @@ const uiStore = useUIStore()
 
 const imageRef = ref(null)
 const cropContainer = ref(null)
-const imageUrl = computed(() => props.file ? getAssetSrc(props.file.path) : '')
+const imageUrl = computed(() => props.file ? getPreviewUrl(props.file.id || props.file.file_id, props.file.file_path || props.file.path) : '')
 const imageLoaded = ref(false)
 const saving = ref(false)
 

@@ -62,7 +62,7 @@
           class="overflow-hidden relative flex items-center justify-center bg-zinc-900/40 rounded-lg border border-white/5"
         >
           <img 
-            :src="getFileUrl(file.path)" 
+            :src="getFileUrl(file)" 
             class="max-w-full max-h-full object-contain pointer-events-none select-none"
             :style="syncImageStyle"
           />
@@ -77,11 +77,11 @@
         <!-- Side-by-side mode -->
         <div v-if="compareMode === 'sidebyside'" class="flex h-full">
           <div class="flex-1 flex items-center justify-center border-r border-white/10 overflow-hidden relative bg-black">
-            <img v-if="leftFile" :src="getFileUrl(leftFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+            <img v-if="leftFile" :src="getFileUrl(leftFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
             <div class="absolute bottom-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[80%] pointer-events-none z-10">{{ leftFile?.name }}</div>
           </div>
           <div class="flex-1 flex items-center justify-center overflow-hidden relative bg-black">
-            <img v-if="rightFile" :src="getFileUrl(rightFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+            <img v-if="rightFile" :src="getFileUrl(rightFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
             <div class="absolute bottom-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[80%] pointer-events-none z-10">{{ rightFile?.name }}</div>
           </div>
         </div>
@@ -91,13 +91,13 @@
           @mousemove.self="onSliderMove" @touchmove.self="onSliderMove">
           <!-- Background (Right image) -->
           <div class="absolute inset-0 flex items-center justify-center bg-black">
-            <img v-if="rightFile" :src="getFileUrl(rightFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+            <img v-if="rightFile" :src="getFileUrl(rightFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
             <div class="absolute bottom-2 right-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[40%] pointer-events-none z-10">{{ rightFile?.name }}</div>
           </div>
           <!-- Foreground (Left image) clip -->
           <div class="absolute inset-y-0 left-0 overflow-hidden bg-transparent pointer-events-none" :style="{ width: sliderPosition + '%' }">
             <div class="absolute inset-y-0 left-0 h-full flex items-center justify-center bg-black" :style="{ width: containerWidth + 'px' }">
-              <img v-if="leftFile" :src="getFileUrl(leftFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+              <img v-if="leftFile" :src="getFileUrl(leftFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
               <div class="absolute bottom-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[40%] pointer-events-none z-10">{{ leftFile?.name }}</div>
             </div>
           </div>
@@ -117,11 +117,11 @@
         <!-- Split mode -->
         <div v-else-if="compareMode === 'split'" class="h-full flex flex-col">
           <div class="flex-1 flex items-center justify-center border-b border-white/10 overflow-hidden relative bg-black">
-            <img v-if="leftFile" :src="getFileUrl(leftFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+            <img v-if="leftFile" :src="getFileUrl(leftFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
             <div class="absolute bottom-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[80%] pointer-events-none z-10">{{ leftFile?.name }}</div>
           </div>
           <div class="flex-1 flex items-center justify-center overflow-hidden relative bg-black">
-            <img v-if="rightFile" :src="getFileUrl(rightFile.path)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
+            <img v-if="rightFile" :src="getFileUrl(rightFile)" class="max-w-full max-h-full object-contain pointer-events-none select-none" :style="syncImageStyle" />
             <div class="absolute bottom-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded truncate max-w-[80%] pointer-events-none z-10">{{ rightFile?.name }}</div>
           </div>
         </div>
@@ -152,7 +152,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getAssetSrc } from '@/common/utils'
+import { getPreviewUrl } from '@/common/utils'
 
 const props = defineProps({
   files: { type: Array, default: () => [] },
@@ -206,8 +206,9 @@ const gridClass = computed(() => {
   return 'grid-cols-3 grid-rows-2'
 })
 
-function getFileUrl(path) {
-  return getAssetSrc(path)
+function getFileUrl(file) {
+  if (!file) return ''
+  return getPreviewUrl(file.id || file.file_id, file.file_path || file.path)
 }
 
 function onSliderMove(event) {

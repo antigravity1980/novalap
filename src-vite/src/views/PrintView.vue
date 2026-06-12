@@ -129,7 +129,7 @@ async function resolvePrintSource(targetPath: string, targetFileType: number, ta
       return;
     }
 
-    imageSrc.value = getAssetSrc(targetPath);
+    imageSrc.value = getPreviewUrl(targetFileId, targetPath);
   } catch (error) {
     console.error('Failed to resolve print source:', error);
     loadError.value = true;

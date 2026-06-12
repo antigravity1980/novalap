@@ -138,15 +138,41 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
             });
         })
         .register_asynchronous_uri_scheme_protocol("preview", |_ctx, request, responder| {
+            use std::io::Write;
+            let log_msg = |msg: &str| {
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("debug_protocol.log")
+                {
+                    let _ = writeln!(
+                        file,
+                        "[{}] {}",
+                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        msg
+                    );
+                }
+                println!("[preview_protocol] {}", msg);
+            };
+
             // URL format: preview://localhost/{library_id}/{file_id}
             // library_id is for browser cache isolation only; file_id is the last segment
+            let uri_str = request.uri().to_string();
             let path = request.uri().path();
-            let file_id_str = path.rsplit('/').next().unwrap_or("");
+            log_msg(&format!("Preview request URI: '{}', path: '{}'", uri_str, path));
+
+            let file_id_str = path.rsplit(|c| c == '/' || c == '\\').next().unwrap_or("");
+            let file_id_str = file_id_str.split('?').next().unwrap_or("").split('#').next().unwrap_or("");
+            log_msg(&format!("Parsed file_id_str: '{}'", file_id_str));
 
             let file_path = if file_id_str.starts_with("hex_") {
                 match decode_hex(&file_id_str[4..]) {
-                    Ok(p) => p,
+                    Ok(p) => {
+                        log_msg(&format!("Decoded hex path to: '{}'", p));
+                        p
+                    }
                     Err(e) => {
+                        log_msg(&format!("Failed to decode hex path '{}': {}", file_id_str, e));
                         responder.respond(text_response(
                             http::StatusCode::BAD_REQUEST,
                             &format!("invalid hex path: {}", e),
@@ -157,6 +183,7 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
             } else {
                 let file_id: i64 = file_id_str.parse().unwrap_or(0);
                 if file_id <= 0 {
+                    log_msg(&format!("Invalid file_id from file_id_str '{}'", file_id_str));
                     responder.respond(text_response(
                         http::StatusCode::BAD_REQUEST,
                         "invalid file_id",
@@ -167,14 +194,19 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
                 let file = match t_sqlite::AFile::get_file_info(file_id) {
                     Ok(Some(file)) => file,
                     _ => {
+                        log_msg(&format!("File info not found for file_id: {}", file_id));
                         responder.respond(text_response(http::StatusCode::NOT_FOUND, "file not found"));
                         return;
                     }
                 };
 
                 match file.file_path {
-                    Some(path) if !path.is_empty() => path,
+                    Some(path) if !path.is_empty() => {
+                        log_msg(&format!("Resolved file_id {} to path: '{}'", file_id, path));
+                        path
+                    }
                     _ => {
+                        log_msg(&format!("File path empty or missing for file_id: {}", file_id));
                         responder.respond(text_response(
                             http::StatusCode::NOT_FOUND,
                             "file path not found",
@@ -185,9 +217,16 @@ pub fn register_protocols(builder: Builder<Wry>) -> Builder<Wry> {
             };
 
             tauri::async_runtime::spawn(async move {
+                log_msg(&format!("Reading file: '{}'", file_path));
                 let response = match t_image::get_file_image_bytes_cached(&file_path).await {
-                    Ok(data) => image_response(data),
-                    Err(_) => text_response(http::StatusCode::NOT_FOUND, "preview not found"),
+                    Ok(data) => {
+                        log_msg(&format!("Successfully read file '{}', bytes: {}", file_path, data.len()));
+                        image_response(data)
+                    }
+                    Err(e) => {
+                        log_msg(&format!("Failed to read file '{}', error: {}", file_path, e));
+                        text_response(http::StatusCode::NOT_FOUND, "preview not found")
+                    }
                 };
                 responder.respond(response);
             });

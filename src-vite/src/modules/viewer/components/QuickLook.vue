@@ -323,7 +323,7 @@ import {
 } from "vue";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { readFile, writeFile } from "@tauri-apps/plugin-fs";
-import { getAssetSrc } from "@/common/utils";
+import { getPreviewUrl } from "@/common/utils";
 import { useUIStore } from "@/stores/uiStore";
 
 const props = defineProps({
@@ -396,7 +396,10 @@ const handles = computed(() => [
 const currentFile = computed(() => props.files[currentIndex.value] || null);
 const currentFileUrl = computed(() => {
   if (!currentFile.value) return "";
-  const base = getAssetSrc(currentFile.value.path);
+  const base = getPreviewUrl(
+    currentFile.value.id || currentFile.value.file_id,
+    currentFile.value.file_path || currentFile.value.path
+  );
   return cacheBuster.value ? `${base}?t=${cacheBuster.value}` : base;
 });
 
@@ -684,7 +687,10 @@ async function saveAndClose() {
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
-      img.src = getAssetSrc(path);
+      img.src = getPreviewUrl(
+        currentFile.value.id || currentFile.value.file_id,
+        path
+      );
     });
 
     const scaleX = img.naturalWidth / displayWidth;
