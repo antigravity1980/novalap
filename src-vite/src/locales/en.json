@@ -425,6 +425,8 @@
   "msgbox": {
     "ok": "OK",
     "discard": "Discard",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
     "reset": "Reset",
     "cancel": "Cancel",
     "close": "Close",
@@ -1204,6 +1206,9 @@
   "explorer": {
     "quick_access": "Quick access",
     "home": "Home",
+    "back": "Back",
+    "forward": "Forward",
+    "go_up": "Go up",
     "favorites": "Favorites",
     "no_favorites": "No favorite folders",
     "recycle_bin": "Recycle Bin",

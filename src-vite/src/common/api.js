@@ -477,6 +477,7 @@ export async function expandFinalFolder(rootFolder, finalPath) {
       }
     }
   }
+  return null;
 }
 
 // recurse all files under the path(include all sub-folders), and count the number of files

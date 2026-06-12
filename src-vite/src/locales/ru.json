@@ -425,6 +425,8 @@
   "msgbox": {
     "ok": "ОК",
     "discard": "Сбросить",
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
     "reset": "Сброс",
     "cancel": "Отмена",
     "close": "Закрыть",
@@ -1204,6 +1206,9 @@
   "explorer": {
     "quick_access": "Быстрый доступ",
     "home": "Главная",
+    "back": "Назад",
+    "forward": "Вперед",
+    "go_up": "Вверх",
     "favorites": "Избранное",
     "no_favorites": "Нет избранных папок",
     "recycle_bin": "Корзина",

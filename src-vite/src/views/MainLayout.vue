@@ -217,7 +217,7 @@
         <div class="flex items-center h-full shrink-0" @mousedown.stop>
           <button
             @click="minimizeWindow"
-            :title="$t('msgbox.discard')"
+            :title="$t('msgbox.minimize')"
             class="w-11 h-full flex items-center justify-center text-base-content/75 hover:bg-base-100/40 hover:text-base-content transition-colors duration-100"
           >
             <svg
@@ -232,7 +232,7 @@
           </button>
           <button
             @click="toggleMaximizeWindow"
-            :title="$t('image_editor.transform')"
+            :title="$t('msgbox.maximize')"
             class="w-11 h-full flex items-center justify-center text-base-content/75 hover:bg-base-100/40 hover:text-base-content transition-colors duration-100"
           >
             <svg
@@ -308,7 +308,7 @@
             class="btn btn-ghost btn-xs btn-circle text-base-content/75 hover:text-base-content hover:bg-base-100/40 flex items-center justify-center"
             @click="goBack"
             :disabled="!navigationStore.canGoBack"
-            :title="$t('welcome.drag_title')"
+            :title="$t('explorer.back')"
           >
             <IconLeft class="w-3.5 h-3.5 shrink-0" />
           </button>
@@ -316,7 +316,7 @@
             class="btn btn-ghost btn-xs btn-circle text-base-content/75 hover:text-base-content hover:bg-base-100/40 flex items-center justify-center"
             @click="goForward"
             :disabled="!navigationStore.canGoForward"
-            :title="$t('welcome.drag_title')"
+            :title="$t('explorer.forward')"
           >
             <IconRight class="w-3.5 h-3.5 shrink-0" />
           </button>
@@ -324,7 +324,7 @@
             class="btn btn-ghost btn-xs btn-circle text-base-content/75 hover:text-base-content hover:bg-base-100/40 flex items-center justify-center"
             @click="goUp"
             :disabled="!navigationStore.currentPath"
-            :title="$t('welcome.drag_title')"
+            :title="$t('explorer.go_up')"
           >
             <IconArrowUp class="w-3.5 h-3.5 shrink-0" />
           </button>
@@ -575,7 +575,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'resolution' }"
                   @click="
-                    galleryStore.sortBy === 'resolution';
+                    galleryStore.sortBy = 'resolution';
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -588,7 +588,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'ai_source' }"
                   @click="
-                    galleryStore.sortBy === 'ai_source';
+                    galleryStore.sortBy = 'ai_source';
                     onSortChange();
                   "
                   class="flex justify-between items-center"
