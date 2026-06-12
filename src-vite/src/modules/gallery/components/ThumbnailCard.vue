@@ -185,7 +185,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
-import { getAssetSrc } from "@/common/utils";
+import { getAssetSrc, getPreviewUrl } from "@/common/utils";
 import {
   getCachedThumbnail,
   setCachedThumbnail,
@@ -342,7 +342,7 @@ async function loadThumbnail() {
 
   // --- 3. Маленькие файлы загружаем мгновенно, без задержки ---
   if (props.file.size < 200 * 1024) {
-    const url = getAssetSrc(currentPath);
+    const url = getPreviewUrl(0, currentPath);
     setCachedThumbnail(cacheKey, url);
     thumbnailUrl.value = url;
     return;
