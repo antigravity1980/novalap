@@ -315,6 +315,7 @@ const isVideo = computed(() => {
 // Async loading of generated thumbnails for large files to prevent UI freeze
 const thumbnailUrl = ref("");
 let debounceTimeout = null;
+const sizeBuckets = [256, 512, 1024];
 
 async function loadThumbnail() {
   thumbnailUrl.value = "";
@@ -322,8 +323,10 @@ async function loadThumbnail() {
   if (!isImage.value) return;
 
   const currentPath = props.file.path;
-  const cacheKey = `${currentPath}__${props.size}`;
-  clearCachedThumbnailByKey(cacheKey);
+  
+  // Квантуем запрашиваемый размер до ближайшего большего фиксированного значения
+  const targetSize = sizeBuckets.find(b => b >= props.size) || 1024;
+  const cacheKey = `${currentPath}__${targetSize}`;
 
   // --- 1. Мгновенная загрузка из кеша в памяти ---
   const cached = getCachedThumbnail(cacheKey);
@@ -353,7 +356,6 @@ async function loadThumbnail() {
       thumbnailUrl.value = cachedNow;
       return;
     }
-    const targetSize = Math.max(256, Math.round(props.size));
     try {
       const url = await invoke("get_explorer_thumbnail", {
         path: currentPath,
