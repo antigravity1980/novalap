@@ -1861,9 +1861,9 @@ const initEditImage = async () => {
   initEditImageLoadingId.value++;
   const loadingId = initEditImageLoadingId.value;
 
-  const srcToLoad = usesBackendPreview.value
+  const srcToLoad = (fileInfo.value && fileInfo.value.id > 0)
     ? (initialImageSrc.value || getPreviewUrl(fileInfo.value.id, fileInfo.value.file_path))
-    : getAssetSrc(fileInfo.value.file_path);
+    : (fileInfo.value ? getAssetSrc(fileInfo.value.file_path) : "");
 
   if (!srcToLoad) {
     isProcessing.value = false;
