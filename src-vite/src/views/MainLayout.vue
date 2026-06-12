@@ -567,7 +567,7 @@
                   "
                   class="flex justify-between items-center"
                 >
-                  <span>{{ $t("calendar.title") }}</span>
+                  <span>{{ $t("explorer.date") }}</span>
                   <span v-if="galleryStore.sortBy === 'date'">✓</span>
                 </a>
               </li>
@@ -580,7 +580,7 @@
                   "
                   class="flex justify-between items-center"
                 >
-                  <span>{{ $t("explorer.resolution") }}</span>
+                  <span>{{ $t("explorer.size") }}</span>
                   <span v-if="galleryStore.sortBy === 'resolution'">✓</span>
                 </a>
               </li>

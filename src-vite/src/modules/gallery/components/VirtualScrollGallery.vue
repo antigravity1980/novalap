@@ -22,15 +22,26 @@
       <template v-for="row in renderedRows" :key="row.key">
         <div
           v-if="row.type === 'header'"
-          class="group-header col-span-full flex items-center justify-between px-4 h-12 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
+          class="group-header col-span-full flex items-center gap-2 px-4 h-10 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
           @click="onGroupHeaderClick($event, row)"
         >
-          <span>{{ row.title }} ({{ row.filePaths.length }})</span>
-          <span class="text-[9px] opacity-40 font-normal">выбрать группу</span>
+          <svg
+            class="w-3 h-3 shrink-0 transition-transform duration-200"
+            :class="collapsedGroups[row.title] ? '-rotate-90' : ''"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 4.5L6 7.5L9 4.5" />
+          </svg>
+          <span>{{ row.title }} ({{ row.fileCount }})</span>
         </div>
 
         <ThumbnailCard
-          v-else
+          v-else-if="!collapsedGroups[row.groupTitle]"
           :file="row.file"
           :size="thumbnailSize"
           :selected="galleryStore.selectedIds.includes(row.file.path)"
@@ -83,6 +94,11 @@ const containerRef = ref(null);
 const contextMenuRef = ref(null);
 const containerWidth = ref(1200);
 const gap = computed(() => galleryStore.thumbnailGap ?? 11);
+const collapsedGroups = reactive({});
+
+function toggleGroupCollapse(title) {
+  collapsedGroups[title] = !collapsedGroups[title];
+}
 
 const colsPerRow = computed(() => {
   const width = Math.max(320, containerWidth.value || 1200);
@@ -98,6 +114,7 @@ const renderedRows = computed(() => {
       type: "file",
       key: file.path,
       file,
+      groupTitle: null,
     }));
   }
 
@@ -109,6 +126,7 @@ const renderedRows = computed(() => {
       type: "header",
       key: `header:${group.title}`,
       title: group.title,
+      fileCount: group.files.length,
       filePaths: group.files.map((f) => f.path),
     });
     for (const file of group.files) {
@@ -116,6 +134,7 @@ const renderedRows = computed(() => {
         type: "file",
         key: file.path,
         file,
+        groupTitle: group.title,
       });
     }
   }
@@ -369,7 +388,7 @@ function onGroupHeaderClick(e, row) {
       ];
     }
   } else {
-    galleryStore.selectedIds = [...row.filePaths];
+    toggleGroupCollapse(row.title);
   }
 }
 

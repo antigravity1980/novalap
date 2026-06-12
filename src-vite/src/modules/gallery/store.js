@@ -118,36 +118,23 @@ export function groupFilesHelper(files, groupBy) {
   }
 
   if (groupBy === "date") {
-    const today = [];
-    const yesterday = [];
+    const last24h = [];
+    const last12h = [];
     const thisWeek = [];
     const thisMonth = [];
-    const lastMonth = [];
-    const thisYear = [];
-    const older = [];
     const folders = [];
 
-    const now = new Date();
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    ).getTime();
-    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
-    const dayOfWeek = now.getDay();
+    const now = Date.now();
+    const H24 = 24 * 60 * 60 * 1000;
+    const H12 = 12 * 60 * 60 * 1000;
+    const startOf24h = now - H24;
+    const startOf12h = now - H12;
+
+    const d = new Date();
+    const dayOfWeek = d.getDay();
     const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const startOfThisWeek = startOfToday - daysToMonday * 24 * 60 * 60 * 1000;
-    const startOfThisMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-    ).getTime();
-    const startOfLastMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() - 1,
-      1,
-    ).getTime();
-    const startOfThisYear = new Date(now.getFullYear(), 0, 1).getTime();
+    const startOfThisWeek = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysToMonday).getTime();
+    const startOfThisMonth = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
 
     for (const f of files) {
       const isDir =
@@ -158,33 +145,26 @@ export function groupFilesHelper(files, groupBy) {
         folders.push(f);
       } else {
         const time = f._modifiedTime || 0;
-        if (time >= startOfToday) {
-          today.push(f);
-        } else if (time >= startOfYesterday) {
-          yesterday.push(f);
+        if (time >= startOf12h) {
+          last12h.push(f);
+        } else if (time >= startOf24h) {
+          last24h.push(f);
         } else if (time >= startOfThisWeek) {
           thisWeek.push(f);
         } else if (time >= startOfThisMonth) {
           thisMonth.push(f);
-        } else if (time >= startOfLastMonth) {
-          lastMonth.push(f);
-        } else if (time >= startOfThisYear) {
-          thisYear.push(f);
         } else {
-          older.push(f);
+          thisMonth.push(f);
         }
       }
     }
 
     return [
       { title: "Папки", files: folders },
-      { title: "Сегодня", files: today },
-      { title: "Вчера", files: yesterday },
-      { title: "Ранее на этой неделе", files: thisWeek },
-      { title: "Ранее в этом месяце", files: thisMonth },
-      { title: "В прошлом месяце", files: lastMonth },
-      { title: "Ранее в этом году", files: thisYear },
-      { title: "Давно", files: older },
+      { title: "12 часов", files: last12h },
+      { title: "24 часа", files: last24h },
+      { title: "Неделя", files: thisWeek },
+      { title: "Месяц", files: thisMonth },
     ].filter((g) => g.files.length > 0);
   }
 
