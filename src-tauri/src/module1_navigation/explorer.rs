@@ -232,22 +232,46 @@ pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
 pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, String> {
     let mut join_set = tokio::task::JoinSet::new();
     for raw in paths {
-        if raw.is_empty() { continue; }
+        if raw.is_empty() {
+            continue;
+        }
         join_set.spawn_blocking(move || {
             let path = std::path::Path::new(&raw);
             if !path.exists() {
-                return EntryEnrichment { path: raw, dir_count: None, file_count: None, ai_source: None };
+                return EntryEnrichment {
+                    path: raw,
+                    dir_count: None,
+                    file_count: None,
+                    ai_source: None,
+                };
             }
             let metadata = match std::fs::metadata(&raw) {
                 Ok(m) => m,
-                Err(_) => return EntryEnrichment { path: raw, dir_count: None, file_count: None, ai_source: None },
+                Err(_) => {
+                    return EntryEnrichment {
+                        path: raw,
+                        dir_count: None,
+                        file_count: None,
+                        ai_source: None,
+                    };
+                }
             };
             if metadata.is_dir() {
                 let (dir_count, file_count) = count_children(path);
-                EntryEnrichment { path: raw, dir_count: Some(dir_count), file_count: Some(file_count), ai_source: None }
+                EntryEnrichment {
+                    path: raw,
+                    dir_count: Some(dir_count),
+                    file_count: Some(file_count),
+                    ai_source: None,
+                }
             } else {
                 let ai_source = quick_ai_source(&raw);
-                EntryEnrichment { path: raw, dir_count: None, file_count: None, ai_source }
+                EntryEnrichment {
+                    path: raw,
+                    dir_count: None,
+                    file_count: None,
+                    ai_source,
+                }
             }
         });
     }
@@ -305,6 +329,17 @@ pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
         free_space: 0,
         is_removable: false,
     }];
+
+    if let Some(home) = dirs::home_dir() {
+        let path = home.to_string_lossy().to_string();
+        drives.push(DriveInfo {
+            name: "Home".to_string(),
+            path,
+            total_space: 0,
+            free_space: 0,
+            is_removable: false,
+        });
+    }
 
     collect_unix_mounts("/Volumes", 1, true, &mut drives);
     collect_unix_mounts("/media", 2, true, &mut drives);

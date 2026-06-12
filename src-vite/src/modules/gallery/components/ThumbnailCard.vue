@@ -30,7 +30,7 @@
       :style="{ height: size * 0.75 + 'px' }"
     >
       <img
-        v-if="isImage"
+        v-if="isImage && thumbnailUrl"
         :src="thumbnailUrl"
         :alt="file.name"
         class="w-full h-full object-contain transition-transform duration-300 hover:scale-105"
@@ -365,10 +365,11 @@ async function loadThumbnail() {
         thumbnailUrl.value = url;
       }
     } catch (e) {
-      const fallback = getAssetSrc(currentPath);
-      setCachedThumbnail(cacheKey, fallback);
+      // Do not fallback to OS shell/file icon here: it causes random Windows
+      // placeholder icons to replace real thumbnails in explorer mode.
+      // Keep the card in its generic file state until a real thumbnail is available.
       if (props.file.path === currentPath) {
-        thumbnailUrl.value = fallback;
+        thumbnailUrl.value = "";
       }
     }
   }, 100);

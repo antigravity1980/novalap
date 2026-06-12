@@ -98,7 +98,8 @@ const navigationStore = useNavigationStore();
 const galleryStore = useGalleryStore();
 const configStore = useConfigStore();
 
-const favoriteFolders = computed(() => configStore.settings.favorites || []);
+const validFavoritePaths = ref([]);
+const favoriteFolders = computed(() => validFavoritePaths.value);
 const dragOverFavPath = ref("");
 
 const getFileName = (path) => {
@@ -150,6 +151,35 @@ const onDrop = (e) => {
   e.preventDefault();
 };
 
+async function refreshFavorites() {
+  const favorites = Array.isArray(configStore.settings.favorites)
+    ? [...configStore.settings.favorites]
+    : [];
+
+  if (!isTauri()) {
+    validFavoritePaths.value = favorites;
+    return;
+  }
+
+  const checks = await Promise.all(
+    favorites.map(async (path) => {
+      try {
+        await invoke("get_file_entry", { path });
+        return path;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const valid = checks.filter(Boolean);
+  validFavoritePaths.value = valid;
+
+  if (valid.length !== favorites.length) {
+    configStore.settings.favorites = valid;
+  }
+}
+
 // ESC → выход
 const onKey = (e) => {
   if (e.key === "Escape" && galleryStore.focusMode) {
@@ -161,6 +191,7 @@ const onKey = (e) => {
 };
 
 onMounted(() => {
+  refreshFavorites();
   window.addEventListener("keydown", onKey, { capture: true });
 });
 onUnmounted(() => {
