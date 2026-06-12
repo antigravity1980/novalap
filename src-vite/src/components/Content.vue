@@ -2306,6 +2306,12 @@ function handleLocalKeyDown(event: KeyboardEvent) {
     return;
   }
 
+  if (matchesShortcut("file.refreshFolder", event, shortcutPlatform)) {
+    event.preventDefault();
+    void updateContent(true);
+    return;
+  }
+
   if (
     selectMode.value &&
     matchesShortcut("file.selectNone", event, shortcutPlatform)
@@ -2644,6 +2650,8 @@ const handleKeyDown = (e: any) => {
 
   if (matchesShortcut("file.openNewWindow", event, shortcutPlatform)) {
     openImageViewer(selectedItemIndex.value, true);
+  } else if (matchesShortcut("file.refreshFolder", event, shortcutPlatform)) {
+    void updateContent(true);
   } else if (matchesShortcut("file.copy", event, shortcutPlatform)) {
     clickCopyImage(fileList.value[selectedItemIndex.value].file_path);
   } else if (matchesShortcut("file.searchSimilar", event, shortcutPlatform)) {

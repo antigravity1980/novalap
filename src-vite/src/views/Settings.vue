@@ -831,6 +831,7 @@ const shortcutDisplaySections: Array<{ key: string; items: ShortcutDisplayItem[]
       { actionId: 'file.moveTo', labelKey: 'move_to' },
       { actionId: 'file.copy', labelKey: 'copy_file' },
       { actionId: 'file.refreshInfo', labelKey: 'refresh_file_info' },
+      { actionId: 'file.refreshFolder', labelKey: 'refresh_folder' },
       { actionId: 'file.trash', labelKey: 'move_to_trash' },
       { actionId: 'file.trash', labelKey: 'delete_permanently', shortcutVariant: 'shift' },
     ],

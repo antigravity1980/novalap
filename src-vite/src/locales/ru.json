@@ -1095,6 +1095,7 @@
         "move_to_trash": "Переместить в корзину",
         "delete_permanently": "Удалить навсегда",
         "refresh_file_info": "Обновить информацию о файле",
+        "refresh_folder": "Обновить содержимое папки",
         "print": "Печать",
         "toggle_favorite": "Добавить в избранное",
         "set_clear_rating": "Установить / сбросить оценку",

@@ -30,6 +30,7 @@ export type ShortcutActionId =
   | 'file.moveTo'
   | 'file.trash'
   | 'file.refreshInfo'
+  | 'file.refreshFolder'
   | 'file.searchSimilar'
   | 'meta.favorite'
   | 'meta.rating.clear'
@@ -210,6 +211,14 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     id: 'file.refreshInfo',
     contexts: ['content'],
     defaultBindings: [{ code: 'KeyR', modifiers: ['shift'], label: { mac: '⇧R', windows: 'Shift+R', linux: 'Shift+R' } }],
+  },
+  {
+    id: 'file.refreshFolder',
+    contexts: ['content'],
+    defaultBindings: [
+      { key: 'F5', label: 'F5' },
+      { key: 'r', modifiers: ['cmdOrCtrl'], label: { mac: '⌘R', windows: 'Ctrl+R', linux: 'Ctrl+R' } }
+    ],
   },
   {
     id: 'file.searchSimilar',

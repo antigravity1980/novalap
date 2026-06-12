@@ -1095,6 +1095,7 @@
         "move_to_trash": "Move to trash",
         "delete_permanently": "Delete permanently",
         "refresh_file_info": "Refresh file info",
+        "refresh_folder": "Refresh folder contents",
         "print": "Print",
         "toggle_favorite": "Toggle favorite",
         "set_clear_rating": "Set / clear rating",
