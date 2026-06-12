@@ -732,6 +732,7 @@ import {
 import { editImage, checkFileExists, getFileInfo } from "@/common/api";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emit as tauriEmit, listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 
 import TitleBar from "@/components/TitleBar.vue";
 import MessageBox from "@/components/MessageBox.vue";
@@ -1838,86 +1839,111 @@ const onImageLoad = async () => {
   });
 };
 
+const loadImage = (src: string) => {
+  return new Promise<{ naturalWidth: number; naturalHeight: number }>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+      });
+    };
+    img.onerror = (err) => {
+      reject(err);
+    };
+    img.src = src;
+  });
+};
+
 const initEditImageLoadingId = ref(0);
 
 const initEditImage = async () => {
   initEditImageLoadingId.value++;
   const loadingId = initEditImageLoadingId.value;
 
-  if (usesBackendPreview.value) {
-    if (initialImageSrc.value) {
-      imageSrc.value = initialImageSrc.value;
+  const srcToLoad = initialImageSrc.value || (usesBackendPreview.value
+    ? getPreviewUrl(fileInfo.value.id, fileInfo.value.file_path)
+    : getAssetSrc(fileInfo.value.file_path));
+
+  if (!srcToLoad) {
+    isProcessing.value = false;
+    return;
+  }
+
+  try {
+    const dims = await loadImage(srcToLoad);
+    if (loadingId !== initEditImageLoadingId.value) return;
+
+    imageWidth.value = dims.naturalWidth || fileInfo.value.width || 0;
+    imageHeight.value = dims.naturalHeight || fileInfo.value.height || 0;
+    isPortrait.value = isPortraitForRotation(
+      imageWidth.value,
+      imageHeight.value,
+      initialDisplayRotate.value,
+    );
+    
+    imageSrc.value = srcToLoad;
+
+    if (isRawFile.value || !canOverwriteOriginal.value) {
+      config.imageEditor.saveAs = 1;
     }
 
-    void (async () => {
-      try {
-        if (loadingId !== initEditImageLoadingId.value) return;
-        const previewSrc = getPreviewUrl(
-          fileInfo.value.id,
-          fileInfo.value.file_path,
-        );
-        if (previewSrc) {
-          imageSrc.value = previewSrc;
-        }
-      } catch {
-        if (loadingId !== initEditImageLoadingId.value) return;
+    containerRect.value = containerRef.value?.getBoundingClientRect() || null;
+    if (containerRect.value) {
+      containerBounds.value = {
+        left: containerRect.value.left + containerPadding,
+        top: containerRect.value.top + containerPadding,
+        width: containerRect.value.width - containerPadding * 2,
+        height: containerRect.value.height - containerPadding * 2,
+      };
+    }
+
+    enableTransition.value = false;
+
+    if (uiStore.activeAdjustments.filePath === fileInfo.value.file_path) {
+      const adj = uiStore.activeAdjustments;
+      rotate.value = initialDisplayRotate.value;
+      isFlippedX.value = false;
+      isFlippedY.value = false;
+      brightness.value = adj.brightness || 0;
+      contrast.value = adj.contrast || 0;
+      saturation.value = adj.saturation ?? 100;
+      hue.value = adj.hue || 0;
+      blur.value = adj.blur || 0;
+      selectedFilter.value = adj.filter || "";
+      const restoredPreset = resolvePresetKey({
+        brightness: brightness.value,
+        contrast: contrast.value,
+        saturation: saturation.value,
+        hue: hue.value,
+        blur: blur.value,
+        filter: selectedFilter.value,
+      });
+      if (restoredPreset === "custom") {
+        skipNextCustomPresetLoad = true;
       }
-    })();
-  } else {
-    imageSrc.value = getAssetSrc(fileInfo.value.file_path);
-  }
-
-  imageWidth.value = fileInfo.value.width;
-  imageHeight.value = fileInfo.value.height;
-  isPortrait.value = isPortraitForRotation(
-    imageWidth.value,
-    imageHeight.value,
-    initialDisplayRotate.value,
-  );
-  if (isRawFile.value || !canOverwriteOriginal.value) {
-    config.imageEditor.saveAs = 1;
-  }
-
-  containerRect.value = containerRef.value?.getBoundingClientRect() || null;
-  if (!containerRect.value) return;
-
-  containerBounds.value = {
-    left: containerRect.value.left + containerPadding,
-    top: containerRect.value.top + containerPadding,
-    width: containerRect.value.width - containerPadding * 2,
-    height: containerRect.value.height - containerPadding * 2,
-  };
-
-  enableTransition.value = false;
-
-  if (uiStore.activeAdjustments.filePath === fileInfo.value.file_path) {
-    const adj = uiStore.activeAdjustments;
-    rotate.value = initialDisplayRotate.value;
-    isFlippedX.value = false;
-    isFlippedY.value = false;
-    brightness.value = adj.brightness || 0;
-    contrast.value = adj.contrast || 0;
-    saturation.value = adj.saturation ?? 100;
-    hue.value = adj.hue || 0;
-    blur.value = adj.blur || 0;
-    selectedFilter.value = adj.filter || "";
-    const restoredPreset = resolvePresetKey({
-      brightness: brightness.value,
-      contrast: contrast.value,
-      saturation: saturation.value,
-      hue: hue.value,
-      blur: blur.value,
-      filter: selectedFilter.value,
-    });
-    if (restoredPreset === "custom") {
-      skipNextCustomPresetLoad = true;
+      selectedPreset.value = restoredPreset;
+    } else {
+      rotate.value = initialDisplayRotate.value;
+      isFlippedX.value = false;
+      isFlippedY.value = false;
+      resetAdjustments();
     }
-    selectedPreset.value = restoredPreset;
-  } else {
-    rotate.value = initialDisplayRotate.value;
-    isFlippedX.value = false;
-    isFlippedY.value = false;
-    resetAdjustments();
+
+    autoFitVisualArea();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        enableTransition.value = true;
+        imageReady.value = true;
+        isProcessing.value = false;
+      });
+    });
+  } catch (err) {
+    console.error("Failed to preload image in editor:", err);
+    if (loadingId === initEditImageLoadingId.value) {
+      isProcessing.value = false;
+    }
   }
 };
 
