@@ -485,7 +485,7 @@ export function getThumbUrl(
     const cached = getCachedThumbnailDataUrl(fileId, thumbnailSize);
     if (cached) return cached;
   }
-  const scheme = isWin ? 'http://thumb.localhost' : 'thumb://localhost';
+  const scheme = 'thumb://localhost';
   const base = `${scheme}/${_thumbLibraryId}/${fileId}`;
   return bustCache ? `${base}?t=${Date.now()}` : base;
 }
@@ -495,7 +495,7 @@ export function getPreviewUrl(
   filePath?: string | null,
   bustCache = false,
 ): string {
-  const scheme = isWin ? 'http://preview.localhost' : 'preview://localhost';
+  const scheme = 'preview://localhost';
 
   if (fileId && fileId > 0) {
     const base = `${scheme}/${_thumbLibraryId}/${fileId}`;
