@@ -77,7 +77,11 @@
       </div>
 
       <div class="flex-1 overflow-hidden">
-        <!-- Галерея рендерится извне (MainLayout), чтобы не пересоздаваться -->
+        <VirtualScrollGallery
+          :files="galleryStore.displayedFiles"
+          :thumbnailSize="galleryStore.thumbnailSize"
+          @openQuickLook="openQuickLook"
+        />
       </div>
     </div>
   </div>
@@ -90,6 +94,7 @@ import { useGalleryStore } from "@/modules/gallery/store";
 import { useConfigStore } from "@/stores/configStore";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import VirtualScrollGallery from "./VirtualScrollGallery.vue";
 
 const emit = defineEmits(["open-quick-look", "exit-focus"]);
 

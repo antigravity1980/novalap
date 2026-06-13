@@ -1179,7 +1179,7 @@
           </div>
         </div>
 
-        <GalleryGrid v-else @open-quick-look="openQuickLook" />
+        <GalleryGrid v-else-if="!galleryStore.focusMode" @open-quick-look="openQuickLook" />
       </div>
 
       <!-- Status Bar -->

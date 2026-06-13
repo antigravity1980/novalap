@@ -45,7 +45,7 @@
 
         <div
           v-else
-          class="grid"
+          class="grid w-full"
           :style="{
             gridTemplateColumns: `repeat(${colsPerRow}, minmax(0, ${thumbnailSize}px))`,
             gap: galleryStore.thumbnailGap + 'px',
@@ -61,7 +61,6 @@
             @click.stop="onCardClick($event, file)"
             @dblclick.stop="onCardDblClick(file)"
             class="shrink-0"
-            :style="{ width: thumbnailSize + 'px' }"
             :data-path="file.path"
           />
         </div>

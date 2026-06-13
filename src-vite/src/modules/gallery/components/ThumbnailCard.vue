@@ -1,12 +1,12 @@
 <template>
   <div
-    class="thumbnail-card rounded-xl overflow-hidden border cursor-pointer transition-all duration-200 bg-base-200/40 relative flex flex-col justify-between"
+    class="thumbnail-card rounded-lg overflow-hidden cursor-pointer transition-all duration-150 relative flex flex-col justify-between"
     :class="{
-      'border-primary ring-2 ring-primary/45 shadow-lg shadow-primary/10 translate-y-[-2px] bg-base-100':
+      'ring-2 ring-primary/60 shadow-lg shadow-primary/15 translate-y-[-1px]':
         selected && !dragOverCard,
-      'border-base-content/5 hover:border-primary/20 hover:shadow-xl hover:translate-y-[-2px] hover:bg-base-100/30':
+      'hover:ring-1 hover:ring-primary/30 hover:shadow-lg hover:translate-y-[-1px]':
         !selected && !dragOverCard,
-      'bg-secondary/20 border-secondary ring-2 ring-secondary/45 border-dashed':
+      'ring-2 ring-secondary/60 ring-dashed bg-secondary/10':
         dragOverCard,
       'opacity-50 grayscale-[35%]': isCut,
     }"
@@ -26,7 +26,7 @@
   >
     <!-- Thumbnail Image Container -->
     <div
-      class="thumbnail-image bg-base-300 flex items-center justify-center overflow-hidden relative select-none w-full"
+      class="thumbnail-image flex items-center justify-center overflow-hidden relative select-none w-full"
       :style="{ height: size * 0.75 + 'px' }"
     >
       <img
@@ -39,7 +39,7 @@
       <!-- Video tag/icon overlay -->
       <div
         v-else-if="isVideo"
-        class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-base-300 to-base-200 text-base-content/40 hover:text-base-content/60"
+        class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40 hover:text-base-contents/60"
       >
         <span class="text-3xl filter drop-shadow">🎬</span>
         <span
@@ -56,7 +56,7 @@
       <!-- Папка -->
       <div
         v-else-if="isFolder"
-        class="w-full h-full flex flex-col items-center justify-center bg-base-300/30"
+        class="w-full h-full flex flex-col items-center justify-center"
       >
         <img
           :src="folderIconUrl"
@@ -66,7 +66,7 @@
       <!-- Other files generic -->
       <div
         v-else
-        class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-base-300/30 text-base-content/40"
+        class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40"
       >
         <span class="text-3xl">📄</span>
         <span class="text-[10px] uppercase font-bold tracking-wider">{{
@@ -117,7 +117,7 @@
 
     <!-- Info row -->
     <div
-      class="thumbnail-info p-2.5 text-xs flex flex-col gap-1 shrink-0 border-t border-base-content/5 bg-base-200/20"
+      class="thumbnail-info px-1 py-1.5 text-xs flex flex-col gap-0.5 shrink-0"
     >
       <div v-if="isRenaming" class="w-full">
         <input
