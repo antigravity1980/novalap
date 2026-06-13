@@ -546,7 +546,7 @@ const contextMenuItems = computed(() => {
         label: "Убрать из сравнения",
         action: () => galleryStore.removeFromCompare(props.file.path),
       });
-    } else if (galleryStore.canAddMoreToCompare()) {
+    } else if (galleryStore.canAddMoreToCompare) {
       items.push({ separator: true });
       items.push({
         label: "Добавить к сравнению",
