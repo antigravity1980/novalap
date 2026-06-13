@@ -3,6 +3,7 @@
     ref="containerRef"
     class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden focus:outline-none px-2 py-4"
     tabindex="0"
+    @scroll="onScroll"
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
@@ -11,23 +12,25 @@
     @contextmenu.prevent.stop="handleContextMenu"
     style="user-select: none"
   >
-    <div
-      class="grid"
-      :style="{
-        gridTemplateColumns: `repeat(${colsPerRow}, minmax(0, ${thumbnailSize}px))`,
-        gap: galleryStore.thumbnailGap + 'px',
-        alignContent: 'start',
-      }"
-    >
-      <template v-for="row in renderedRows" :key="row.key">
+    <div :style="{ height: totalHeight + 'px', position: 'relative' }">
+      <div
+        v-for="item in visibleItems"
+        :key="item.key"
+        :style="{
+          position: 'absolute',
+          top: item.top + 'px',
+          left: '0px',
+          right: '0px',
+        }"
+      >
         <div
-          v-if="row.type === 'header'"
-          class="group-header col-span-full flex items-center gap-2 px-4 h-10 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
-          @click="onGroupHeaderClick($event, row)"
+          v-if="item.type === 'header'"
+          class="group-header flex items-center gap-2 px-4 h-10 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
+          @click="onGroupHeaderClick($event, item)"
         >
           <svg
             class="w-3 h-3 shrink-0 transition-transform duration-200"
-            :class="collapsedGroups[row.title] ? '-rotate-90' : ''"
+            :class="collapsedGroups[item.title] ? '-rotate-90' : ''"
             viewBox="0 0 12 12"
             fill="none"
             stroke="currentColor"
@@ -37,21 +40,31 @@
           >
             <path d="M3 4.5L6 7.5L9 4.5" />
           </svg>
-          <span>{{ row.title }} ({{ row.fileCount }})</span>
+          <span>{{ item.title }} ({{ item.fileCount }})</span>
         </div>
 
-        <ThumbnailCard
-          v-else-if="!collapsedGroups[row.groupTitle]"
-          :file="row.file"
-          :size="thumbnailSize"
-          :selected="galleryStore.selectedIds.includes(row.file.path)"
-          @click.stop="onCardClick($event, row.file)"
-          @dblclick.stop="onCardDblClick(row.file)"
-          class="shrink-0"
-          :style="{ width: thumbnailSize + 'px' }"
-          :data-path="row.file.path"
-        />
-      </template>
+        <div
+          v-else
+          class="flex flex-wrap"
+          :style="{
+            gap: galleryStore.thumbnailGap + 'px',
+            paddingLeft: galleryStore.thumbnailGap + 'px',
+          }"
+        >
+          <ThumbnailCard
+            v-for="file in item.files"
+            :key="file.path"
+            :file="file"
+            :size="thumbnailSize"
+            :selected="galleryStore.selectedIds.includes(file.path)"
+            @click.stop="onCardClick($event, file)"
+            @dblclick.stop="onCardDblClick(file)"
+            class="shrink-0"
+            :style="{ width: thumbnailSize + 'px' }"
+            :data-path="file.path"
+          />
+        </div>
+      </div>
     </div>
 
     <div v-if="isDragging" class="rubber-band" :style="rubberBandStyle" />
@@ -93,8 +106,11 @@ const navigationStore = useNavigationStore();
 const containerRef = ref(null);
 const contextMenuRef = ref(null);
 const containerWidth = ref(1200);
+const containerHeight = ref(800);
+const scrollTop = ref(0);
 const gap = computed(() => galleryStore.thumbnailGap ?? 11);
 const collapsedGroups = reactive({});
+const BUFFER_ROWS = 5;
 
 function toggleGroupCollapse(title) {
   collapsedGroups[title] = !collapsedGroups[title];
@@ -108,38 +124,96 @@ const colsPerRow = computed(() => {
   );
 });
 
-const renderedRows = computed(() => {
+const HEADER_HEIGHT = 40;
+
+const layoutRows = computed(() => {
+  const rows = [];
+  const cols = colsPerRow.value;
+
   if (!galleryStore.groupBy || galleryStore.groupBy === "none") {
-    return props.files.map((file) => ({
-      type: "file",
-      key: file.path,
-      file,
-      groupTitle: null,
-    }));
+    const files = props.files;
+    for (let i = 0; i < files.length; i += cols) {
+      rows.push({
+        type: "file-row",
+        files: files.slice(i, i + cols),
+        height: props.thumbnailSize,
+      });
+    }
+    return rows;
   }
 
-  const rows = [];
   const groups = groupFilesHelper(props.files, galleryStore.groupBy);
   for (const group of groups) {
     if (!group.files.length) continue;
     rows.push({
       type: "header",
-      key: `header:${group.title}`,
       title: group.title,
       fileCount: group.files.length,
       filePaths: group.files.map((f) => f.path),
+      height: HEADER_HEIGHT,
     });
-    for (const file of group.files) {
-      rows.push({
-        type: "file",
-        key: file.path,
-        file,
-        groupTitle: group.title,
-      });
+    if (!collapsedGroups[group.title]) {
+      const files = group.files;
+      for (let i = 0; i < files.length; i += cols) {
+        rows.push({
+          type: "file-row",
+          files: files.slice(i, i + cols),
+          height: props.thumbnailSize,
+        });
+      }
     }
   }
   return rows;
 });
+
+const totalHeight = computed(() => {
+  let h = 0;
+  for (const row of layoutRows.value) {
+    h += row.height + gap.value;
+  }
+  return h;
+});
+
+const visibleItems = computed(() => {
+  const rows = layoutRows.value;
+  const g = gap.value;
+  const viewTop = scrollTop.value;
+  const viewBottom = viewTop + containerHeight.value;
+
+  let y = 0;
+  const result = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowBottom = y + row.height;
+
+    if (rowBottom >= viewTop - BUFFER_ROWS * (props.thumbnailSize + g) &&
+        y <= viewBottom + BUFFER_ROWS * (props.thumbnailSize + g)) {
+      if (row.type === "header") {
+        result.push({
+          key: `header:${row.title}`,
+          type: "header",
+          title: row.title,
+          fileCount: row.fileCount,
+          filePaths: row.filePaths,
+          top: y,
+        });
+      } else {
+        result.push({
+          key: `row:${i}:${row.files[0]?.path}`,
+          type: "file-row",
+          files: row.files,
+          top: y,
+        });
+      }
+    }
+    y += row.height + g;
+  }
+  return result;
+});
+
+function onScroll(e) {
+  scrollTop.value = e.target.scrollTop;
+}
 
 async function loadEnrichments() {
   const visibleFiles = props.files.filter((file) =>
@@ -310,7 +384,6 @@ async function onCardDblClick(file) {
     file.is_directory === true;
   if (isFolder) {
     await navigationStore.navigateTo(file.path);
-    galleryStore.setFiles(navigationStore.folders);
   } else {
     emit("openQuickLook", file);
   }
@@ -475,9 +548,12 @@ let resizeObserver = null;
 onMounted(() => {
   if (containerRef.value) {
     containerWidth.value = containerRef.value.clientWidth || 1200;
+    containerHeight.value = containerRef.value.clientHeight || 800;
+    scrollTop.value = containerRef.value.scrollTop || 0;
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         containerWidth.value = entry.contentRect.width;
+        containerHeight.value = entry.contentRect.height;
       }
     });
     resizeObserver.observe(containerRef.value);
