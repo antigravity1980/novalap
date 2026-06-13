@@ -79,6 +79,11 @@
   </div>
 </template>
 
+<script>
+// Module-scoped cache to persist scroll position across unmount/remount (e.g. when toggling focus mode)
+const scrollPositionsCache = new Map();
+</script>
+
 <script setup>
 import {
   ref,
@@ -103,8 +108,6 @@ const props = defineProps({
 
 const emit = defineEmits(["openQuickLook"]);
 
-// Global cache to persist scroll position across unmount/remount (e.g. during reload/refresh)
-const scrollPositionsCache = new Map();
 const isUnmounting = ref(false);
 
 onBeforeUnmount(() => {
@@ -235,7 +238,8 @@ const visibleItems = computed(() => {
 function onScroll(e) {
   scrollTop.value = e.target.scrollTop;
   if (isUnmounting.value || navigationStore.isLoading) return;
-  if (navigationStore.currentPath && props.files.length > 0 && totalHeight.value > 0) {
+  const isScrollable = e.target.scrollHeight > e.target.clientHeight;
+  if (isScrollable && navigationStore.currentPath && props.files.length > 0 && totalHeight.value > 0) {
     scrollPositionsCache.set(navigationStore.currentPath, e.target.scrollTop);
   }
 }
