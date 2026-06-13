@@ -675,7 +675,7 @@ async function apply() {
           }
         }
       }
-      emit('success')
+      emit('success', { affectedPaths: filesToProcess, isCopyMode: needCopyToTargets })
     }
   } catch (error) {
     console.error('Batch processing failed:', error)

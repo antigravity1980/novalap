@@ -408,6 +408,9 @@ export const useGalleryStore = defineStore("gallery", {
         if (u.ai_source != null && entry.ai_source !== u.ai_source) {
           entry.ai_source = u.ai_source;
         }
+        if (u.resolution != null && !entry.resolution) {
+          entry.resolution = u.resolution;
+        }
       }
     },
 
@@ -420,12 +423,11 @@ export const useGalleryStore = defineStore("gallery", {
       if (isDir) {
         return !file.dir_count || !file.file_count;
       }
-      return (
-        !file.ai_source &&
-        /\.(png|jpe?g|webp|tiff?|avif|heic|heif|jxl|gif)$/i.test(
-          file.extension || "",
-        )
+      const isImage = /\.(png|jpe?g|webp|tiff?|avif|heic|heif|jxl|gif)$/i.test(
+        file.extension || "",
       );
+      if (!isImage) return false;
+      return !file.ai_source || !file.resolution;
     },
 
     async requestEnrichments(extraPaths) {

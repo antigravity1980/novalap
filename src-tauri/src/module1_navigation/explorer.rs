@@ -58,6 +58,7 @@ pub struct EntryEnrichment {
     pub dir_count: Option<u32>,
     pub file_count: Option<u32>,
     pub ai_source: Option<String>,
+    pub resolution: Option<Resolution>,
 }
 
 /// Список файлов и директорий по пути
@@ -243,6 +244,7 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                     dir_count: None,
                     file_count: None,
                     ai_source: None,
+                    resolution: None,
                 };
             }
             let metadata = match std::fs::metadata(&raw) {
@@ -253,6 +255,7 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                         dir_count: None,
                         file_count: None,
                         ai_source: None,
+                        resolution: None,
                     };
                 }
             };
@@ -263,14 +266,18 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                     dir_count: Some(dir_count),
                     file_count: Some(file_count),
                     ai_source: None,
+                    resolution: None,
                 }
             } else {
                 let ai_source = quick_ai_source(&raw);
+                let ext_str = path.extension().map(|e| e.to_string_lossy().to_lowercase());
+                let resolution = get_file_resolution(path, ext_str.as_deref());
                 EntryEnrichment {
                     path: raw,
                     dir_count: None,
                     file_count: None,
                     ai_source,
+                    resolution,
                 }
             }
         });

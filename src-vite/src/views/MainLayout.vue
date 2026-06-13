@@ -1604,6 +1604,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useNavigationStore } from "@/modules/navigation/store";
 import { useGalleryStore } from "@/modules/gallery/store";
 import { useConfigStore } from "@/stores/configStore";
+import { useUIStore } from "@/stores/uiStore";
+import { clearCachedThumbnail } from "@/modules/gallery/explorerThumbnailsCache.js";
 import { setTheme, getAssetSrc } from "@/common/utils";
 
 // SVG Icons
@@ -1642,6 +1644,7 @@ const router = useRouter();
 const navigationStore = useNavigationStore();
 const galleryStore = useGalleryStore();
 const configStore = useConfigStore();
+const uiStore = useUIStore();
 
 const showDrivesDropdown = ref(false);
 const dragOverFavPath = ref("");
@@ -2264,8 +2267,20 @@ function onCropSaved() {
   refreshData();
 }
 
-function onBatchComplete() {
-  refreshData();
+function onBatchComplete(payload) {
+  if (payload && payload.isCopyMode) {
+    refreshData()
+    return
+  }
+  if (payload && Array.isArray(payload.affectedPaths) && payload.affectedPaths.length > 0) {
+    for (const p of payload.affectedPaths) {
+      clearCachedThumbnail(p)
+      uiStore.updateThumbnailVersion(p)
+      uiStore.updateFileVersion(p)
+    }
+  } else {
+    refreshData()
+  }
 }
 
 // Trash Bin actions
