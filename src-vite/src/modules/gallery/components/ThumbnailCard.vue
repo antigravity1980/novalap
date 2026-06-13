@@ -321,7 +321,6 @@ async function loadThumbnail() {
   if (!isImage.value) return;
 
   const currentPath = props.file.path;
-  
   const targetSize = sizeBuckets.find(b => b >= props.size) || 1024;
   const cacheKey = `${currentPath}__${targetSize}`;
 
@@ -329,6 +328,17 @@ async function loadThumbnail() {
   if (cached) {
     thumbnailUrl.value = cached;
     return;
+  }
+
+  for (const bucket of sizeBuckets) {
+    if (bucket >= props.size) {
+      const altKey = `${currentPath}__${bucket}`;
+      const altCached = getCachedThumbnail(altKey);
+      if (altCached) {
+        thumbnailUrl.value = altCached;
+        return;
+      }
+    }
   }
 
   if (debounceTimeout) {

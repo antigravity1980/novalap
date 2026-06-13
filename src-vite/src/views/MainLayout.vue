@@ -1176,12 +1176,11 @@
             </div>
           </div>
         </div>
-
-        <GalleryGrid v-else @open-quick-look="openQuickLook" />
       </div>
 
       <!-- Status Bar -->
       <footer
+        v-if="!galleryStore.focusMode"
         class="h-7 border-t border-neutral/20 bg-base-200/40 text-[11px] text-base-content/60 flex items-center justify-between px-4 select-none shrink-0"
       >
         <div class="flex items-center gap-3">
@@ -1576,10 +1575,19 @@
 
     <!-- Focus mode: полноэкранный режим галереи + избранное слева -->
     <FocusOverlay
-      v-if="galleryStore.focusMode"
+      v-show="galleryStore.focusMode"
       @open-quick-look="openQuickLook"
       @exit-focus="onExitFocus"
     />
+
+    <!-- GalleryGrid: единый экземпляр, позиционируется по режиму -->
+    <div
+      v-show="!activeTab || activeTab !== 'trash'"
+      :class="galleryStore.focusMode ? 'fixed inset-0 z-40 ml-64 flex flex-col bg-base-100' : 'flex-1 flex flex-col overflow-hidden relative bg-base-100'"
+      :style="galleryStore.focusMode ? {} : { }"
+    >
+      <GalleryGrid @open-quick-look="openQuickLook" />
+    </div>
   </div>
 </template>
 

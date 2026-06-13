@@ -77,7 +77,7 @@
       </div>
 
       <div class="flex-1 overflow-hidden">
-        <GalleryGrid @open-quick-look="openQuickLook" />
+        <!-- Галерея рендерится извне (MainLayout), чтобы не пересоздаваться -->
       </div>
     </div>
   </div>
@@ -90,7 +90,6 @@ import { useGalleryStore } from "@/modules/gallery/store";
 import { useConfigStore } from "@/stores/configStore";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import GalleryGrid from "@/modules/gallery/components/GalleryGrid.vue";
 
 const emit = defineEmits(["open-quick-look", "exit-focus"]);
 
