@@ -45,10 +45,11 @@
 
         <div
           v-else
-          class="flex flex-wrap"
+          class="grid"
           :style="{
+            gridTemplateColumns: `repeat(${colsPerRow}, minmax(0, ${thumbnailSize}px))`,
             gap: galleryStore.thumbnailGap + 'px',
-            paddingLeft: galleryStore.thumbnailGap + 'px',
+            justifyContent: 'start',
           }"
         >
           <ThumbnailCard
@@ -125,10 +126,12 @@ const colsPerRow = computed(() => {
 });
 
 const HEADER_HEIGHT = 40;
+const ROW_HEIGHT_OFFSET = 42;
 
 const layoutRows = computed(() => {
   const rows = [];
   const cols = colsPerRow.value;
+  const rowH = Math.round(props.thumbnailSize * 0.75) + ROW_HEIGHT_OFFSET;
 
   if (!galleryStore.groupBy || galleryStore.groupBy === "none") {
     const files = props.files;
@@ -136,7 +139,7 @@ const layoutRows = computed(() => {
       rows.push({
         type: "file-row",
         files: files.slice(i, i + cols),
-        height: props.thumbnailSize,
+        height: rowH,
       });
     }
     return rows;
@@ -158,7 +161,7 @@ const layoutRows = computed(() => {
         rows.push({
           type: "file-row",
           files: files.slice(i, i + cols),
-          height: props.thumbnailSize,
+          height: rowH,
         });
       }
     }

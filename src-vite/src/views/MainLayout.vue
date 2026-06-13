@@ -2620,15 +2620,22 @@ function handleKeyDown(e) {
 }
 
 let unlistenDirectoryChanged = null;
+let directoryRefreshDebounce = null;
+let isDirectoryRefreshPending = false;
 
 onMounted(async () => {
   document.addEventListener("keydown", handleKeyDown);
 
-  // Подписка на событие изменения папки
   unlistenDirectoryChanged = await listen("directory-changed", (event) => {
     const changedPath = event.payload;
     if (changedPath === navigationStore.currentPath) {
-      refreshData();
+      if (isDirectoryRefreshPending) return;
+      isDirectoryRefreshPending = true;
+      if (directoryRefreshDebounce) clearTimeout(directoryRefreshDebounce);
+      directoryRefreshDebounce = setTimeout(() => {
+        isDirectoryRefreshPending = false;
+        refreshData();
+      }, 500);
     }
   });
 
