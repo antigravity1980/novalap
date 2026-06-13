@@ -347,7 +347,7 @@ function onMouseDown(e) {
   dragCurrent.x = x;
   dragCurrent.y = y;
 
-  if (!e.ctrlKey && !e.shiftKey) {
+  if (!galleryStore.selectionMode && !e.ctrlKey && !e.shiftKey) {
     galleryStore.clearSelection();
     selectionBeforeDrag = [];
   } else {
