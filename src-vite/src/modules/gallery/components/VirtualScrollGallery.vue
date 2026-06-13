@@ -101,6 +101,9 @@ const props = defineProps({
 
 const emit = defineEmits(["openQuickLook"]);
 
+// Global cache to persist scroll position across unmount/remount (e.g. during reload/refresh)
+const scrollPositionsCache = new Map();
+
 const galleryStore = useGalleryStore();
 const navigationStore = useNavigationStore();
 const containerRef = ref(null);
@@ -224,6 +227,9 @@ const visibleItems = computed(() => {
 
 function onScroll(e) {
   scrollTop.value = e.target.scrollTop;
+  if (navigationStore.currentPath) {
+    scrollPositionsCache.set(navigationStore.currentPath, e.target.scrollTop);
+  }
 }
 
 async function loadEnrichments() {
@@ -562,7 +568,19 @@ onMounted(() => {
   if (containerRef.value) {
     containerWidth.value = containerRef.value.clientWidth || 1200;
     containerHeight.value = containerRef.value.clientHeight || 800;
-    scrollTop.value = containerRef.value.scrollTop || 0;
+    
+    const savedScroll = scrollPositionsCache.get(navigationStore.currentPath);
+    if (savedScroll !== undefined && savedScroll > 0) {
+      scrollTop.value = savedScroll;
+      nextTick(() => {
+        if (containerRef.value) {
+          containerRef.value.scrollTop = savedScroll;
+        }
+      });
+    } else {
+      scrollTop.value = containerRef.value.scrollTop || 0;
+    }
+
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         containerWidth.value = entry.target.clientWidth || 1200;
