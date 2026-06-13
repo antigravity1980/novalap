@@ -565,7 +565,34 @@ function onKeyDown(e) {
 }
 
 let resizeObserver = null;
+let scrollRestored = false;
+
+// Watch totalHeight to restore scroll position when the gallery height is computed
+watch(
+  [totalHeight, () => navigationStore.currentPath],
+  ([newHeight, currentPath]) => {
+    if (newHeight > 0 && !scrollRestored) {
+      const savedScroll = scrollPositionsCache.get(currentPath);
+      if (savedScroll !== undefined && savedScroll > 0) {
+        nextTick(() => {
+          if (containerRef.value) {
+            containerRef.value.scrollTop = savedScroll;
+            scrollTop.value = savedScroll;
+            if (Math.abs(containerRef.value.scrollTop - savedScroll) < 2) {
+              scrollRestored = true;
+            }
+          }
+        });
+      } else {
+        scrollRestored = true;
+      }
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
+  scrollRestored = false;
   if (containerRef.value) {
     containerWidth.value = containerRef.value.clientWidth || 1200;
     containerHeight.value = containerRef.value.clientHeight || 800;
