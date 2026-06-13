@@ -29,7 +29,7 @@
           @click="onGroupHeaderClick($event, item)"
         >
           <svg
-            class="w-3 h-3 shrink-0 transition-transform duration-200"
+            class="w-4 h-4 shrink-0 transition-transform duration-200 cursor-pointer hover:text-primary"
             :class="collapsedGroups[item.title] ? '-rotate-90' : ''"
             viewBox="0 0 12 12"
             fill="none"
@@ -37,6 +37,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
+            @click.stop="toggleGroupCollapse(item.title)"
           >
             <path d="M3 4.5L6 7.5L9 4.5" />
           </svg>
@@ -492,7 +493,7 @@ function onGroupHeaderClick(e, row) {
       ];
     }
   } else {
-    toggleGroupCollapse(row.title);
+    galleryStore.selectedIds = [...row.filePaths];
   }
 }
 
