@@ -395,6 +395,7 @@ export const useGalleryStore = defineStore("gallery", {
 
     applyEnrichments(updates) {
       if (!Array.isArray(updates) || updates.length === 0) return;
+      console.log("applyEnrichments updates received count:", updates.length, "Sample updates:", updates.slice(0, 3));
       const map = new Map(updates.map((u) => [u.path, u]));
       let changed = false;
       for (let i = 0; i < this.files.length; i++) {
