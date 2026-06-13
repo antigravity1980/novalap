@@ -396,21 +396,41 @@ export const useGalleryStore = defineStore("gallery", {
     applyEnrichments(updates) {
       if (!Array.isArray(updates) || updates.length === 0) return;
       const map = new Map(updates.map((u) => [u.path, u]));
-      for (const entry of this.files) {
+      let changed = false;
+      for (let i = 0; i < this.files.length; i++) {
+        const entry = this.files[i];
         const u = map.get(entry.path);
         if (!u) continue;
+        
+        let entryChanged = false;
+        const newEntry = { ...entry };
+        
         if (u.dir_count != null && entry.dir_count !== u.dir_count) {
-          entry.dir_count = u.dir_count;
+          newEntry.dir_count = u.dir_count;
+          entryChanged = true;
         }
         if (u.file_count != null && entry.file_count !== u.file_count) {
-          entry.file_count = u.file_count;
+          newEntry.file_count = u.file_count;
+          entryChanged = true;
         }
         if (u.ai_source != null && entry.ai_source !== u.ai_source) {
-          entry.ai_source = u.ai_source;
+          newEntry.ai_source = u.ai_source;
+          entryChanged = true;
         }
-        if (u.resolution != null && !entry.resolution) {
-          entry.resolution = u.resolution;
+        if (u.resolution != null) {
+          if (!entry.resolution || entry.resolution.width !== u.resolution.width || entry.resolution.height !== u.resolution.height) {
+            newEntry.resolution = u.resolution;
+            entryChanged = true;
+          }
         }
+        
+        if (entryChanged) {
+          this.files[i] = newEntry;
+          changed = true;
+        }
+      }
+      if (changed) {
+        this.files = [...this.files];
       }
     },
 
@@ -421,13 +441,13 @@ export const useGalleryStore = defineStore("gallery", {
         file.file_type === "directory" ||
         file.is_directory === true;
       if (isDir) {
-        return !file.dir_count || !file.file_count;
+        return file.dir_count === undefined || file.file_count === undefined;
       }
       const isImage = /\.(png|jpe?g|webp|tiff?|avif|heic|heif|jxl|gif)$/i.test(
         file.extension || "",
       );
       if (!isImage) return false;
-      return !file.ai_source || !file.resolution;
+      return !file.resolution;
     },
 
     async requestEnrichments(extraPaths) {

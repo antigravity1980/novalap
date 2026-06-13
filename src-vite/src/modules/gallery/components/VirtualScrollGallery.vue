@@ -144,9 +144,10 @@ const layoutItems = computed(() => {
     for (let r = 0; r < totalRows; r++) {
       const start = r * c;
       const rowFiles = files.slice(start, start + c);
+      const firstFilePath = rowFiles[0]?.path || "empty";
       result.push({
         type: "file-row",
-        key: `row-${r}`,
+        key: `row-${c}-${props.thumbnailSize}-${r}-${firstFilePath}`,
         files: rowFiles,
         top: r * (rh + g),
         height: rh,
@@ -176,9 +177,10 @@ const layoutItems = computed(() => {
       for (let r = 0; r < rows; r++) {
         const start = r * c;
         const rowFiles = files.slice(start, start + c);
+        const firstFilePath = rowFiles[0]?.path || "empty";
         result.push({
           type: "file-row",
-          key: `row-${group.title}-${r}`,
+          key: `row-${group.title}-${c}-${props.thumbnailSize}-${r}-${firstFilePath}`,
           files: rowFiles,
           top: y,
           height: rh,
