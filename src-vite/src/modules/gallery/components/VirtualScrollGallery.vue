@@ -85,6 +85,7 @@ import {
   computed,
   onMounted,
   onUnmounted,
+  onBeforeUnmount,
   reactive,
   watch,
   nextTick,
@@ -104,6 +105,11 @@ const emit = defineEmits(["openQuickLook"]);
 
 // Global cache to persist scroll position across unmount/remount (e.g. during reload/refresh)
 const scrollPositionsCache = new Map();
+const isUnmounting = ref(false);
+
+onBeforeUnmount(() => {
+  isUnmounting.value = true;
+});
 
 const galleryStore = useGalleryStore();
 const navigationStore = useNavigationStore();
@@ -228,7 +234,8 @@ const visibleItems = computed(() => {
 
 function onScroll(e) {
   scrollTop.value = e.target.scrollTop;
-  if (navigationStore.currentPath) {
+  if (isUnmounting.value || navigationStore.isLoading) return;
+  if (navigationStore.currentPath && props.files.length > 0 && totalHeight.value > 0) {
     scrollPositionsCache.set(navigationStore.currentPath, e.target.scrollTop);
   }
 }
