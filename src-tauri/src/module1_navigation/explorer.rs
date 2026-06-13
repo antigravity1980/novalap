@@ -627,12 +627,35 @@ fn get_file_resolution(path: &Path, extension: Option<&str>) -> Option<Resolutio
         t_common::NORMAL_IMGS.contains(&ext) || t_common::FFMPEG_BACKED_IMGS.contains(&ext);
 
     if is_image {
-        if let Ok(dim) = imagesize::size(path) {
-            return Some(Resolution {
-                width: dim.width as u32,
-                height: dim.height as u32,
-            });
+        match imagesize::size(path) {
+            Ok(dim) => {
+                return Some(Resolution {
+                    width: dim.width as u32,
+                    height: dim.height as u32,
+                });
+            }
+            Err(e) => {
+                let log_msg = format!("imagesize failed for {:?}: {:?}\n", path, e);
+                let _ = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(r"d:\NovaLAP\novalap\debug_log.txt")
+                    .and_then(|mut f| {
+                        use std::io::Write;
+                        write!(f, "{}", log_msg)
+                    });
+            }
         }
+    } else {
+        let log_msg = format!("get_file_resolution skipped (not an image) for {:?}, ext={:?}\n", path, ext);
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(r"d:\NovaLAP\novalap\debug_log.txt")
+            .and_then(|mut f| {
+                use std::io::Write;
+                write!(f, "{}", log_msg)
+            });
     }
 
     None

@@ -37,6 +37,7 @@ ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "
 tauri = { version = "2", features = [
     "macos-private-api",
     "protocol-asset",
+    "devtools",
 ] }
 tauri-plugin-window-state = "2.4.1"
 tauri-plugin-shell = "2.3.5"
