@@ -366,7 +366,7 @@ async function loadThumbnail() {
         path: currentPath,
         size: targetSize,
       });
-      const busterUrl = url + versionQuery;
+      const busterUrl = url.startsWith("data:") ? url : url + versionQuery;
       setCachedThumbnail(cacheKey, busterUrl);
       if (props.file.path === currentPath) {
         thumbnailUrl.value = busterUrl;
