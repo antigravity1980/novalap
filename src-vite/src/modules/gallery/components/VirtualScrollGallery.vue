@@ -146,6 +146,7 @@ const layoutItems = computed(() => {
       const rowFiles = files.slice(start, start + c);
       result.push({
         type: "file-row",
+        key: `row-${r}`,
         files: rowFiles,
         top: r * (rh + g),
         height: rh,
@@ -161,6 +162,7 @@ const layoutItems = computed(() => {
     if (!group.files.length) continue;
     result.push({
       type: "header",
+      key: `header-${group.title}`,
       title: group.title,
       fileCount: group.files.length,
       filePaths: group.files.map((f) => f.path),
@@ -176,6 +178,7 @@ const layoutItems = computed(() => {
         const rowFiles = files.slice(start, start + c);
         result.push({
           type: "file-row",
+          key: `row-${group.title}-${r}`,
           files: rowFiles,
           top: y,
           height: rh,
@@ -217,27 +220,26 @@ function onScroll(e) {
 }
 
 async function loadEnrichments() {
-  const visibleFiles = props.files.filter((file) =>
-    galleryStore.needsEnrichment(file),
-  );
+  const visibleFiles = visibleItems.value
+    .flatMap((item) => item.files || [])
+    .filter((file) => galleryStore.needsEnrichment(file));
   if (visibleFiles.length === 0) return;
+  
   await galleryStore.requestEnrichments(
-    visibleFiles.slice(0, 60).map((f) => f.path),
+    visibleFiles.map((f) => f.path)
   );
 }
 
-let prevFileCount = 0;
-let prevFileKey = "";
+let enrichDebounce = null;
 watch(
-  () => props.files,
-  (newFiles) => {
-    const newKey = newFiles.length + ":" + (newFiles[0]?.path || "");
-    if (newKey === prevFileKey && newFiles.length === prevFileCount) return;
-    prevFileKey = newKey;
-    prevFileCount = newFiles.length;
-    loadEnrichments();
+  visibleItems,
+  () => {
+    if (enrichDebounce) clearTimeout(enrichDebounce);
+    enrichDebounce = setTimeout(() => {
+      loadEnrichments();
+    }, 150);
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 let primeDebounce = null;
