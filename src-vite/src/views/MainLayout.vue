@@ -67,6 +67,7 @@
                 : '',
             ]"
             @click="navigateTo(path)"
+            @contextmenu.prevent.stop="handleFavoriteContextMenu($event, path)"
             @dragover.prevent="dragOverFavPath = path"
             @dragenter.prevent="dragOverFavPath = path"
             @dragleave="dragOverFavPath = ''"
@@ -1583,6 +1584,13 @@
       @open-quick-look="openQuickLook"
       @exit-focus="onExitFocus"
     />
+
+    <ContextMenu
+      ref="favContextMenuRef"
+      :menuItems="favContextMenuItems"
+      :smallIcon="true"
+      style="display: none"
+    />
   </div>
 </template>
 
@@ -1639,6 +1647,7 @@ import CompareView from "@/modules/viewer/components/CompareView.vue";
 import QuickCrop from "@/modules/viewer/components/QuickCrop.vue";
 import BatchOperations from "@/modules/operations/components/BatchOperations.vue";
 import MessageBox from "@/components/MessageBox.vue";
+import ContextMenu from "@/components/ContextMenu.vue";
 
 const router = useRouter();
 const navigationStore = useNavigationStore();
@@ -1648,6 +1657,24 @@ const uiStore = useUIStore();
 
 const showDrivesDropdown = ref(false);
 const dragOverFavPath = ref("");
+
+const contextMenuFavPath = ref("");
+const favContextMenuRef = ref(null);
+const favContextMenuItems = computed(() => [
+  {
+    label: "Открыть в проводнике",
+    action: () => {
+      if (contextMenuFavPath.value) {
+        revealInExplorer(contextMenuFavPath.value);
+      }
+    },
+  },
+]);
+
+function handleFavoriteContextMenu(e, path) {
+  contextMenuFavPath.value = path;
+  favContextMenuRef.value?.open(e.clientX, e.clientY);
+}
 
 async function handleFavDrop(e, destPath) {
   dragOverFavPath.value = "";

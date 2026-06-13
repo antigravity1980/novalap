@@ -37,6 +37,7 @@
               : 'text-base-content/75 hover:bg-base-100/60 hover:text-base-content hover:border-neutral/20'
           "
           @click="navigateTo(path)"
+          @contextmenu.prevent.stop="handleFavoriteContextMenu($event, path)"
           @dragover.prevent="dragOverFavPath = path"
           @dragenter.prevent="dragOverFavPath = path"
           @dragleave="dragOverFavPath = ''"
@@ -84,6 +85,13 @@
         />
       </div>
     </div>
+
+    <ContextMenu
+      ref="favContextMenuRef"
+      :menuItems="favContextMenuItems"
+      :smallIcon="true"
+      style="display: none"
+    />
   </div>
 </template>
 
@@ -95,6 +103,7 @@ import { useConfigStore } from "@/stores/configStore";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import VirtualScrollGallery from "./VirtualScrollGallery.vue";
+import ContextMenu from "@/components/ContextMenu.vue";
 
 const emit = defineEmits(["open-quick-look", "exit-focus"]);
 
@@ -105,6 +114,24 @@ const configStore = useConfigStore();
 const validFavoritePaths = ref([]);
 const favoriteFolders = computed(() => validFavoritePaths.value);
 const dragOverFavPath = ref("");
+
+const contextMenuFavPath = ref("");
+const favContextMenuRef = ref(null);
+const favContextMenuItems = computed(() => [
+  {
+    label: "Открыть в проводнике",
+    action: () => {
+      if (contextMenuFavPath.value) {
+        invoke("open_in_explorer", { path: contextMenuFavPath.value });
+      }
+    },
+  },
+]);
+
+function handleFavoriteContextMenu(e, path) {
+  contextMenuFavPath.value = path;
+  favContextMenuRef.value?.open(e.clientX, e.clientY);
+}
 
 const getFileName = (path) => {
   if (!path) return "";
