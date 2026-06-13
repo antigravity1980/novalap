@@ -1,7 +1,7 @@
 <template>
   <div
     ref="containerRef"
-    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden focus:outline-none px-2 py-4"
+    class="virtual-scroll-gallery h-full overflow-y-auto overflow-x-hidden focus:outline-none"
     tabindex="0"
     @scroll="onScroll"
     @mousedown="onMouseDown"
@@ -19,13 +19,13 @@
         :style="{
           position: 'absolute',
           top: item.top + 'px',
-          left: '0px',
-          right: '0px',
+          left: '0',
+          right: '0',
         }"
       >
         <div
           v-if="item.type === 'header'"
-          class="group-header flex items-center gap-2 px-4 h-10 text-xs font-bold border-b border-neutral/20 text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150 rounded"
+          class="group-header flex items-center gap-2 px-4 h-10 text-xs font-bold text-base-content/60 select-none hover:bg-neutral/5 hover:text-base-content cursor-pointer transition-colors duration-150"
           @click="onGroupHeaderClick($event, item)"
         >
           <svg
@@ -45,22 +45,22 @@
 
         <div
           v-else
-          class="grid w-full"
+          class="grid-row"
           :style="{
-            gridTemplateColumns: `repeat(${colsPerRow}, minmax(0, ${thumbnailSize}px))`,
-            gap: galleryStore.thumbnailGap + 'px',
-            justifyContent: 'start',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+            gap: gap + 'px',
+            padding: '0 8px',
           }"
         >
           <ThumbnailCard
             v-for="file in item.files"
             :key="file.path"
             :file="file"
-            :size="thumbnailSize"
+            :size="cellWidth"
             :selected="galleryStore.selectedIds.includes(file.path)"
             @click.stop="onCardClick($event, file)"
             @dblclick.stop="onCardDblClick(file)"
-            class="shrink-0"
             :data-path="file.path"
           />
         </div>
@@ -110,105 +110,104 @@ const containerHeight = ref(800);
 const scrollTop = ref(0);
 const gap = computed(() => galleryStore.thumbnailGap ?? 11);
 const collapsedGroups = reactive({});
-const BUFFER_ROWS = 5;
+const BUFFER = 5;
+
+const HEADER_H = 40;
+const INFO_H = 48;
 
 function toggleGroupCollapse(title) {
   collapsedGroups[title] = !collapsedGroups[title];
 }
 
-const colsPerRow = computed(() => {
-  const width = Math.max(320, containerWidth.value || 1200);
-  return Math.max(
-    1,
-    Math.floor((width - 16 + gap.value) / (props.thumbnailSize + gap.value)),
-  );
+const cols = computed(() => {
+  const w = Math.max(320, containerWidth.value || 1200);
+  const cell = props.thumbnailSize + gap.value;
+  return Math.max(1, Math.floor((w + gap.value) / cell));
 });
 
-const HEADER_HEIGHT = 40;
-const ROW_HEIGHT_OFFSET = 42;
+const cellWidth = computed(() => {
+  const w = Math.max(320, containerWidth.value || 1200);
+  return Math.floor((w - gap.value * (cols.value - 1) - 16) / cols.value);
+});
 
-const layoutRows = computed(() => {
-  const rows = [];
-  const cols = colsPerRow.value;
-  const rowH = Math.round(props.thumbnailSize * 0.75) + ROW_HEIGHT_OFFSET;
+const rowH = computed(() => Math.round(props.thumbnailSize * 0.75) + INFO_H);
+
+const layoutItems = computed(() => {
+  const c = cols.value;
+  const rh = rowH.value;
+  const g = gap.value;
 
   if (!galleryStore.groupBy || galleryStore.groupBy === "none") {
+    const result = [];
     const files = props.files;
-    for (let i = 0; i < files.length; i += cols) {
-      rows.push({
+    const totalRows = Math.ceil(files.length / c);
+    for (let r = 0; r < totalRows; r++) {
+      const start = r * c;
+      const rowFiles = files.slice(start, start + c);
+      result.push({
         type: "file-row",
-        files: files.slice(i, i + cols),
-        height: rowH,
+        files: rowFiles,
+        top: r * (rh + g),
+        height: rh,
       });
     }
-    return rows;
+    return result;
   }
 
   const groups = groupFilesHelper(props.files, galleryStore.groupBy);
+  const result = [];
+  let y = 0;
   for (const group of groups) {
     if (!group.files.length) continue;
-    rows.push({
+    result.push({
       type: "header",
       title: group.title,
       fileCount: group.files.length,
       filePaths: group.files.map((f) => f.path),
-      height: HEADER_HEIGHT,
+      top: y,
+      height: HEADER_H,
     });
+    y += HEADER_H + g;
     if (!collapsedGroups[group.title]) {
       const files = group.files;
-      for (let i = 0; i < files.length; i += cols) {
-        rows.push({
+      const rows = Math.ceil(files.length / c);
+      for (let r = 0; r < rows; r++) {
+        const start = r * c;
+        const rowFiles = files.slice(start, start + c);
+        result.push({
           type: "file-row",
-          files: files.slice(i, i + cols),
-          height: rowH,
+          files: rowFiles,
+          top: y,
+          height: rh,
         });
+        y += rh + g;
       }
     }
   }
-  return rows;
+  return result;
 });
 
 const totalHeight = computed(() => {
-  let h = 0;
-  for (const row of layoutRows.value) {
-    h += row.height + gap.value;
-  }
-  return h;
+  const items = layoutItems.value;
+  if (items.length === 0) return 0;
+  const last = items[items.length - 1];
+  return last.top + last.height + gap.value;
 });
 
 const visibleItems = computed(() => {
-  const rows = layoutRows.value;
+  const items = layoutItems.value;
+  if (items.length === 0) return [];
   const g = gap.value;
-  const viewTop = scrollTop.value;
-  const viewBottom = viewTop + containerHeight.value;
+  const buf = BUFFER * (rowH.value + g);
+  const vTop = scrollTop.value - buf;
+  const vBot = scrollTop.value + containerHeight.value + buf;
 
-  let y = 0;
   const result = [];
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const rowBottom = y + row.height;
-
-    if (rowBottom >= viewTop - BUFFER_ROWS * (props.thumbnailSize + g) &&
-        y <= viewBottom + BUFFER_ROWS * (props.thumbnailSize + g)) {
-      if (row.type === "header") {
-        result.push({
-          key: `header:${row.title}`,
-          type: "header",
-          title: row.title,
-          fileCount: row.fileCount,
-          filePaths: row.filePaths,
-          top: y,
-        });
-      } else {
-        result.push({
-          key: `row:${i}:${row.files[0]?.path}`,
-          type: "file-row",
-          files: row.files,
-          top: y,
-        });
-      }
-    }
-    y += row.height + g;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.top + item.height < vTop) continue;
+    if (item.top > vBot) break;
+    result.push(item);
   }
   return result;
 });
@@ -229,13 +228,17 @@ async function loadEnrichments() {
 
 let prevFileCount = 0;
 let prevFileKey = "";
-watch(() => props.files, (newFiles) => {
-  const newKey = newFiles.length + ":" + (newFiles[0]?.path || "");
-  if (newKey === prevFileKey && newFiles.length === prevFileCount) return;
-  prevFileKey = newKey;
-  prevFileCount = newFiles.length;
-  loadEnrichments();
-}, { immediate: true });
+watch(
+  () => props.files,
+  (newFiles) => {
+    const newKey = newFiles.length + ":" + (newFiles[0]?.path || "");
+    if (newKey === prevFileKey && newFiles.length === prevFileCount) return;
+    prevFileKey = newKey;
+    prevFileCount = newFiles.length;
+    loadEnrichments();
+  },
+  { immediate: true },
+);
 
 let primeDebounce = null;
 let prevSelectionKey = "";
@@ -295,7 +298,6 @@ function getFilesInRect(rx1, ry1, rx2, ry2) {
   const right = Math.max(rx1, rx2);
   const top = Math.min(ry1, ry2);
   const bottom = Math.max(ry1, ry2);
-
   return cardRects
     .filter(
       (r) =>
@@ -514,14 +516,14 @@ function onKeyDown(e) {
     }
     if (currentIndex === -1) currentIndex = 0;
 
-    const cols = Math.max(1, colsPerRow.value || 1);
+    const c = Math.max(1, cols.value);
     let nextIndex = currentIndex;
     if (e.key === "ArrowLeft") nextIndex = Math.max(0, currentIndex - 1);
     else if (e.key === "ArrowRight")
       nextIndex = Math.min(props.files.length - 1, currentIndex + 1);
-    else if (e.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - cols);
+    else if (e.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - c);
     else if (e.key === "ArrowDown")
-      nextIndex = Math.min(props.files.length - 1, currentIndex + cols);
+      nextIndex = Math.min(props.files.length - 1, currentIndex + c);
 
     if (e.shiftKey) {
       if (anchorIndex.value === -1) anchorIndex.value = currentIndex;
@@ -554,8 +556,8 @@ onMounted(() => {
     scrollTop.value = containerRef.value.scrollTop || 0;
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        containerWidth.value = entry.contentRect.width;
-        containerHeight.value = entry.contentRect.height;
+        containerWidth.value = entry.target.clientWidth || 1200;
+        containerHeight.value = entry.target.clientHeight || 800;
       }
     });
     resizeObserver.observe(containerRef.value);
