@@ -130,7 +130,7 @@ const cellWidth = computed(() => {
   return Math.floor((w - gap.value * (cols.value - 1) - 16) / cols.value);
 });
 
-const rowH = computed(() => Math.round(props.thumbnailSize * 0.75) + INFO_H);
+const rowH = computed(() => Math.round(cellWidth.value * 0.75) + INFO_H);
 
 const layoutItems = computed(() => {
   const c = cols.value;
