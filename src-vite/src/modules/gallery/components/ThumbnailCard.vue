@@ -10,6 +10,7 @@
         dragOverCard,
       'opacity-50 grayscale-[35%]': isCut,
     }"
+    :style="{ width: size + 'px' }"
     @click="$emit('click', $event)"
     @dblclick="$emit('dblclick', $event)"
     @contextmenu.prevent.stop="handleContextMenu($event)"
@@ -26,7 +27,7 @@
     <!-- Thumbnail Image Container -->
     <div
       class="thumbnail-image flex items-center justify-center overflow-hidden relative select-none w-full"
-      style="aspect-ratio: 4/3"
+      :style="{ height: size * 0.75 + 'px' }"
     >
       <img
         v-if="isImage && thumbnailUrl"

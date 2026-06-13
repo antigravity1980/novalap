@@ -48,7 +48,7 @@
           class="grid-row"
           :style="{
             display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${cols}, minmax(0, ${props.thumbnailSize}px))`,
             gap: gap + 'px',
             padding: '0 8px',
           }"
@@ -57,7 +57,7 @@
             v-for="file in item.files"
             :key="file.path"
             :file="file"
-            :size="cellWidth"
+            :size="thumbnailSize"
             :selected="galleryStore.selectedIds.includes(file.path)"
             @click.stop="onCardClick($event, file)"
             @dblclick.stop="onCardDblClick(file)"
@@ -130,7 +130,7 @@ const cellWidth = computed(() => {
   return Math.floor((w - gap.value * (cols.value - 1) - 16) / cols.value);
 });
 
-const rowH = computed(() => Math.round(cellWidth.value * 0.75) + INFO_H);
+const rowH = computed(() => Math.round(props.thumbnailSize * 0.75) + INFO_H);
 
 const layoutItems = computed(() => {
   const c = cols.value;
