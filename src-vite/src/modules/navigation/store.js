@@ -207,7 +207,20 @@ export const useNavigationStore = defineStore("navigation", {
 
     async refresh() {
       if (this.currentPath) {
-        await this.navigateTo(this.currentPath);
+        try {
+          const path = this.currentPath;
+          const folders = await invoke("list_directory", { path });
+          this.folders = folders;
+          
+          const galleryStore = useGalleryStore();
+          galleryStore.setFiles(folders);
+
+          const treeData = await invoke("expand_folder", { path });
+          this.treeFolders[path] = treeData;
+        } catch (error) {
+          console.error("Refresh error:", error);
+          await this.navigateTo(this.currentPath);
+        }
       }
     },
 
