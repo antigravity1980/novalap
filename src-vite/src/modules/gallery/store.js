@@ -185,7 +185,6 @@ export const useGalleryStore = defineStore("gallery", {
     // shallowRef: большой массив файлов, нет смысла гонять Proxy по каждому элементу.
     // Обновляется через $patch / прямое присваивание, реактивность по длине/идентичности.
     files: [],
-    filteredFiles: [],
     isLoading: false,
 
     // Стек сравнения (выживает между папками)
@@ -253,7 +252,6 @@ export const useGalleryStore = defineStore("gallery", {
     // Мемоизированный (через Vue computed) пайплайн отображения файлов.
     // Работает только при реальном изменении ссылок или фильтров/сортировки/группировки.
     displayedFiles: (state) => {
-      // alias для читаемости + одиночная точка входа
       const allFiles = Array.isArray(state.files) ? state.files : (state.files && Array.isArray(state.files.value) ? state.files.value : []);
       if (!allFiles || allFiles.length === 0) return [];
 
@@ -261,12 +259,10 @@ export const useGalleryStore = defineStore("gallery", {
       const hasActiveFilter =
         !!f.format || !!f.aiSource || !!f.dateFrom || !!f.dateTo || !!f.search;
       const hasGrouping = !!state.groupBy && state.groupBy !== "none";
-
-      // Сортировка
       const sortBy = state.sortBy;
       const sortOrder = state.sortOrder;
-      // Используем копию только когда нужна сортировка/фильтрация
-      let result = [...allFiles];
+
+      let result = hasActiveFilter ? [...allFiles] : allFiles;
 
       if (hasActiveFilter) {
         const q = f.search ? String(f.search).toLowerCase() : null;
@@ -275,7 +271,6 @@ export const useGalleryStore = defineStore("gallery", {
 
         const normalizeSource = (v) =>
           v == null ? "" : String(v).trim().replace(/\s+/g, " ");
-
         const normalizeExt = (v) => {
           if (v == null) return "";
           return String(v).trim().toLowerCase();
@@ -284,7 +279,6 @@ export const useGalleryStore = defineStore("gallery", {
         result = result.filter((file) => {
           const fileExt = normalizeExt(file.extension);
           const wantExt = normalizeExt(f.format);
-
           if (wantExt && fileExt !== wantExt) return false;
 
           const fileSource = normalizeSource(file.ai_source);
@@ -313,44 +307,45 @@ export const useGalleryStore = defineStore("gallery", {
         });
       }
 
-      // Сортировка по выбранному полю
-      const dir = sortOrder === "desc" ? -1 : 1;
-      result.sort((a, b) => {
-        const aIsDir =
-          a.is_dir === true ||
-          a.file_type === "directory" ||
-          a.is_directory === true;
-        const bIsDir =
-          b.is_dir === true ||
-          b.file_type === "directory" ||
-          b.is_directory === true;
-        if (aIsDir && !bIsDir) return -1;
-        if (!aIsDir && bIsDir) return 1;
+      const isDefaultSort = sortBy === "name" && sortOrder === "asc";
+      if (!isDefaultSort) {
+        const dir = sortOrder === "desc" ? -1 : 1;
+        result.sort((a, b) => {
+          const aIsDir =
+            a.is_dir === true ||
+            a.file_type === "directory" ||
+            a.is_directory === true;
+          const bIsDir =
+            b.is_dir === true ||
+            b.file_type === "directory" ||
+            b.is_directory === true;
+          if (aIsDir && !bIsDir) return -1;
+          if (!aIsDir && bIsDir) return 1;
 
-        let cmp = 0;
-        switch (sortBy) {
-          case "size":
-            cmp = (a.size || 0) - (b.size || 0);
-            break;
-          case "date":
-            cmp = (a._modifiedTime || 0) - (b._modifiedTime || 0);
-            break;
-          case "resolution":
-            cmp = (a.resolution?.width || 0) - (b.resolution?.width || 0);
-            break;
-          case "ai_source":
-            cmp = (a.ai_source || "").localeCompare(b.ai_source || "");
-            break;
-          case "name":
-          default:
-            cmp = (a.name || "").localeCompare(b.name || "");
-            break;
-        }
-        return dir * (cmp || 0);
-      });
+          let cmp = 0;
+          switch (sortBy) {
+            case "size":
+              cmp = (a.size || 0) - (b.size || 0);
+              break;
+            case "date":
+              cmp = (a._modifiedTime || 0) - (b._modifiedTime || 0);
+              break;
+            case "resolution":
+              cmp = (a.resolution?.width || 0) - (b.resolution?.width || 0);
+              break;
+            case "ai_source":
+              cmp = (a.ai_source || "").localeCompare(b.ai_source || "");
+              break;
+            case "name":
+            default:
+              cmp = (a.name || "").localeCompare(b.name || "");
+              break;
+          }
+          return dir * (cmp || 0);
+        });
+      }
 
       if (hasGrouping) {
-        // groupFilesHelper возвращает массив групп, разворачиваем в плоский список
         const groups = groupFilesHelper(result, state.groupBy);
         const flat = [];
         for (const g of groups) {
@@ -395,33 +390,24 @@ export const useGalleryStore = defineStore("gallery", {
         ...f,
         _modifiedTime: f.modified ? new Date(f.modified).getTime() : 0,
       }));
-      // shallowRef заменяем напрямую — реактивность по identity.
       this.files = normalized;
-      this.filteredFiles = [...normalized];
     },
 
     applyEnrichments(updates) {
       if (!Array.isArray(updates) || updates.length === 0) return;
       const map = new Map(updates.map((u) => [u.path, u]));
-      let changed = false;
       for (const entry of this.files) {
         const u = map.get(entry.path);
         if (!u) continue;
         if (u.dir_count != null && entry.dir_count !== u.dir_count) {
           entry.dir_count = u.dir_count;
-          changed = true;
         }
         if (u.file_count != null && entry.file_count !== u.file_count) {
           entry.file_count = u.file_count;
-          changed = true;
         }
         if (u.ai_source != null && entry.ai_source !== u.ai_source) {
           entry.ai_source = u.ai_source;
-          changed = true;
         }
-      }
-      if (changed) {
-        this.filteredFiles = [...this.files];
       }
     },
 
@@ -506,7 +492,6 @@ export const useGalleryStore = defineStore("gallery", {
       } else {
         this.files.unshift(normalized);
       }
-      this.filteredFiles = [...this.files];
     },
 
     setSorting(sortBy, order) {

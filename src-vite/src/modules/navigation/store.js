@@ -124,7 +124,6 @@ export const useNavigationStore = defineStore("navigation", {
 
     async goBack() {
       if (this.canGoBack) {
-        clearThumbnailCache();
         this.historyIndex--;
         const path = this.history[this.historyIndex];
         this.currentPath = path;
@@ -147,7 +146,6 @@ export const useNavigationStore = defineStore("navigation", {
 
     async goForward() {
       if (this.canGoForward) {
-        clearThumbnailCache();
         this.historyIndex++;
         const path = this.history[this.historyIndex];
         this.currentPath = path;

@@ -318,29 +318,23 @@ let debounceTimeout = null;
 const sizeBuckets = [256, 512, 1024];
 
 async function loadThumbnail() {
-  thumbnailUrl.value = "";
-
   if (!isImage.value) return;
 
   const currentPath = props.file.path;
   
-  // Квантуем запрашиваемый размер до ближайшего большего фиксированного значения
   const targetSize = sizeBuckets.find(b => b >= props.size) || 1024;
   const cacheKey = `${currentPath}__${targetSize}`;
 
-  // --- 1. Мгновенная загрузка из кеша в памяти ---
   const cached = getCachedThumbnail(cacheKey);
   if (cached) {
     thumbnailUrl.value = cached;
     return;
   }
 
-  // --- 2. Отменяем предыдущий дебаунс ---
   if (debounceTimeout) {
     clearTimeout(debounceTimeout);
   }
 
-  // --- 3. Маленькие файлы загружаем мгновенно, без задержки ---
   if (props.file.size < 200 * 1024) {
     const url = getPreviewUrl(0, currentPath);
     setCachedThumbnail(cacheKey, url);
@@ -348,9 +342,7 @@ async function loadThumbnail() {
     return;
   }
 
-  // --- 4. Крупные файлы — дебаунс + IPC (только если не закешировано) ---
   debounceTimeout = setTimeout(async () => {
-    // Проверяем кеш ещё раз — могло быть заполнено параллельным вызовом
     const cachedNow = getCachedThumbnail(cacheKey);
     if (cachedNow) {
       thumbnailUrl.value = cachedNow;
@@ -362,14 +354,10 @@ async function loadThumbnail() {
         size: targetSize,
       });
       setCachedThumbnail(cacheKey, url);
-      // Проверяем, что карточка всё ещё отображает тот же файл
       if (props.file.path === currentPath) {
         thumbnailUrl.value = url;
       }
     } catch (e) {
-      // Do not fallback to OS shell/file icon here: it causes random Windows
-      // placeholder icons to replace real thumbnails in explorer mode.
-      // Keep the card in its generic file state until a real thumbnail is available.
       if (props.file.path === currentPath) {
         thumbnailUrl.value = "";
       }

@@ -151,16 +151,28 @@ async function loadEnrichments() {
   );
 }
 
-watch(() => props.files, loadEnrichments, { immediate: true });
+let prevFileCount = 0;
+let prevFileKey = "";
+watch(() => props.files, (newFiles) => {
+  const newKey = newFiles.length + ":" + (newFiles[0]?.path || "");
+  if (newKey === prevFileKey && newFiles.length === prevFileCount) return;
+  prevFileKey = newKey;
+  prevFileCount = newFiles.length;
+  loadEnrichments();
+}, { immediate: true });
 
 let primeDebounce = null;
+let prevSelectionKey = "";
 watch(
-  () => galleryStore.selectedIds.slice().sort().join("|"),
+  () => galleryStore.selectedIds.length,
   () => {
+    const newKey = galleryStore.selectedIds.join("|");
+    if (newKey === prevSelectionKey) return;
+    prevSelectionKey = newKey;
     if (primeDebounce) clearTimeout(primeDebounce);
     primeDebounce = setTimeout(
       () => galleryStore.primeSelectedForEnrichment(),
-      80,
+      200,
     );
   },
 );

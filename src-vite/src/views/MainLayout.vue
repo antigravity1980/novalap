@@ -1776,13 +1776,16 @@ watch(
 );
 
 // Automatically record selection changes for Ctrl+Z undo selection
+let prevSelectionLen = 0;
+let prevSelectionKey = "";
 watch(
-  () => [...galleryStore.selectedIds],
-  (newVal, oldVal) => {
+  () => galleryStore.selectedIds.length,
+  (newLen) => {
     if (galleryStore.isUndoing) return;
-    if (JSON.stringify(newVal) === JSON.stringify(oldVal)) return;
-    // recordSelectionState без аргументов: снимает текущий selectedIds,
-    // чтобы Ctrl+Z возвращался именно к тому, что было до изменения.
+    const newKey = galleryStore.selectedIds.join("|");
+    if (newKey === prevSelectionKey) return;
+    prevSelectionKey = newKey;
+    prevSelectionLen = newLen;
     galleryStore.recordSelectionState();
   },
 );
@@ -1859,10 +1862,15 @@ const totalFoldersCount = computed(() => {
   ).length;
 });
 const selectedSizeSum = computed(() => {
+  if (galleryStore.selectedIds.length === 0) return 0;
+  const sizeMap = new Map();
+  for (const f of galleryStore.files) {
+    if (f.size) sizeMap.set(f.path, f.size);
+  }
   let sum = 0;
   for (const path of galleryStore.selectedIds) {
-    const file = galleryStore.files.find((f) => f.path === path);
-    if (file && file.size) sum += file.size;
+    const s = sizeMap.get(path);
+    if (s) sum += s;
   }
   return sum;
 });
@@ -2044,7 +2052,6 @@ async function goUp() {
 
 async function refreshData() {
   await navigationStore.refresh();
-  galleryStore.setFiles(navigationStore.folders);
   fetchTrash();
 }
 
