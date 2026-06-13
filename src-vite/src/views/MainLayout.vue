@@ -156,11 +156,11 @@
 
     <!-- Main Workspace -->
     <main
-      v-show="!galleryStore.focusMode"
       class="flex-1 flex flex-col overflow-hidden bg-base-100"
     >
       <!-- Windows 11 Tabs at the top -->
       <div
+        v-if="!galleryStore.focusMode"
         class="h-10 bg-base-200 border-b border-neutral/25 flex items-center pl-4 pr-1 justify-between shrink-0 select-none"
         data-tauri-drag-region
       >
@@ -277,6 +277,7 @@
 
       <!-- Navigation address bar & Controls -->
       <header
+        v-if="!galleryStore.focusMode"
         class="h-12 flex items-center justify-between px-6 border-b border-neutral/25 bg-base-200 shrink-0 z-10 gap-4"
       >
         <!-- Navigation Arrows & Controls -->
@@ -401,6 +402,7 @@
 
       <!-- Command Bar -->
       <div
+        v-if="!galleryStore.focusMode"
         class="h-12 border-b border-neutral/25 bg-base-200/50 flex items-center justify-between shrink-0 select-none overflow-visible"
       >
         <div class="flex items-center gap-1 px-3 shrink-0">
@@ -1176,6 +1178,8 @@
             </div>
           </div>
         </div>
+
+        <GalleryGrid v-else @open-quick-look="openQuickLook" />
       </div>
 
       <!-- Status Bar -->
@@ -1579,15 +1583,6 @@
       @open-quick-look="openQuickLook"
       @exit-focus="onExitFocus"
     />
-
-    <!-- GalleryGrid: единый экземпляр, позиционируется по режиму -->
-    <div
-      v-show="!activeTab || activeTab !== 'trash'"
-      :class="galleryStore.focusMode ? 'fixed inset-0 z-40 ml-64 flex flex-col bg-base-100' : 'flex-1 flex flex-col overflow-hidden relative bg-base-100'"
-      :style="galleryStore.focusMode ? {} : { }"
-    >
-      <GalleryGrid @open-quick-look="openQuickLook" />
-    </div>
   </div>
 </template>
 
