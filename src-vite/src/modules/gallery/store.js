@@ -424,6 +424,11 @@ export const useGalleryStore = defineStore("gallery", {
           }
         }
         
+        if (!entry._enriched) {
+          newEntry._enriched = true;
+          entryChanged = true;
+        }
+        
         if (entryChanged) {
           this.files[i] = newEntry;
           changed = true;
@@ -436,6 +441,7 @@ export const useGalleryStore = defineStore("gallery", {
 
     needsEnrichment(file) {
       if (!file || !file.path) return false;
+      if (file._enriched) return false;
       const isDir =
         file.is_dir === true ||
         file.file_type === "directory" ||

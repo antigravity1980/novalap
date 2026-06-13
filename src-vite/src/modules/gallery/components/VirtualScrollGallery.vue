@@ -144,10 +144,9 @@ const layoutItems = computed(() => {
     for (let r = 0; r < totalRows; r++) {
       const start = r * c;
       const rowFiles = files.slice(start, start + c);
-      const firstFilePath = rowFiles[0]?.path || "empty";
       result.push({
         type: "file-row",
-        key: `row-${c}-${props.thumbnailSize}-${r}-${firstFilePath}`,
+        key: `row-${c}-${props.thumbnailSize}-${r}`,
         files: rowFiles,
         top: r * (rh + g),
         height: rh,
@@ -161,9 +160,10 @@ const layoutItems = computed(() => {
   let y = 0;
   for (const group of groups) {
     if (!group.files.length) continue;
+    const cleanGroupTitle = String(group.title).replace(/[^a-zA-Z0-9]/g, "_");
     result.push({
       type: "header",
-      key: `header-${group.title}`,
+      key: `header-${cleanGroupTitle}`,
       title: group.title,
       fileCount: group.files.length,
       filePaths: group.files.map((f) => f.path),
@@ -177,10 +177,9 @@ const layoutItems = computed(() => {
       for (let r = 0; r < rows; r++) {
         const start = r * c;
         const rowFiles = files.slice(start, start + c);
-        const firstFilePath = rowFiles[0]?.path || "empty";
         result.push({
           type: "file-row",
-          key: `row-${group.title}-${c}-${props.thumbnailSize}-${r}-${firstFilePath}`,
+          key: `row-${cleanGroupTitle}-${c}-${props.thumbnailSize}-${r}`,
           files: rowFiles,
           top: y,
           height: rh,
@@ -207,14 +206,9 @@ const visibleItems = computed(() => {
   const vTop = scrollTop.value - buf;
   const vBot = scrollTop.value + containerHeight.value + buf;
 
-  const result = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item.top + item.height < vTop) continue;
-    if (item.top > vBot) break;
-    result.push(item);
-  }
-  return result;
+  return items.filter((item) => {
+    return (item.top + item.height >= vTop) && (item.top <= vBot);
+  });
 });
 
 function onScroll(e) {

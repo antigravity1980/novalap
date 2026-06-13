@@ -688,3 +688,4 @@ pub fn watch_directory(app: tauri::AppHandle, path: String) -> Result<(), String
 
     Ok(())
 }
+
