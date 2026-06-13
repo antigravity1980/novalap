@@ -1496,7 +1496,7 @@
       :files="filteredFiles"
       :initial-index="quickLookIndex"
       @update:visible="quickLookVisible = $event"
-      @saved="refreshData"
+      @saved="onImageSaved"
     />
 
     <!-- Compare View Overlay -->
@@ -2263,7 +2263,21 @@ function openCrop(file) {
   cropVisible.value = true;
 }
 
-function onCropSaved() {
+function onCropSaved(savePath) {
+  if (savePath) {
+    clearCachedThumbnail(savePath);
+    uiStore.updateThumbnailVersion(savePath);
+    uiStore.updateFileVersion(savePath);
+  }
+  refreshData();
+}
+
+function onImageSaved(filePath) {
+  if (filePath) {
+    clearCachedThumbnail(filePath);
+    uiStore.updateThumbnailVersion(filePath);
+    uiStore.updateFileVersion(filePath);
+  }
   refreshData();
 }
 

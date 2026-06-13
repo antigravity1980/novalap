@@ -45,6 +45,12 @@ export function setCachedThumbnail(filePath, url) {
 export function clearCachedThumbnail(filePath) {
   if (!filePath) return;
   _cache.delete(filePath);
+  // Also delete all size-based keys for this path
+  for (const key of _cache.keys()) {
+    if (key.startsWith(filePath + "__")) {
+      _cache.delete(key);
+    }
+  }
 }
 
 /**

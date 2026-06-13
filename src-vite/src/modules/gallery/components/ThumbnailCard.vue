@@ -345,8 +345,11 @@ async function loadThumbnail() {
     clearTimeout(debounceTimeout);
   }
 
+  const ver = uiStore.thumbnailVersions[currentPath] || uiStore.fileVersions[currentPath] || 0;
+  const versionQuery = ver ? `?v=${ver}` : "";
+
   if (props.file.size < 200 * 1024) {
-    const url = getPreviewUrl(0, currentPath);
+    const url = getPreviewUrl(0, currentPath) + versionQuery;
     setCachedThumbnail(cacheKey, url);
     thumbnailUrl.value = url;
     return;
@@ -363,9 +366,10 @@ async function loadThumbnail() {
         path: currentPath,
         size: targetSize,
       });
-      setCachedThumbnail(cacheKey, url);
+      const busterUrl = url + versionQuery;
+      setCachedThumbnail(cacheKey, busterUrl);
       if (props.file.path === currentPath) {
-        thumbnailUrl.value = url;
+        thumbnailUrl.value = busterUrl;
       }
     } catch (e) {
       if (props.file.path === currentPath) {

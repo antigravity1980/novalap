@@ -94,8 +94,9 @@
 
           <!-- Reset Button -->
           <button
-            v-if="isModified"
-            class="btn btn-ghost btn-xs text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1 px-2 py-1 rounded border border-white/10 ml-2"
+            class="btn btn-ghost btn-xs text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1 px-2 py-1 rounded border border-white/10 ml-2 transition-all duration-150"
+            :class="!isModified ? 'opacity-25 pointer-events-none select-none' : ''"
+            :disabled="!isModified"
             @click="resetAllEdits"
             title="Сбросить все изменения"
           >
@@ -733,7 +734,7 @@ async function saveAndClose() {
     if (success) {
       uiStore.updateFileVersion(params.destFilePath);
       cacheBuster.value = Date.now();
-      emit("saved");
+      emit("saved", params.destFilePath);
       close();
     } else {
       alert("Не удалось сохранить изменения");
