@@ -198,21 +198,21 @@ import { useUIStore } from "@/stores/uiStore";
 import { invoke } from "@tauri-apps/api/core";
 import ContextMenu from "@/components/ContextMenu.vue";
 import MessageBox from "@/components/MessageBox.vue";
-import icon01 from "@/assets/folder-icons/01.svg";
-import icon02 from "@/assets/folder-icons/02.svg";
-import icon03 from "@/assets/folder-icons/03.svg";
-import icon04 from "@/assets/folder-icons/04.svg";
-import icon05 from "@/assets/folder-icons/05.svg";
-import icon06 from "@/assets/folder-icons/06.svg";
-import icon07 from "@/assets/folder-icons/07.svg";
-import icon08 from "@/assets/folder-icons/08.svg";
-import icon09 from "@/assets/folder-icons/09.svg";
-import icon10 from "@/assets/folder-icons/10.svg";
-import icon11 from "@/assets/folder-icons/11.svg";
-import icon12 from "@/assets/folder-icons/12.svg";
-import icon14 from "@/assets/folder-icons/14.svg";
-import icon15 from "@/assets/folder-icons/15.svg";
-import iconI1 from "@/assets/folder-icons/I1.svg";
+import icon01 from "@/assets/folder-icons/01.svg?url";
+import icon02 from "@/assets/folder-icons/02.svg?url";
+import icon03 from "@/assets/folder-icons/03.svg?url";
+import icon04 from "@/assets/folder-icons/04.svg?url";
+import icon05 from "@/assets/folder-icons/05.svg?url";
+import icon06 from "@/assets/folder-icons/06.svg?url";
+import icon07 from "@/assets/folder-icons/07.svg?url";
+import icon08 from "@/assets/folder-icons/08.svg?url";
+import icon09 from "@/assets/folder-icons/09.svg?url";
+import icon10 from "@/assets/folder-icons/10.svg?url";
+import icon11 from "@/assets/folder-icons/11.svg?url";
+import icon12 from "@/assets/folder-icons/12.svg?url";
+import icon14 from "@/assets/folder-icons/14.svg?url";
+import icon15 from "@/assets/folder-icons/15.svg?url";
+import iconI1 from "@/assets/folder-icons/I1.svg?url";
 
 const props = defineProps({
   file: { type: Object, required: true },
