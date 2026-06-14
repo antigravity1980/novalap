@@ -1271,7 +1271,8 @@
       "size": "Размер",
       "date": "Дата",
       "resolution": "Разрешение",
-      "ai_source": "Источник AI"
+      "ai_source": "Источник AI",
+      "random": "Рандом"
     },
     "selected_count": "Выбрано: {count}",
     "no_files": "В этой папке нет файлов",

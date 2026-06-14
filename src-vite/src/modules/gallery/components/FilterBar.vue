@@ -18,6 +18,7 @@
       <option value="date">{{ $t('gallery.sort_options.date') }}</option>
       <option value="resolution">{{ $t('gallery.sort_options.resolution') }}</option>
       <option value="ai_source">{{ $t('gallery.sort_options.ai_source') }}</option>
+      <option value="random">{{ $t('gallery.sort_options.random') }}</option>
     </select>
 
     <button class="btn btn-ghost btn-sm" @click="toggleSortOrder">
@@ -75,6 +76,9 @@ function onSearchChange() {
 }
 
 function onSortChange() {
+  if (galleryStore.sortBy === 'random') {
+    galleryStore.reshuffleRandomWeights()
+  }
   galleryStore.setSorting(galleryStore.sortBy, galleryStore.sortOrder)
 }
 

@@ -601,6 +601,24 @@
                   <span v-if="galleryStore.sortBy === 'ai_source'">✓</span>
                 </a>
               </li>
+              <li>
+                <a
+                  :class="{ active: galleryStore.sortBy === 'random' }"
+                  @click="
+                    if (galleryStore.sortBy === 'random') {
+                      galleryStore.reshuffleRandomWeights();
+                    } else {
+                      galleryStore.sortBy = 'random';
+                      galleryStore.reshuffleRandomWeights();
+                    }
+                    onSortChange();
+                  "
+                  class="flex justify-between items-center"
+                >
+                  <span>{{ $t("gallery.sort_options.random") }}</span>
+                  <span v-if="galleryStore.sortBy === 'random'">✓</span>
+                </a>
+              </li>
               <div class="divider my-1"></div>
               <li>
                 <a

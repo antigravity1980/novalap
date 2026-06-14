@@ -1271,7 +1271,8 @@
       "size": "Size",
       "date": "Date",
       "resolution": "Resolution",
-      "ai_source": "AI Source"
+      "ai_source": "AI Source",
+      "random": "Random"
     },
     "selected_count": "{count} selected",
     "no_files": "No files in this directory",

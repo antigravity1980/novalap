@@ -342,6 +342,9 @@ export const useGalleryStore = defineStore("gallery", {
             case "ai_source":
               cmp = (a.ai_source || "").localeCompare(b.ai_source || "");
               break;
+            case "random":
+              cmp = (a._randomWeight || 0) - (b._randomWeight || 0);
+              break;
             case "name":
             default:
               cmp = (a.name || "").localeCompare(b.name || "");
@@ -395,6 +398,7 @@ export const useGalleryStore = defineStore("gallery", {
       const normalized = files.map((f) => ({
         ...f,
         _modifiedTime: f.modified ? new Date(f.modified).getTime() : 0,
+        _randomWeight: Math.random(),
       }));
       this.files = normalized;
     },
@@ -507,6 +511,7 @@ export const useGalleryStore = defineStore("gallery", {
         _modifiedTime: file.modified
           ? new Date(file.modified).getTime()
           : file._modifiedTime || Date.now(),
+        _randomWeight: file._randomWeight !== undefined ? file._randomWeight : Math.random(),
       };
       const existingIndex = this.files.findIndex(
         (f) => f.path === normalized.path,
@@ -532,6 +537,13 @@ export const useGalleryStore = defineStore("gallery", {
     setSorting(sortBy, order) {
       this.sortBy = sortBy;
       this.sortOrder = order;
+    },
+
+    reshuffleRandomWeights() {
+      this.files.forEach((f) => {
+        f._randomWeight = Math.random();
+      });
+      this.files = [...this.files];
     },
 
     setFilter(key, value) {
