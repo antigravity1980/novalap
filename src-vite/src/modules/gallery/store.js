@@ -235,6 +235,12 @@ export const useGalleryStore = defineStore("gallery", {
       action: null, // 'copy' | 'cut'
       paths: [], // array of file/folder paths
     },
+    pasteProgress: {
+      show: false,
+      total: 0,
+      current: 0,
+      percentage: 0,
+    },
     deletedHistory: [], // stack of arrays of TrashEntry
     isUndoing: false,
     // Initialize with cached count so the badge is correct before first fetch
@@ -770,6 +776,11 @@ export const useGalleryStore = defineStore("gallery", {
     setClipboard(action, paths) {
       this.clipboard.action = action;
       this.clipboard.paths = paths;
+      try {
+        invoke("write_to_system_clipboard", { paths });
+      } catch (err) {
+        console.warn("Failed to write to system clipboard:", err);
+      }
     },
 
     clearClipboard() {
@@ -778,24 +789,65 @@ export const useGalleryStore = defineStore("gallery", {
     },
 
     async paste(destPath) {
-      if (!this.clipboard.action || this.clipboard.paths.length === 0) return;
-      const { action, paths } = this.clipboard;
+      // 1. Try to read files from the system clipboard first
+      let paths = [];
+      let isSystemClipboard = false;
+      try {
+        paths = await invoke("read_from_system_clipboard");
+        if (paths && paths.length > 0) {
+          isSystemClipboard = true;
+        }
+      } catch (err) {
+        console.warn("Failed to read files from system clipboard:", err);
+      }
+
+      // 2. Fallback to internal clipboard if system clipboard has no files
+      let action = "copy";
+      if (!isSystemClipboard) {
+        if (!this.clipboard.action || this.clipboard.paths.length === 0) return;
+        action = this.clipboard.action;
+        paths = this.clipboard.paths;
+      }
+
+      const isCopy = action === "copy";
+      if (isCopy) {
+        this.pasteProgress.show = true;
+        this.pasteProgress.total = paths.length;
+        this.pasteProgress.current = 0;
+        this.pasteProgress.percentage = 0;
+      }
+
+      let completedCount = 0;
       const promises = paths.map(async (src) => {
         const fileName = src.split("\\").pop() || src.split("/").pop();
         const dest = `${destPath}\\${fileName}`;
         try {
-          if (action === "copy") {
+          if (isCopy) {
             await invoke("cross_copy", { src, dest });
           } else if (action === "cut") {
             await invoke("cross_move", { src, dest });
           }
         } catch (error) {
           console.error(`Failed to ${action} ${src} to ${dest}:`, error);
+        } finally {
+          if (isCopy) {
+            completedCount++;
+            this.pasteProgress.current = completedCount;
+            this.pasteProgress.percentage = Math.round((completedCount / paths.length) * 100);
+          }
         }
       });
       await Promise.all(promises);
 
-      if (action === "cut") {
+      if (isCopy) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        this.pasteProgress.show = false;
+        this.pasteProgress.total = 0;
+        this.pasteProgress.current = 0;
+        this.pasteProgress.percentage = 0;
+      }
+
+      if (action === "cut" && !isSystemClipboard) {
         this.clearClipboard();
       }
 

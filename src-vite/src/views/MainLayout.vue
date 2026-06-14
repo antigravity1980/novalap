@@ -412,14 +412,15 @@
             v-if="activeTab === 'explorer' && navigationStore.currentPath"
             class="win11-btn text-xs font-semibold flex items-center gap-1.5"
             @click="createFolder"
+            :title="$t('explorer.new_folder')"
           >
             <IconNewFolder class="w-4 h-4 text-primary" />
-            <span>{{ $t("explorer.new_folder") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.new_folder") }}</span>
           </button>
 
           <div
             v-if="activeTab === 'explorer' && navigationStore.currentPath"
-            class="divider divider-horizontal h-4 mx-1.5 self-center"
+            class="divider divider-horizontal h-4 mx-0.5 sm:mx-1 xl:mx-1.5 self-center"
           ></div>
 
           <!-- Rename -->
@@ -430,7 +431,7 @@
             :title="$t('explorer.rename')"
           >
             <IconRename class="w-4 h-4" />
-            <span>{{ $t("explorer.rename") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">{{ $t("explorer.rename") }}</span>
           </button>
 
           <!-- Delete -->
@@ -441,7 +442,7 @@
             :title="$t('explorer.delete')"
           >
             <IconTrash class="w-4 h-4 text-error" />
-            <span>{{ $t("explorer.delete") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">{{ $t("explorer.delete") }}</span>
           </button>
 
           <!-- Compare -->
@@ -456,7 +457,7 @@
             @drop.prevent.stop="onDropToCompareStack"
           >
             <IconFolder class="w-3.5 h-3.5" />
-            <span>{{ $t("explorer.compare") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">{{ $t("explorer.compare") }}</span>
             <span
               v-if="
                 galleryStore.compareStack &&
@@ -475,10 +476,10 @@
             :title="$t('explorer.batch')"
           >
             <IconAdjustments class="w-4 h-4" />
-            <span>{{ $t("explorer.batch") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">{{ $t("explorer.batch") }}</span>
           </button>
 
-          <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
+          <div class="divider divider-horizontal h-4 mx-0.5 sm:mx-1 xl:mx-1.5 self-center"></div>
 
           <!-- Multi-select Mode -->
           <button
@@ -495,7 +496,7 @@
               class="w-3.5 h-3.5 flex items-center justify-center border rounded border-current text-[9px] font-bold"
               >✓</span
             >
-            <span>Режим выбора</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">Режим выбора</span>
           </button>
 
           <!-- Focus mode (только при включённом режиме выбора) -->
@@ -519,16 +520,16 @@
             >
               <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
             </svg>
-            <span>На весь экран</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">На весь экран</span>
           </button>
 
-          <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
+          <div class="divider divider-horizontal h-4 mx-0.5 sm:mx-1 xl:mx-1.5 self-center"></div>
 
           <!-- Sort Dropdown -->
           <div class="dropdown">
-            <label tabindex="0" class="win11-btn flex items-center gap-1.5">
+            <label tabindex="0" class="win11-btn flex items-center gap-1.5" :title="$t('explorer.sort')">
               <IconArrowUpDown class="w-4 h-4 text-primary" />
-              <span>{{ $t("explorer.sort") }}</span>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.sort") }}</span>
               <span class="opacity-50">▾</span>
             </label>
             <ul
@@ -634,9 +635,9 @@
 
           <!-- Group Dropdown -->
           <div class="dropdown">
-            <label tabindex="0" class="win11-btn flex items-center gap-1.5">
+            <label tabindex="0" class="win11-btn flex items-center gap-1.5" title="Группировка">
               <IconStack class="w-4 h-4 text-primary" />
-              <span>Группировка</span>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">Группировка</span>
               <span class="opacity-50">▾</span>
             </label>
             <ul
@@ -713,9 +714,9 @@
 
           <!-- Filter Dropdown -->
           <div class="dropdown">
-            <label tabindex="0" class="win11-btn flex items-center gap-1.5">
+            <label tabindex="0" class="win11-btn flex items-center gap-1.5" :title="$t('explorer.filter')">
               <IconSearch class="w-4 h-4" />
-              <span>{{ $t("explorer.filter") }}</span>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.filter") }}</span>
               <span class="opacity-50">▾</span>
             </label>
             <ul
@@ -1057,7 +1058,7 @@
               >
                 <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
               </svg>
-              <span>{{ $t("explorer.dark_theme") }}</span>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.dark_theme") }}</span>
             </span>
             <span v-else class="flex items-center gap-1.5">
               <svg
@@ -1075,11 +1076,11 @@
                   d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
                 />
               </svg>
-              <span>{{ $t("explorer.light_theme") }}</span>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.light_theme") }}</span>
             </span>
           </button>
 
-          <div class="divider divider-horizontal h-4 mx-1.5 self-center"></div>
+          <div class="divider divider-horizontal h-4 mx-0.5 sm:mx-1 xl:mx-1.5 self-center"></div>
 
           <!-- Info toggle -->
           <button
@@ -1092,7 +1093,7 @@
             :title="$t('explorer.details')"
           >
             <IconInformation class="w-4 h-4 text-primary" />
-            <span>{{ $t("explorer.details") }}</span>
+            <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">{{ $t("explorer.details") }}</span>
           </button>
         </div>
       </div>

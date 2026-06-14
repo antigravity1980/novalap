@@ -214,6 +214,8 @@ async fn main() {
             module1_navigation::enrich_entries,
             module1_navigation::delete_file_system,
             module1_navigation::open_in_explorer,
+            t_pasteboard::read_from_system_clipboard,
+            t_pasteboard::write_to_system_clipboard,
             // Module 4: AI Parsing & Batch Operations
             module4_backend::parse_ai_metadata,
             module4_backend::detect_ai_source,
