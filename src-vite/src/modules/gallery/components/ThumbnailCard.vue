@@ -60,7 +60,8 @@
       >
         <img
           :src="folderIconUrl"
-          class="w-16 h-16 object-contain select-none pointer-events-none"
+          class="object-contain select-none pointer-events-none"
+          :style="{ width: (size * 0.35) + 'px', height: (size * 0.35) + 'px' }"
         />
       </div>
       <!-- Other files generic -->
