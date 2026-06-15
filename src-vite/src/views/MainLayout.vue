@@ -1633,7 +1633,7 @@ import { useGalleryStore } from "@/modules/gallery/store";
 import { useConfigStore } from "@/stores/configStore";
 import { useUIStore } from "@/stores/uiStore";
 import { clearCachedThumbnail } from "@/modules/gallery/explorerThumbnailsCache.js";
-import { setTheme, getAssetSrc } from "@/common/utils";
+import { setTheme, getAssetSrc, isWin } from "@/common/utils";
 
 // SVG Icons
 import {
@@ -1703,11 +1703,12 @@ async function handleFavDrop(e, destPath) {
     const paths = JSON.parse(data);
     if (!Array.isArray(paths) || paths.length === 0) return;
 
+    const separator = destPath.includes("/") ? "/" : "\\";
     for (const src of paths) {
       if (src === destPath) continue;
       const lastSlash = Math.max(src.lastIndexOf("\\"), src.lastIndexOf("/"));
       const fileName = lastSlash !== -1 ? src.substring(lastSlash + 1) : src;
-      const dest = `${destPath}${destPath.endsWith("\\") || destPath.endsWith("/") ? "" : "\\"}${fileName}`;
+      const dest = `${destPath}${destPath.endsWith("\\") || destPath.endsWith("/") ? "" : separator}${fileName}`;
       if (src.toLowerCase() === dest.toLowerCase()) continue;
 
       await invoke("cross_move", { src, dest });
@@ -1989,14 +1990,16 @@ watch(activeTab, (val) => {
 // Breadcrumbs builder
 const breadcrumbs = computed(() => {
   if (!navigationStore.currentPath) return [];
-  return navigationStore.currentPath
-    .split("\\")
-    .filter(Boolean)
-    .reduce((acc, part, i, arr) => {
-      const path = arr.slice(0, i + 1).join("\\");
-      acc.push({ name: part, path });
-      return acc;
-    }, []);
+  const sep = isWin ? "\\" : "/";
+  const parts = navigationStore.currentPath.split(sep).filter(Boolean);
+  return parts.reduce((acc, part, i, arr) => {
+    let path = arr.slice(0, i + 1).join(sep);
+    if (!isWin) {
+      path = "/" + path;
+    }
+    acc.push({ name: part, path });
+    return acc;
+  }, []);
 });
 
 function saveActiveTabState() {
@@ -2093,9 +2096,13 @@ async function goForward() {
 
 async function goUp() {
   if (!navigationStore.currentPath) return;
-  const parts = navigationStore.currentPath.split("\\").filter(Boolean);
+  const separator = navigationStore.currentPath.includes("/") ? "/" : "\\";
+  const parts = navigationStore.currentPath.split(separator).filter(Boolean);
   if (parts.length > 1) {
-    const parentPath = parts.slice(0, parts.length - 1).join("\\");
+    let parentPath = parts.slice(0, parts.length - 1).join(separator);
+    if (separator === "/") {
+      parentPath = "/" + parentPath;
+    }
     await navigateTo(parentPath);
   } else {
     await navigateToHome();
@@ -2174,7 +2181,8 @@ async function saveFileName() {
   )
     return;
   const oldPath = selectedFile.value.path;
-  const index = oldPath.lastIndexOf("\\");
+  const separator = oldPath.includes("/") ? "/" : "\\";
+  const index = oldPath.lastIndexOf(separator);
   const dir = index >= 0 ? oldPath.substring(0, index + 1) : "";
   const newPath = dir + renamingState.name;
 

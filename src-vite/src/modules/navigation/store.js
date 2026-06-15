@@ -2,6 +2,7 @@ import { useGalleryStore } from "@/modules/gallery/store";
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 import { clearThumbnailCache } from "@/modules/gallery/explorerThumbnailsCache";
+import { isWin } from "@/common/utils";
 
 /**
  * Store для навигации (Модуль 1)
@@ -35,26 +36,36 @@ export const useNavigationStore = defineStore("navigation", {
     currentFolderDirs: (state) => state.folders.filter((f) => f.is_dir),
     parentFolders: (state) => {
       if (!state.currentPath) return [];
-      return state.currentPath
-        .split("\\")
-        .filter(Boolean)
-        .map((part, i, arr) => ({
+      const sep = isWin ? "\\" : "/";
+      const parts = state.currentPath.split(sep).filter(Boolean);
+      return parts.map((part, i) => {
+        let path = parts.slice(0, i + 1).join(sep);
+        if (!isWin) {
+          path = "/" + path;
+        }
+        return {
           name: part,
-          path: arr.slice(0, i + 1).join("\\"),
-        }));
+          path: path,
+        };
+      });
     },
   },
 
   actions: {
     normalizePath(path) {
       if (!path) return "";
-      // unify separators to backslash, trim trailing separators (except root like C:\)
-      let p = String(path).replace(/[\/]+/g, "\\");
-      // remove trailing slash unless it is like "C:\\" or "\\\\server\\share\\"
-      p = p.replace(/\\+$/, "");
-      // restore drive root "C:\" if it got trimmed
-      if (/^[a-zA-Z]:\\?$/.test(p)) p = p.replace(/\\?$/, "\\");
-      return p;
+      if (isWin) {
+        let p = String(path).replace(/[\/]+/g, "\\");
+        p = p.replace(/\\+$/, "");
+        if (/^[a-zA-Z]:\\?$/.test(p)) p = p.replace(/\\?$/, "\\");
+        return p;
+      } else {
+        let p = String(path).replace(/[\\]+/g, "/").replace(/[\/]+/g, "/");
+        if (p.length > 1) {
+          p = p.replace(/\/+$/, "");
+        }
+        return p;
+      }
     },
     async _stopWatching() {
       try {

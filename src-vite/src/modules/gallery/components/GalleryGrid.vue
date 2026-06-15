@@ -40,7 +40,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Копирование файлов...
+            {{ galleryStore.pasteProgress.action === 'cut' ? $t("gallery.paste_progress.moving") : $t("gallery.paste_progress.copying") }}
           </span>
           <span class="font-mono text-base-content/60">{{ galleryStore.pasteProgress.current }} / {{ galleryStore.pasteProgress.total }}</span>
         </div>
@@ -51,58 +51,105 @@
           ></div>
         </div>
         <div class="flex justify-between text-[10px] text-base-content/40 font-medium">
-          <span>Готово: {{ galleryStore.pasteProgress.percentage }}%</span>
-          <span>Вставка...</span>
+          <span>{{ $t("gallery.paste_progress.done", { percent: galleryStore.pasteProgress.percentage }) }}</span>
+          <span>{{ $t("gallery.paste_progress.pasting") }}</span>
         </div>
       </div>
 
       <!-- Zoom + spacing controls -->
       <div
-        class="zoom-control pointer-events-auto flex items-center gap-3 bg-base-300/80 backdrop-blur border border-base-200/50 rounded-lg px-3 py-2 shadow-2xl hover:border-primary/30 transition-all duration-200"
+        class="zoom-control pointer-events-auto flex items-center bg-base-300/80 backdrop-blur border border-base-200/50 shadow-2xl transition-all duration-300 ease-in-out"
+        :class="{
+          'rounded-lg px-3 py-2 gap-3 hover:border-primary/30': isSlidersExpanded,
+          'rounded-full p-1.5 hover:border-primary/30': !isSlidersExpanded
+        }"
       >
-        <span class="text-xs text-base-content/65">🔍</span>
-        <input
-          type="range"
-          min="0.5"
-          max="5.12"
-          step="0.1"
-          :value="galleryStore.zoomLevel"
-          @input="onZoomChange"
-          class="range range-xs range-primary w-24"
-          title="Размер миниатюр"
-        />
-        <span class="text-xs font-mono w-10 text-right text-base-content/70"
-          >{{ Math.round(galleryStore.thumbnailSize) }}px</span
+        <button
+          @click="toggleSliders"
+          class="btn btn-ghost btn-circle btn-xs text-base-content/70 hover:text-primary transition-colors duration-200 flex items-center justify-center"
+          :class="{ 'h-6 w-6': !isSlidersExpanded, 'h-5 w-5': isSlidersExpanded }"
+          :title="isSlidersExpanded ? 'Свернуть панель' : 'Развернуть размер/интервал'"
         >
+          <!-- Close/Collapse arrow when expanded -->
+          <svg
+            v-if="isSlidersExpanded"
+            class="h-3.5 w-3.5"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          <!-- Adjustments icon when collapsed -->
+          <svg
+            v-else
+            class="h-4 w-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+        </button>
 
-        <div class="w-px h-5 bg-base-content/15 mx-1"></div>
+        <!-- Sliders content -->
+        <div v-if="isSlidersExpanded" class="flex items-center gap-3">
+          <span class="text-xs text-base-content/65" title="Размер миниатюр">🔍</span>
+          <input
+            type="range"
+            min="0.5"
+            max="5.12"
+            step="0.1"
+            :value="galleryStore.zoomLevel"
+            @input="onZoomChange"
+            class="range range-xs range-primary w-24"
+            title="Размер миниатюр"
+          />
+          <span class="text-xs font-mono w-10 text-right text-base-content/70"
+            >{{ Math.round(galleryStore.thumbnailSize) }}px</span
+          >
 
-        <span class="text-xs text-base-content/65">↔</span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          :value="Math.round((galleryStore.thumbnailGap / 50) * 100)"
-          @input="onGapChange"
-          class="range range-xs range-primary w-24"
-          title="Промежуток между миниатюрами (0 = вплотную, 100 = 50px)"
-        />
-        <span class="text-xs font-mono w-10 text-right text-base-content/70"
-          >{{ galleryStore.thumbnailGap }}px</span
-        >
+          <div class="w-px h-5 bg-base-content/15 mx-1"></div>
+
+          <span class="text-xs text-base-content/65" title="Промежуток между миниатюрами">↔</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="Math.round((galleryStore.thumbnailGap / 50) * 100)"
+            @input="onGapChange"
+            class="range range-xs range-primary w-24"
+            title="Промежуток между миниатюрами (0 = вплотную, 100 = 50px)"
+          />
+          <span class="text-xs font-mono w-10 text-right text-base-content/70"
+            >{{ galleryStore.thumbnailGap }}px</span
+          >
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useGalleryStore } from "../store";
 import { useNavigationStore } from "../../navigation/store";
 import VirtualScrollGallery from "./VirtualScrollGallery.vue";
 
 const galleryStore = useGalleryStore();
 const navigationStore = useNavigationStore();
+
+const isSlidersExpanded = ref(localStorage.getItem("lap_sliders_expanded") !== "false");
+
+function toggleSliders() {
+  isSlidersExpanded.value = !isSlidersExpanded.value;
+  localStorage.setItem("lap_sliders_expanded", isSlidersExpanded.value);
+}
 
 const emit = defineEmits(["openQuickLook"]);
 

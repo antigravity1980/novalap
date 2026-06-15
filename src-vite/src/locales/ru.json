@@ -1278,7 +1278,13 @@
     "no_files": "В этой папке нет файлов",
     "video_label": "Видео",
     "file_label": "Файл",
-    "folder_label": "Папка"
+    "folder_label": "Папка",
+    "paste_progress": {
+      "copying": "Копирование файлов...",
+      "moving": "Перемещение файлов...",
+      "done": "Готово: {percent}%",
+      "pasting": "Вставка..."
+    }
   },
   "batch_ops": {
     "title": "Пакетные операции",

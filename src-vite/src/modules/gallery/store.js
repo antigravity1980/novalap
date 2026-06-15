@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { shallowRef, markRaw } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { isWin } from "@/common/utils";
 
 // Helper function to group files/folders Win11-style
 export function groupFilesHelper(files, groupBy) {
@@ -240,6 +241,7 @@ export const useGalleryStore = defineStore("gallery", {
       total: 0,
       current: 0,
       percentage: 0,
+      action: null, // 'copy' | 'cut'
     },
     deletedHistory: [], // stack of arrays of TrashEntry
     isUndoing: false,
@@ -753,34 +755,73 @@ export const useGalleryStore = defineStore("gallery", {
 
     async copySelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return;
-      const promises = this.selectedIds.map(async (src) => {
+
+      this.pasteProgress.show = true;
+      this.pasteProgress.total = this.selectedIds.length;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = "copy";
+
+      const sep = isWin ? "\\" : "/";
+      let completedCount = 0;
+      for (const src of this.selectedIds) {
         try {
           const fileName = src.split("\\").pop() || src.split("/").pop();
           await invoke("cross_copy", {
             src,
-            dest: `${destPath}\\${fileName}`,
+            dest: `${destPath}${sep}${fileName}`,
           });
         } catch (error) {
           console.error("Failed to copy:", error);
+        } finally {
+          completedCount++;
+          this.pasteProgress.current = completedCount;
+          this.pasteProgress.percentage = Math.round((completedCount / this.selectedIds.length) * 100);
         }
-      });
-      await Promise.all(promises);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      this.pasteProgress.show = false;
+      this.pasteProgress.total = 0;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = null;
     },
 
     async moveSelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return;
-      const promises = this.selectedIds.map(async (src) => {
+
+      this.pasteProgress.show = true;
+      this.pasteProgress.total = this.selectedIds.length;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = "cut";
+
+      const sep = isWin ? "\\" : "/";
+      let completedCount = 0;
+      for (const src of this.selectedIds) {
         try {
           const fileName = src.split("\\").pop() || src.split("/").pop();
           await invoke("cross_move", {
             src,
-            dest: `${destPath}\\${fileName}`,
+            dest: `${destPath}${sep}${fileName}`,
           });
         } catch (error) {
           console.error("Failed to move:", error);
+        } finally {
+          completedCount++;
+          this.pasteProgress.current = completedCount;
+          this.pasteProgress.percentage = Math.round((completedCount / this.selectedIds.length) * 100);
         }
-      });
-      await Promise.all(promises);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      this.pasteProgress.show = false;
+      this.pasteProgress.total = 0;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = null;
+
       this.files = this.files.filter((f) => !this.selectedIds.includes(f.path));
       this.selectedIds = [];
     },
@@ -822,17 +863,18 @@ export const useGalleryStore = defineStore("gallery", {
       }
 
       const isCopy = action === "copy";
-      if (isCopy) {
-        this.pasteProgress.show = true;
-        this.pasteProgress.total = paths.length;
-        this.pasteProgress.current = 0;
-        this.pasteProgress.percentage = 0;
-      }
+      
+      this.pasteProgress.show = true;
+      this.pasteProgress.total = paths.length;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = action;
 
+      const sep = isWin ? "\\" : "/";
       let completedCount = 0;
-      const promises = paths.map(async (src) => {
+      for (const src of paths) {
         const fileName = src.split("\\").pop() || src.split("/").pop();
-        const dest = `${destPath}\\${fileName}`;
+        const dest = `${destPath}${sep}${fileName}`;
         try {
           if (isCopy) {
             await invoke("cross_copy", { src, dest });
@@ -842,22 +884,18 @@ export const useGalleryStore = defineStore("gallery", {
         } catch (error) {
           console.error(`Failed to ${action} ${src} to ${dest}:`, error);
         } finally {
-          if (isCopy) {
-            completedCount++;
-            this.pasteProgress.current = completedCount;
-            this.pasteProgress.percentage = Math.round((completedCount / paths.length) * 100);
-          }
+          completedCount++;
+          this.pasteProgress.current = completedCount;
+          this.pasteProgress.percentage = Math.round((completedCount / paths.length) * 100);
         }
-      });
-      await Promise.all(promises);
-
-      if (isCopy) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        this.pasteProgress.show = false;
-        this.pasteProgress.total = 0;
-        this.pasteProgress.current = 0;
-        this.pasteProgress.percentage = 0;
       }
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      this.pasteProgress.show = false;
+      this.pasteProgress.total = 0;
+      this.pasteProgress.current = 0;
+      this.pasteProgress.percentage = 0;
+      this.pasteProgress.action = null;
 
       if (action === "cut" && !isSystemClipboard) {
         this.clearClipboard();

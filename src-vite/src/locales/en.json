@@ -1278,7 +1278,13 @@
     "no_files": "No files in this directory",
     "video_label": "Video",
     "file_label": "File",
-    "folder_label": "Folder"
+    "folder_label": "Folder",
+    "paste_progress": {
+      "copying": "Copying files...",
+      "moving": "Moving files...",
+      "done": "Done: {percent}%",
+      "pasting": "Pasting..."
+    }
   },
   "batch_ops": {
     "title": "Batch Operations",
