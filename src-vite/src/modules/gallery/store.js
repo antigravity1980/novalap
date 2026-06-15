@@ -460,7 +460,7 @@ export const useGalleryStore = defineStore("gallery", {
         file.file_type === "directory" ||
         file.is_directory === true;
       if (isDir) {
-        return file.dir_count === undefined || file.file_count === undefined;
+        return file.dir_count == null || file.file_count == null;
       }
       const isImage = /^(png|jpe?g|webp|tiff?|avif|heic|heif|jxl|gif)$/i.test(
         file.extension || "",

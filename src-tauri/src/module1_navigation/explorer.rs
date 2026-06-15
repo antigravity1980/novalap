@@ -118,11 +118,7 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
 
             let resolution = None;
 
-            let (dir_count, file_count) = if is_dir {
-                (Some(0), Some(0))
-            } else {
-                (None, None)
-            };
+            let (dir_count, file_count) = (None, None);
 
             let ai_source = None;
 
