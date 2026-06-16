@@ -225,6 +225,7 @@ async fn main() {
             module4_backend::strip_metadata,
             module4_backend::move_to_trash,
             module4_backend::restore_from_trash,
+            module4_backend::restore_from_trash_to,
             module4_backend::get_trash_contents,
             module4_backend::empty_trash,
             module4_backend::backup_originals,

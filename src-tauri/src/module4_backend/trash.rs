@@ -26,6 +26,8 @@ pub struct TrashEntry {
     pub trash_path: String,
     pub deleted_at: String,
     pub size: u64,
+    #[serde(default)]
+    pub is_dir: bool,
 }
 
 /// Путь к корзине для указанной директории
@@ -90,11 +92,12 @@ pub fn move_to_trash(paths: Vec<String>) -> Result<Vec<TrashEntry>, String> {
         let trash_name = format!("{}_{}", timestamp, file_name);
         let trash_path = trash_dir.join(&trash_name);
 
+        let is_dir = path.is_dir();
         let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
         // Перемещаем в корзину
         if let Err(e) = fs::rename(path, &trash_path) {
-            if path.is_dir() {
+            if is_dir {
                 if let Err(copy_err) = copy_dir_all(path, &trash_path) {
                     eprintln!("Failed to move directory to trash {}: {} / {}", path_str, e, copy_err);
                     continue;
@@ -114,6 +117,7 @@ pub fn move_to_trash(paths: Vec<String>) -> Result<Vec<TrashEntry>, String> {
             trash_path: trash_path.to_string_lossy().to_string(),
             deleted_at: now.clone(),
             size,
+            is_dir,
         });
 
         // Сохраняем метаданные о перемещении
@@ -122,6 +126,7 @@ pub fn move_to_trash(paths: Vec<String>) -> Result<Vec<TrashEntry>, String> {
             trash_path: trash_path.to_string_lossy().to_string(),
             deleted_at: now.clone(),
             size,
+            is_dir,
         });
     }
 
@@ -183,6 +188,79 @@ pub fn restore_from_trash(trash_paths: Vec<String>) -> Result<Vec<String>, Strin
     Ok(restored)
 }
 
+/// Восстановить файлы из корзины в другую папку по выбору пользователя
+#[command]
+pub fn restore_from_trash_to(trash_paths: Vec<String>, target_dir: String) -> Result<Vec<String>, String> {
+    let mut restored = Vec::new();
+    let target_dir_path = Path::new(&target_dir);
+    if !target_dir_path.exists() {
+        fs::create_dir_all(target_dir_path).map_err(|e| format!("Failed to create target directory: {}", e))?;
+    }
+
+    for trash_path_str in &trash_paths {
+        let trash_path = Path::new(trash_path_str);
+
+        if !trash_path.exists() {
+            continue;
+        }
+
+        // Читаем метаданные для получения оригинального имени
+        let meta = load_trash_meta(trash_path);
+        let original_name = if let Some(ref meta) = meta {
+            Path::new(&meta.original_path).file_name().unwrap_or(trash_path.file_name().unwrap_or_default())
+        } else {
+            trash_path.file_name().unwrap_or_default()
+        };
+
+        // Разрешаем конфликт имен, чтобы не перезаписать файл
+        let dest_path = get_unique_dest_path(target_dir_path, original_name);
+
+        // Перемещаем в выбранную папку
+        if let Err(e) = fs::rename(trash_path, &dest_path) {
+            if trash_path.is_dir() {
+                if let Err(copy_err) = copy_dir_all(trash_path, &dest_path) {
+                    eprintln!("Failed to restore directory to {:?}: {} / {}", dest_path, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_dir_all(trash_path);
+            } else {
+                if let Err(copy_err) = fs::copy(trash_path, &dest_path) {
+                    eprintln!("Failed to restore file to {:?}: {} / {}", dest_path, e, copy_err);
+                    continue;
+                }
+                let _ = fs::remove_file(trash_path);
+            }
+        }
+
+        // Удаляем файл метаданных
+        let meta_path = trash_path.with_extension("meta.json");
+        fs::remove_file(meta_path).ok();
+
+        restored.push(dest_path.to_string_lossy().to_string());
+    }
+
+    Ok(restored)
+}
+
+/// Получить уникальное имя файла/папки для предотвращения перезаписи при восстановлении
+fn get_unique_dest_path(parent: &Path, file_name: &std::ffi::OsStr) -> PathBuf {
+    let mut dest = parent.join(file_name);
+    if !dest.exists() {
+        return dest;
+    }
+
+    let stem = Path::new(file_name).file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let ext = Path::new(file_name).extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+
+    let mut counter = 1;
+    while dest.exists() {
+        let new_name = format!("{}_{}{}", stem, counter, ext);
+        dest = parent.join(new_name);
+        counter += 1;
+    }
+    dest
+}
+
 /// Получить список файлов в корзине
 #[command]
 pub fn get_trash_contents() -> Result<Vec<TrashEntry>, String> {
@@ -204,16 +282,21 @@ pub fn get_trash_contents() -> Result<Vec<TrashEntry>, String> {
             continue;
         }
 
-        if let Some(meta) = load_trash_meta(&path) {
+        if let Some(mut meta) = load_trash_meta(&path) {
+            if !meta.is_dir && path.is_dir() {
+                meta.is_dir = true;
+            }
             entries.push(meta);
         } else {
             // Если метаданных нет, создаём запись с минимальной информацией
             let metadata = fs::metadata(&path).ok();
+            let is_dir = path.is_dir();
             entries.push(TrashEntry {
                 original_path: String::new(),
                 trash_path: path.to_string_lossy().to_string(),
                 deleted_at: String::new(),
                 size: metadata.map(|m| m.len()).unwrap_or(0),
+                is_dir,
             });
         }
     }

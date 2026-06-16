@@ -1155,47 +1155,16 @@
 
           <div
             v-else
-            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5"
           >
-            <div
+            <TrashCard
               v-for="item in trashItems"
               :key="item.trashPath"
-              class="p-3.5 rounded-lg bg-base-200 border border-neutral/25 flex flex-col justify-between hover:bg-neutral/10 transition-all duration-150 relative group"
-            >
-              <div class="pr-6">
-                <p
-                  class="text-xs font-semibold text-base-content/85 truncate"
-                  :title="getFileName(item.originalPath)"
-                >
-                  {{ getFileName(item.originalPath) }}
-                </p>
-                <p
-                  class="text-[10px] text-base-content/40 truncate mt-0.5"
-                  :title="item.originalPath"
-                >
-                  {{ item.originalPath }}
-                </p>
-              </div>
-              <div
-                class="flex items-center justify-between mt-3 text-[10px] text-base-content/50 border-t border-neutral/15 pt-2"
-              >
-                <span>{{ formatBytes(item.size) }}</span>
-                <div class="flex gap-2">
-                  <button
-                    class="btn btn-primary btn-xs px-2.5 h-6 min-h-0 rounded text-[10px]"
-                    @click="restoreTrashFile(item.trashPath)"
-                  >
-                    {{ $t("explorer.restore") }}
-                  </button>
-                  <button
-                    class="btn btn-ghost btn-xs px-2.5 h-6 min-h-0 rounded text-[10px] text-error hover:bg-error/10"
-                    @click="deleteTrashFilePermanently(item)"
-                  >
-                    {{ $t("explorer.delete_permanently") }}
-                  </button>
-                </div>
-              </div>
-            </div>
+              :item="item"
+              @restore="restoreTrashFile"
+              @restore-to="restoreTrashFileTo"
+              @delete-permanent="deleteTrashFilePermanently"
+            />
           </div>
         </div>
 
@@ -1633,7 +1602,7 @@ import { useGalleryStore } from "@/modules/gallery/store";
 import { useConfigStore } from "@/stores/configStore";
 import { useUIStore } from "@/stores/uiStore";
 import { clearCachedThumbnail } from "@/modules/gallery/explorerThumbnailsCache.js";
-import { setTheme, getAssetSrc, isWin } from "@/common/utils";
+import { setTheme, getAssetSrc, isWin, openFolderDialog } from "@/common/utils";
 
 // SVG Icons
 import {
@@ -1667,6 +1636,7 @@ import QuickCrop from "@/modules/viewer/components/QuickCrop.vue";
 import BatchOperations from "@/modules/operations/components/BatchOperations.vue";
 import MessageBox from "@/components/MessageBox.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
+import TrashCard from "@/components/TrashCard.vue";
 
 const router = useRouter();
 const navigationStore = useNavigationStore();
@@ -2358,6 +2328,21 @@ async function restoreTrashFile(trashPath) {
     await refreshData();
   } catch (err) {
     alert("Не удалось восстановить файл: " + err);
+  }
+}
+
+async function restoreTrashFileTo(item) {
+  try {
+    const targetDir = await openFolderDialog();
+    if (!targetDir) return; // user cancelled
+    
+    await invoke("restore_from_trash_to", {
+      trashPaths: [item.trashPath],
+      targetDir: targetDir,
+    });
+    await refreshData();
+  } catch (err) {
+    alert("Не удалось восстановить файл в выбранную папку: " + err);
   }
 }
 

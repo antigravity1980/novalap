@@ -242,6 +242,9 @@ export const useGalleryStore = defineStore("gallery", {
       current: 0,
       percentage: 0,
       action: null, // 'copy' | 'cut'
+      cancelled: false,
+      sourceDir: "",
+      targetDir: "",
     },
     deletedHistory: [], // stack of arrays of TrashEntry
     isUndoing: false,
@@ -382,6 +385,10 @@ export const useGalleryStore = defineStore("gallery", {
   },
 
   actions: {
+    cancelPaste() {
+      this.pasteProgress.cancelled = true;
+    },
+
     async fetchTrash() {
       try {
         this.trashItems = await invoke("get_trash_contents");
@@ -756,15 +763,25 @@ export const useGalleryStore = defineStore("gallery", {
     async copySelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return;
 
+      const firstSrc = this.selectedIds[0];
+      const lastSlash = Math.max(firstSrc.lastIndexOf("\\"), firstSrc.lastIndexOf("/"));
+      const sourceDir = lastSlash !== -1 ? firstSrc.substring(0, lastSlash) : "";
+
       this.pasteProgress.show = true;
       this.pasteProgress.total = this.selectedIds.length;
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = "copy";
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = sourceDir;
+      this.pasteProgress.targetDir = destPath;
 
       const sep = isWin ? "\\" : "/";
       let completedCount = 0;
       for (const src of this.selectedIds) {
+        if (this.pasteProgress.cancelled) {
+          break;
+        }
         try {
           const fileName = src.split("\\").pop() || src.split("/").pop();
           await invoke("cross_copy", {
@@ -786,26 +803,41 @@ export const useGalleryStore = defineStore("gallery", {
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = null;
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = "";
+      this.pasteProgress.targetDir = "";
     },
 
     async moveSelectedFiles(destPath) {
       if (this.selectedIds.length === 0) return;
+
+      const firstSrc = this.selectedIds[0];
+      const lastSlash = Math.max(firstSrc.lastIndexOf("\\"), firstSrc.lastIndexOf("/"));
+      const sourceDir = lastSlash !== -1 ? firstSrc.substring(0, lastSlash) : "";
 
       this.pasteProgress.show = true;
       this.pasteProgress.total = this.selectedIds.length;
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = "cut";
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = sourceDir;
+      this.pasteProgress.targetDir = destPath;
 
       const sep = isWin ? "\\" : "/";
       let completedCount = 0;
+      const movedPaths = [];
       for (const src of this.selectedIds) {
+        if (this.pasteProgress.cancelled) {
+          break;
+        }
         try {
           const fileName = src.split("\\").pop() || src.split("/").pop();
           await invoke("cross_move", {
             src,
             dest: `${destPath}${sep}${fileName}`,
           });
+          movedPaths.push(src);
         } catch (error) {
           console.error("Failed to move:", error);
         } finally {
@@ -821,9 +853,12 @@ export const useGalleryStore = defineStore("gallery", {
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = null;
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = "";
+      this.pasteProgress.targetDir = "";
 
-      this.files = this.files.filter((f) => !this.selectedIds.includes(f.path));
-      this.selectedIds = [];
+      this.files = this.files.filter((f) => !movedPaths.includes(f.path));
+      this.selectedIds = this.selectedIds.filter((id) => !movedPaths.includes(id));
     },
 
     setClipboard(action, paths) {
@@ -864,15 +899,26 @@ export const useGalleryStore = defineStore("gallery", {
 
       const isCopy = action === "copy";
       
+      const firstSrc = paths[0] || "";
+      const lastSlash = Math.max(firstSrc.lastIndexOf("\\"), firstSrc.lastIndexOf("/"));
+      const sourceDir = lastSlash !== -1 ? firstSrc.substring(0, lastSlash) : "";
+
       this.pasteProgress.show = true;
       this.pasteProgress.total = paths.length;
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = action;
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = sourceDir;
+      this.pasteProgress.targetDir = destPath;
 
       const sep = isWin ? "\\" : "/";
       let completedCount = 0;
+      const movedPaths = [];
       for (const src of paths) {
+        if (this.pasteProgress.cancelled) {
+          break;
+        }
         const fileName = src.split("\\").pop() || src.split("/").pop();
         const dest = `${destPath}${sep}${fileName}`;
         try {
@@ -880,6 +926,7 @@ export const useGalleryStore = defineStore("gallery", {
             await invoke("cross_copy", { src, dest });
           } else if (action === "cut") {
             await invoke("cross_move", { src, dest });
+            movedPaths.push(src);
           }
         } catch (error) {
           console.error(`Failed to ${action} ${src} to ${dest}:`, error);
@@ -896,9 +943,20 @@ export const useGalleryStore = defineStore("gallery", {
       this.pasteProgress.current = 0;
       this.pasteProgress.percentage = 0;
       this.pasteProgress.action = null;
+      this.pasteProgress.cancelled = false;
+      this.pasteProgress.sourceDir = "";
+      this.pasteProgress.targetDir = "";
 
       if (action === "cut" && !isSystemClipboard) {
-        this.clearClipboard();
+        // Only clear paths that were actually cut-moved
+        if (this.pasteProgress.cancelled) {
+          this.clipboard.paths = this.clipboard.paths.filter((p) => !movedPaths.includes(p));
+          if (this.clipboard.paths.length === 0) {
+            this.clearClipboard();
+          }
+        } else {
+          this.clearClipboard();
+        }
       }
 
       const { useNavigationStore } = await import("../navigation/store");

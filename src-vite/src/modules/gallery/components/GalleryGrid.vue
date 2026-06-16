@@ -32,7 +32,7 @@
       <!-- Paste Progress Bar -->
       <div
         v-if="galleryStore.pasteProgress.show"
-        class="pointer-events-auto flex flex-col gap-2 p-3.5 rounded-lg bg-base-300/90 backdrop-blur-md border border-neutral/30 shadow-2xl w-80 text-xs transition-all duration-300"
+        class="pointer-events-auto flex flex-col gap-2.5 p-4 rounded-xl bg-base-300/90 backdrop-blur-md border border-neutral/30 shadow-2xl w-80 text-xs transition-all duration-300"
       >
         <div class="flex justify-between items-center font-bold text-base-content/90">
           <span class="flex items-center gap-1.5">
@@ -44,15 +44,38 @@
           </span>
           <span class="font-mono text-base-content/60">{{ galleryStore.pasteProgress.current }} / {{ galleryStore.pasteProgress.total }}</span>
         </div>
+
+        <!-- Directories info: Source & Target -->
+        <div class="flex flex-col gap-1 text-[10px] text-base-content/60 border-t border-b border-neutral/15 py-2 my-0.5">
+          <div class="flex items-center justify-between gap-3 min-w-0">
+            <span class="font-semibold text-base-content/40 shrink-0">Откуда:</span>
+            <span class="truncate font-mono text-right" :title="galleryStore.pasteProgress.sourceDir">
+              {{ getFolderName(galleryStore.pasteProgress.sourceDir) || '—' }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between gap-3 min-w-0">
+            <span class="font-semibold text-base-content/40 shrink-0">Куда:</span>
+            <span class="truncate font-mono text-right" :title="galleryStore.pasteProgress.targetDir">
+              {{ getFolderName(galleryStore.pasteProgress.targetDir) || '—' }}
+            </span>
+          </div>
+        </div>
+
         <div class="w-full bg-base-100/50 rounded-full h-2 overflow-hidden border border-neutral/15">
           <div
             class="bg-primary h-full rounded-full transition-all duration-300 ease-out"
             :style="{ width: galleryStore.pasteProgress.percentage + '%' }"
           ></div>
         </div>
-        <div class="flex justify-between text-[10px] text-base-content/40 font-medium">
+        <div class="flex justify-between items-center text-[10px] text-base-content/40 font-medium">
           <span>{{ $t("gallery.paste_progress.done", { percent: galleryStore.pasteProgress.percentage }) }}</span>
-          <span>{{ $t("gallery.paste_progress.pasting") }}</span>
+          
+          <button
+            class="btn btn-ghost btn-xs text-error hover:bg-error/10 font-bold px-2 py-0.5 rounded min-h-0 h-5"
+            @click="cancelPaste"
+          >
+            {{ $t("batch_ops.cancel") || "Отмена" }}
+          </button>
         </div>
       </div>
 
@@ -173,6 +196,15 @@ function onWheel(event) {
 
 function openQuickLook(file) {
   emit("openQuickLook", file);
+}
+
+function cancelPaste() {
+  galleryStore.cancelPaste();
+}
+
+function getFolderName(path) {
+  if (!path) return "";
+  return path.split("\\").pop() || path.split("/").pop() || path;
 }
 </script>
 
