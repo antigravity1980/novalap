@@ -1802,7 +1802,7 @@ function handleItemClicked(
       }
 
       selectedItemIndex.value = index;
-      lastSelectedIndex.value = index;
+      lastSelectedIndex.value = anchorIndex;
       if (!wasSelectMode) {
         toast.info(localeMsg.value.info_panel.select_mode_entered);
       }
@@ -1884,27 +1884,30 @@ const lastSelectedIndex = ref(-1);
 const keyboardSelectionAnchorIndex = ref(-1);
 
 function handleItemSelectToggled(index: number, shiftKey: boolean = false) {
-  if (
-    shiftKey &&
-    lastSelectedIndex.value !== -1 &&
-    lastSelectedIndex.value !== index
-  ) {
-    // Range selection: select all items between lastSelectedIndex and index
-    const start = Math.min(lastSelectedIndex.value, index);
-    const end = Math.max(lastSelectedIndex.value, index);
+  if (shiftKey) {
+    if (lastSelectedIndex.value === -1) {
+      lastSelectedIndex.value = fileList.value.findIndex(f => f.isSelected);
+      if (lastSelectedIndex.value === -1) {
+        lastSelectedIndex.value = index;
+      }
+    }
 
-    // Set all items in range to the same selection state as the target item
-    const targetState = !fileList.value[index].isSelected;
-    for (let i = start; i <= end; i++) {
-      fileList.value[i].isSelected = targetState;
+    if (lastSelectedIndex.value !== -1 && lastSelectedIndex.value !== index) {
+      const start = Math.min(lastSelectedIndex.value, index);
+      const end = Math.max(lastSelectedIndex.value, index);
+
+      for (let i = start; i <= end; i++) {
+        if (isRealFileItem(fileList.value[i])) {
+          fileList.value[i].isSelected = true;
+        }
+      }
     }
   } else {
     // Single toggle
     fileList.value[index].isSelected = !fileList.value[index].isSelected;
+    // Update last selected index only for non-Shift click
+    lastSelectedIndex.value = index;
   }
-
-  // Update last selected index
-  lastSelectedIndex.value = index;
 }
 
 function toggleKeyboardSelection(direction: "prev" | "next") {

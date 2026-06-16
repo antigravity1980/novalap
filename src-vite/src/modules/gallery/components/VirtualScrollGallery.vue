@@ -387,23 +387,38 @@ function onCardClick(e, file) {
   const clickedIndex = props.files.findIndex((f) => f.path === file.path);
   containerRef.value?.focus();
 
-  if (galleryStore.selectionMode || e.ctrlKey || e.metaKey) {
-    galleryStore.toggleSelection(file.path);
-    anchorIndex.value = clickedIndex;
-  } else if (e.shiftKey && galleryStore.selectedIds.length > 0) {
+  const isMultiSelect = galleryStore.selectionMode || e.ctrlKey || e.metaKey;
+
+  if (e.shiftKey) {
     if (anchorIndex.value === -1) {
-      const lastPath = galleryStore.selectedIds[0];
-      anchorIndex.value = props.files.findIndex((f) => f.path === lastPath);
+      if (galleryStore.selectedIds.length > 0) {
+        const anchorPath = galleryStore.selectedIds[0];
+        anchorIndex.value = props.files.findIndex((f) => f.path === anchorPath);
+      }
+      if (anchorIndex.value === -1) {
+        anchorIndex.value = clickedIndex;
+      }
     }
+
     if (anchorIndex.value >= 0 && clickedIndex >= 0) {
       const from = Math.min(anchorIndex.value, clickedIndex);
       const to = Math.max(anchorIndex.value, clickedIndex);
-      galleryStore.selectedIds = props.files
-        .slice(from, to + 1)
-        .map((f) => f.path);
+      const rangePaths = props.files.slice(from, to + 1).map((f) => f.path);
+
+      if (isMultiSelect) {
+        galleryStore.selectedIds = [
+          ...new Set([...galleryStore.selectedIds, ...rangePaths]),
+        ];
+      } else {
+        galleryStore.selectedIds = rangePaths;
+      }
     }
   } else {
-    galleryStore.selectedIds = [file.path];
+    if (isMultiSelect) {
+      galleryStore.toggleSelection(file.path);
+    } else {
+      galleryStore.selectedIds = [file.path];
+    }
     anchorIndex.value = clickedIndex;
   }
 }

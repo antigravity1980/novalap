@@ -248,15 +248,7 @@ export const useGalleryStore = defineStore("gallery", {
     },
     deletedHistory: [], // stack of arrays of TrashEntry
     isUndoing: false,
-    // Initialize with cached count so the badge is correct before first fetch
-    trashItems: (() => {
-      try {
-        const cached = localStorage.getItem("lapai_trash_cache");
-        return cached ? JSON.parse(cached) : [];
-      } catch {
-        return [];
-      }
-    })(),
+    trashItems: [],
   }),
 
   getters: {
@@ -390,17 +382,7 @@ export const useGalleryStore = defineStore("gallery", {
     },
 
     async fetchTrash() {
-      try {
-        this.trashItems = await invoke("get_trash_contents");
-        try {
-          localStorage.setItem(
-            "lapai_trash_cache",
-            JSON.stringify(this.trashItems),
-          );
-        } catch {}
-      } catch (err) {
-        console.error("Failed to load trash:", err);
-      }
+      this.trashItems = [];
     },
 
     setFiles(files) {

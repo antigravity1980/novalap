@@ -18,24 +18,6 @@
           >
             {{ $t("explorer.quick_access") }}
           </div>
-          <!-- Recycle Bin item -->
-          <div
-            class="flex items-center gap-2.5 px-3 py-2 cursor-pointer rounded-lg text-xs font-semibold transition-all duration-150 relative"
-            :class="
-              activeTab === 'trash'
-                ? 'bg-primary/15 text-primary font-bold active-nav-item'
-                : 'text-base-content/75 hover:bg-base-100/50 hover:text-base-content'
-            "
-            @click="activeTab = 'trash'"
-          >
-            <IconTrash class="w-4 h-4 shrink-0" />
-            <span class="flex-1">{{ $t("explorer.recycle_bin") }}</span>
-            <span
-              v-if="trashCount > 0"
-              class="badge badge-error badge-sm scale-75"
-              >{{ trashCount }}</span
-            >
-          </div>
         </div>
 
         <!-- Favorites Section -->
@@ -181,21 +163,15 @@
             "
             @click="switchTab(t.id)"
           >
-            <IconTrash
-              v-if="t.activeTab === 'trash'"
-              class="w-3.5 h-3.5 text-primary"
-            />
             <IconFolders
-              v-else-if="t.currentPath"
+              v-if="t.currentPath"
               class="w-3.5 h-3.5 text-primary"
             />
             <IconHome v-else class="w-3.5 h-3.5 text-primary" />
             <span>{{
-              t.activeTab === "trash"
-                ? $t("explorer.recycle_bin")
-                : t.currentPath
-                  ? getFileName(t.currentPath)
-                  : $t("explorer.home")
+              t.currentPath
+                ? getFileName(t.currentPath)
+                : $t("explorer.home")
             }}</span>
             <button
               v-if="tabs.length > 1"
@@ -1118,57 +1094,7 @@
 
       <!-- Main gallery area -->
       <div class="flex-1 overflow-hidden relative bg-base-100">
-        <!-- Recycle Bin contents list overlay -->
-        <div
-          v-if="activeTab === 'trash'"
-          class="absolute inset-0 z-10 bg-base-100 overflow-y-auto p-6 space-y-4"
-        >
-          <div
-            class="flex items-center justify-between border-b border-neutral/20 pb-4"
-          >
-            <div>
-              <h2 class="text-lg font-bold text-base-content">
-                {{ $t("explorer.recycle_bin") }}
-              </h2>
-              <p class="text-xs text-base-content/50 mt-1">
-                {{ $t("explorer.recycle_bin_hint") }}
-              </p>
-            </div>
-            <button
-              class="btn btn-error btn-sm font-semibold rounded-md"
-              :disabled="trashItems.length === 0"
-              @click="clearTrash"
-            >
-              {{ $t("explorer.empty_trash") }}
-            </button>
-          </div>
-
-          <div
-            v-if="trashItems.length === 0"
-            class="flex flex-col items-center justify-center py-24 text-center text-base-content/30 space-y-3"
-          >
-            <span class="text-5xl">🗑️</span>
-            <span class="text-sm font-medium">{{
-              $t("explorer.recycle_bin_empty")
-            }}</span>
-          </div>
-
-          <div
-            v-else
-            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5"
-          >
-            <TrashCard
-              v-for="item in trashItems"
-              :key="item.trashPath"
-              :item="item"
-              @restore="restoreTrashFile"
-              @restore-to="restoreTrashFileTo"
-              @delete-permanent="deleteTrashFilePermanently"
-            />
-          </div>
-        </div>
-
-        <GalleryGrid v-else-if="!galleryStore.focusMode" @open-quick-look="openQuickLook" />
+        <GalleryGrid v-if="!galleryStore.focusMode" @open-quick-look="openQuickLook" />
       </div>
 
       <!-- Status Bar -->
@@ -1636,7 +1562,6 @@ import QuickCrop from "@/modules/viewer/components/QuickCrop.vue";
 import BatchOperations from "@/modules/operations/components/BatchOperations.vue";
 import MessageBox from "@/components/MessageBox.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
-import TrashCard from "@/components/TrashCard.vue";
 
 const router = useRouter();
 const navigationStore = useNavigationStore();
@@ -1820,8 +1745,8 @@ watch(searchQuery, (newVal) => {
 });
 
 // Trash list state
-const trashItems = computed(() => galleryStore.trashItems);
-const trashCount = computed(() => galleryStore.trashItems.length);
+const trashItems = computed(() => []);
+const trashCount = computed(() => 0);
 
 // Action visibility
 const compareVisible = ref(false);
@@ -1947,15 +1872,7 @@ const totalSelectedSize = computed(() => {
 });
 
 // Fetch trash items
-async function fetchTrash() {
-  await galleryStore.fetchTrash();
-}
-
-watch(activeTab, (val) => {
-  if (val === "trash") {
-    fetchTrash();
-  }
-});
+async function fetchTrash() {}
 
 // Breadcrumbs builder
 const breadcrumbs = computed(() => {
@@ -1987,14 +1904,10 @@ async function switchTab(tabId) {
   const newTab = tabs.value.find((t) => t.id === tabId);
   if (newTab) {
     activeTab.value = newTab.activeTab;
-    if (newTab.activeTab === "trash") {
-      await fetchTrash();
+    if (newTab.currentPath) {
+      await navigateTo(newTab.currentPath);
     } else {
-      if (newTab.currentPath) {
-        await navigateTo(newTab.currentPath);
-      } else {
-        await navigateToHome();
-      }
+      await navigateToHome();
     }
     galleryStore.selectedIds = [...newTab.selectedIds];
   }
@@ -2081,7 +1994,6 @@ async function goUp() {
 
 async function refreshData() {
   await navigationStore.refresh();
-  fetchTrash();
 }
 
 function toggleInspector() {
@@ -2318,59 +2230,6 @@ function onBatchComplete(payload) {
     }
   } else {
     refreshData()
-  }
-}
-
-// Trash Bin actions
-async function restoreTrashFile(trashPath) {
-  try {
-    await invoke("restore_from_trash", { trashPaths: [trashPath] });
-    await refreshData();
-  } catch (err) {
-    alert("Не удалось восстановить файл: " + err);
-  }
-}
-
-async function restoreTrashFileTo(item) {
-  try {
-    const targetDir = await openFolderDialog();
-    if (!targetDir) return; // user cancelled
-    
-    await invoke("restore_from_trash_to", {
-      trashPaths: [item.trashPath],
-      targetDir: targetDir,
-    });
-    await refreshData();
-  } catch (err) {
-    alert("Не удалось восстановить файл в выбранную папку: " + err);
-  }
-}
-
-async function deleteTrashFilePermanently(item) {
-  if (confirm("Удалить файл навсегда? Это действие нельзя отменить.")) {
-    try {
-      await invoke("delete_file_system", { path: item.trashPath });
-      const meta = item.trashPath.replace(/\.[^/.]+$/, "") + ".meta.json";
-      await invoke("delete_file_system", { path: meta }).catch(() => {});
-      await refreshData();
-    } catch (err) {
-      alert("Не удалось удалить файл: " + err);
-    }
-  }
-}
-
-async function clearTrash() {
-  if (
-    confirm(
-      "Очистить корзину навсегда? Все файлы внутри будут удалены окончательно.",
-    )
-  ) {
-    try {
-      await invoke("empty_trash");
-      await refreshData();
-    } catch (err) {
-      alert("Не удалось очистить корзину: " + err);
-    }
   }
 }
 
@@ -2711,7 +2570,6 @@ onMounted(async () => {
   });
 
   await navigationStore.loadDrives();
-  await fetchTrash();
 
   if (navigationStore.currentPath) {
     await navigateTo(navigationStore.currentPath);
