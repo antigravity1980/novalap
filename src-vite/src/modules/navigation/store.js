@@ -107,11 +107,15 @@ export const useNavigationStore = defineStore("navigation", {
         }
         this.history.push(path);
         this.historyIndex = this.history.length - 1;
+        const isDifferentPath = this.currentPath !== path;
         this.currentPath = path;
 
         // Загружаем содержимое
         this.folders = await invoke("list_directory", { path });
         const galleryStore = useGalleryStore();
+        if (isDifferentPath) {
+          galleryStore.resetSelection();
+        }
         galleryStore.setFiles(this.folders);
 
         // Кешируем поддерево для tree view
@@ -137,11 +141,15 @@ export const useNavigationStore = defineStore("navigation", {
       if (this.canGoBack) {
         this.historyIndex--;
         const path = this.history[this.historyIndex];
+        const isDifferentPath = this.currentPath !== path;
         this.currentPath = path;
         this.isLoading = true;
         try {
           this.folders = await invoke("list_directory", { path });
           const galleryStore = useGalleryStore();
+          if (isDifferentPath) {
+            galleryStore.resetSelection();
+          }
           galleryStore.setFiles(this.folders);
 
           await this._stopWatching();
@@ -159,11 +167,15 @@ export const useNavigationStore = defineStore("navigation", {
       if (this.canGoForward) {
         this.historyIndex++;
         const path = this.history[this.historyIndex];
+        const isDifferentPath = this.currentPath !== path;
         this.currentPath = path;
         this.isLoading = true;
         try {
           this.folders = await invoke("list_directory", { path });
           const galleryStore = useGalleryStore();
+          if (isDifferentPath) {
+            galleryStore.resetSelection();
+          }
           galleryStore.setFiles(this.folders);
 
           await this._stopWatching();

@@ -679,6 +679,12 @@ export const useGalleryStore = defineStore("gallery", {
       }
     },
 
+    resetSelection() {
+      this.selectedIds = [];
+      this.selectionHistory = [];
+      this.historyIndex = -1;
+    },
+
     undo() {
       if (this.canUndo) {
         this.isUndoing = true;
