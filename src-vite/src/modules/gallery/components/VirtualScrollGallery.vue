@@ -220,16 +220,6 @@ const visibleItems = computed(() => {
   const viewportHeight = Math.max(containerHeight.value || 0, 800);
   const vBot = scrollTop.value + viewportHeight + buf;
 
-  console.log("VirtualScrollGallery visibleItems debug:", {
-    totalLayoutRows: items.length,
-    scrollTop: scrollTop.value,
-    containerHeight: containerHeight.value,
-    viewportHeight,
-    vTop,
-    vBot,
-    rowH: rowH.value,
-  });
-
   return items.filter((item) => {
     return (item.top + item.height >= vTop) && (item.top <= vBot);
   });

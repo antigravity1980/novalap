@@ -393,6 +393,7 @@ function deletePreset(idx) {
 
 watch(() => props.visible, (val) => {
   if (val) {
+    resultMessage.value = ''
     loadCustomPresets()
   }
 }, { immediate: true })
@@ -577,91 +578,110 @@ async function apply() {
       filesToProcess = copiedFiles
     }
 
-    switch (activeTab.value) {
-      case 'resize':
-        result = await invoke('batch_resize', {
-          files: filesToProcess,
-          preset: {
-            width: Math.max(0, parseInt(resize.width) || 0),
-            height: Math.max(0, parseInt(resize.height) || 0),
-            fit: resize.fit,
-          },
-        })
-        progressCurrent.value = progressTotal.value
-        break
-      case 'convert':
-        result = await invoke('batch_convert', {
-          files: filesToProcess,
-          targetFormat: convert.format,
-          quality: convert.quality,
-        })
-        progressCurrent.value = progressTotal.value
-        break
-      case 'rename':
-        result = await invoke('batch_rename', {
-          files: props.selectedFiles,
-          mask: rename.mask,
-          counterStart: rename.counterStart,
-        })
-        progressCurrent.value = progressTotal.value
-        break
-      case 'color':
-        result = await invoke('batch_color_correct', {
-          files: filesToProcess,
-          saturation: color.saturation,
-          gamma: color.gamma,
-        })
-        progressCurrent.value = progressTotal.value
-        break
-      case 'compress': {
-        // JPEG: native Rust (always available)
-        // PNG: external pngquant
-        const pngFiles = filesToProcess.filter((f) => f.toLowerCase().endsWith('.png'))
-        const jpgFiles = filesToProcess.filter((f) =>
-          ['.jpg', '.jpeg'].some((ext) => f.toLowerCase().endsWith(ext))
-        )
+    if (activeTab.value === 'compress') {
+      // JPEG: native Rust (always available)
+      // PNG: external pngquant
+      const pngFiles = filesToProcess.filter((f) => f.toLowerCase().endsWith('.png'))
+      const jpgFiles = filesToProcess.filter((f) =>
+        ['.jpg', '.jpeg'].some((ext) => f.toLowerCase().endsWith(ext))
+      )
 
-        let succ = 0
-        let errs = []
-        progressTotal.value = pngFiles.length + jpgFiles.length
-        progressCurrent.value = 0
+      let succ = 0
+      let errs = []
+      progressTotal.value = pngFiles.length + jpgFiles.length
+      progressCurrent.value = 0
 
-        if (jpgFiles.length > 0) {
-          // Process JPEGs one by one so we can update progress
-          for (const jpgFile of jpgFiles) {
-            const res = await invoke('optimize_with_mozjpeg', { files: [jpgFile] })
-            succ += res.succeeded
-            errs = [...errs, ...res.errors]
-            progressCurrent.value++
-          }
+      if (jpgFiles.length > 0) {
+        // Process JPEGs one by one so we can update progress
+        for (const jpgFile of jpgFiles) {
+          const res = await invoke('optimize_with_mozjpeg', { files: [jpgFile] })
+          succ += res.succeeded
+          errs = [...errs, ...res.errors]
+          progressCurrent.value++
         }
-        if (pngFiles.length > 0 && optimizers.pngquant) {
-          for (const pngFile of pngFiles) {
-            const res = await invoke('optimize_with_pngquant', { files: [pngFile] })
-            succ += res.succeeded
-            errs = [...errs, ...res.errors]
-            progressCurrent.value++
-          }
-        } else if (pngFiles.length > 0) {
-          // pngquant not available, skip with error
-          for (const f of pngFiles) {
-            errs.push(`${f}: pngquant не установлен`)
-            progressCurrent.value++
-          }
-        }
-
-        result = {
-          total: pngFiles.length + jpgFiles.length,
-          succeeded: succ,
-          failed: pngFiles.length + jpgFiles.length - succ,
-          errors: errs,
-        }
-        break
       }
-      case 'strip':
-        result = await invoke('strip_metadata', { files: filesToProcess })
-        progressCurrent.value = progressTotal.value
-        break
+      if (pngFiles.length > 0 && optimizers.pngquant) {
+        for (const pngFile of pngFiles) {
+          const res = await invoke('optimize_with_pngquant', { files: [pngFile] })
+          succ += res.succeeded
+          errs = [...errs, ...res.errors]
+          progressCurrent.value++
+        }
+      } else if (pngFiles.length > 0) {
+        // pngquant not available, skip with error
+        for (const f of pngFiles) {
+          errs.push(`${f}: pngquant не установлен`)
+          progressCurrent.value++
+        }
+      }
+
+      result = {
+        total: pngFiles.length + jpgFiles.length,
+        succeeded: succ,
+        failed: pngFiles.length + jpgFiles.length - succ,
+        errors: errs,
+      }
+    } else {
+      let succ = 0
+      let errs = []
+      const total = filesToProcess.length
+      progressTotal.value = total
+      progressCurrent.value = 0
+
+      for (let i = 0; i < total; i++) {
+        const file = filesToProcess[i]
+        let singleResult = null
+
+        switch (activeTab.value) {
+          case 'resize':
+            singleResult = await invoke('batch_resize', {
+              files: [file],
+              preset: {
+                width: Math.max(0, parseInt(resize.width) || 0),
+                height: Math.max(0, parseInt(resize.height) || 0),
+                fit: resize.fit,
+              },
+            })
+            break
+          case 'convert':
+            singleResult = await invoke('batch_convert', {
+              files: [file],
+              targetFormat: convert.format,
+              quality: convert.quality,
+            })
+            break
+          case 'rename':
+            singleResult = await invoke('batch_rename', {
+              files: [props.selectedFiles[i]],
+              mask: rename.mask,
+              counterStart: rename.counterStart + i,
+            })
+            break
+          case 'color':
+            singleResult = await invoke('batch_color_correct', {
+              files: [file],
+              saturation: color.saturation,
+              gamma: color.gamma,
+            })
+            break
+          case 'strip':
+            singleResult = await invoke('strip_metadata', { files: [file] })
+            break
+        }
+
+        if (singleResult) {
+          succ += singleResult.succeeded
+          errs = [...errs, ...singleResult.errors]
+        }
+        progressCurrent.value++
+      }
+
+      result = {
+        total: total,
+        succeeded: succ,
+        failed: total - succ,
+        errors: errs,
+      }
     }
 
     if (result) {

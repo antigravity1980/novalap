@@ -883,6 +883,16 @@ export const useGalleryStore = defineStore("gallery", {
         if (!this.clipboard.action || this.clipboard.paths.length === 0) return;
         action = this.clipboard.action;
         paths = this.clipboard.paths;
+      } else if (this.clipboard.action && this.clipboard.paths.length > 0) {
+        // If system clipboard has the exact same paths as our internal clipboard,
+        // use our internal clipboard's action (which could be 'cut').
+        const systemSet = new Set(paths.map(p => p.replace(/\\/g, '/').toLowerCase()));
+        const internalSet = new Set(this.clipboard.paths.map(p => p.replace(/\\/g, '/').toLowerCase()));
+        const match = systemSet.size === internalSet.size && [...systemSet].every(p => internalSet.has(p));
+        if (match) {
+          action = this.clipboard.action;
+          isSystemClipboard = false; // treat as internal to clear clipboard properly on cut
+        }
       }
 
       const isCopy = action === "copy";

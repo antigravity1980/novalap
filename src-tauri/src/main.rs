@@ -390,9 +390,6 @@ async fn main() {
                     #[cfg(not(target_os = "macos"))]
                     {
                         if let Some(window) = app_handle.get_webview_window("main") {
-                            if let Err(e) = window.set_decorations(false) {
-                                eprintln!("Failed to disable decorations: {}", e);
-                            }
                             let icon_bytes = include_bytes!("../icons/icon.png");
                             if let Ok(dyn_img) = image::load_from_memory(icon_bytes) {
                                 let rgba = dyn_img.into_rgba8();
