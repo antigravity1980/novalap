@@ -374,16 +374,18 @@ async function expandFolder(path) {
   await navigationStore.expandTreeFolder(path)
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (navigationStore.currentPath) {
     const drive = navigationStore.drives.find(d => navigationStore.currentPath.startsWith(d.path))
     if (drive) {
       expandedNodes[drive.path] = true
+      // Загружаем дерево с диска, а не из кэша прошлой сессии
+      await navigationStore.refreshTreeFolder(drive.path)
     }
   }
 })
 
-watch(() => navigationStore.currentPath, (newPath) => {
+watch(() => navigationStore.currentPath, async (newPath) => {
   if (newPath) {
     const drive = navigationStore.drives.find(d => newPath.startsWith(d.path))
     if (drive) {

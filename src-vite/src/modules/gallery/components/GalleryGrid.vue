@@ -18,8 +18,19 @@
     <!-- Virtual scroll container -->
     <div v-else class="w-full h-full">
       <VirtualScrollGallery
+        v-if="galleryStore.viewMode === 'grid'"
         :files="galleryStore.displayedFiles"
         :thumbnailSize="galleryStore.thumbnailSize"
+        @openQuickLook="openQuickLook"
+      />
+      <ListView
+        v-else-if="galleryStore.viewMode === 'list'"
+        :files="galleryStore.displayedFiles"
+        @openQuickLook="openQuickLook"
+      />
+      <TableView
+        v-else-if="galleryStore.viewMode === 'table'"
+        :files="galleryStore.displayedFiles"
         @openQuickLook="openQuickLook"
       />
     </div>
@@ -81,6 +92,7 @@
 
       <!-- Zoom + spacing controls -->
       <div
+        v-if="galleryStore.viewMode === 'grid'"
         class="zoom-control pointer-events-auto flex items-center bg-base-300/80 backdrop-blur border border-base-200/50 shadow-2xl transition-all duration-300 ease-in-out"
         :class="{
           'rounded-lg px-3 py-2 gap-3 hover:border-primary/30': isSlidersExpanded,
@@ -163,6 +175,8 @@ import { ref } from "vue";
 import { useGalleryStore } from "../store";
 import { useNavigationStore } from "../../navigation/store";
 import VirtualScrollGallery from "./VirtualScrollGallery.vue";
+import ListView from "./ListView.vue";
+import TableView from "./TableView.vue";
 
 const galleryStore = useGalleryStore();
 const navigationStore = useNavigationStore();

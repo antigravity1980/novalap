@@ -499,6 +499,77 @@
             <span v-if="configStore.settings.showButtonText" class="hidden 2xl:inline">На весь экран</span>
           </button>
 
+          <!-- View Dropdown -->
+          <div class="dropdown">
+            <label tabindex="0" class="win11-btn flex items-center gap-1.5" title="Вид">
+              <!-- View Grid/List/Table selector icon -->
+              <svg v-if="galleryStore.viewMode === 'grid'" class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <svg v-else-if="galleryStore.viewMode === 'list'" class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+              <svg v-else-if="galleryStore.viewMode === 'table'" class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
+                <line x1="10" y1="9" x2="10" y2="21" />
+              </svg>
+              <span v-if="configStore.settings.showButtonText" class="hidden xl:inline">Вид</span>
+              <span class="opacity-50">▾</span>
+            </label>
+            <ul
+              tabindex="0"
+              class="dropdown-content menu p-1.5 shadow-2xl bg-base-300 border border-neutral/30 rounded-lg w-36 z-30 text-xs mt-1"
+            >
+              <li>
+                <a
+                  :class="{ active: galleryStore.viewMode === 'grid' }"
+                  @click="galleryStore.viewMode = 'grid'"
+                  class="flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  <span>Миниатюры</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  :class="{ active: galleryStore.viewMode === 'list' }"
+                  @click="galleryStore.viewMode = 'list'"
+                  class="flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                    <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                  </svg>
+                  <span>Список</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  :class="{ active: galleryStore.viewMode === 'table' }"
+                  @click="galleryStore.viewMode = 'table'"
+                  class="flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
+                    <line x1="10" y1="9" x2="10" y2="21" />
+                  </svg>
+                  <span>Таблица</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
           <div class="divider divider-horizontal h-4 mx-0.5 sm:mx-1 xl:mx-1.5 self-center"></div>
 
           <!-- Sort Dropdown -->
@@ -516,7 +587,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'name' }"
                   @click="
-                    galleryStore.sortBy = 'name';
+                    galleryStore.setSorting('name', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -529,7 +600,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'size' }"
                   @click="
-                    galleryStore.sortBy = 'size';
+                    galleryStore.setSorting('size', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -542,7 +613,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'date' }"
                   @click="
-                    galleryStore.sortBy = 'date';
+                    galleryStore.setSorting('date', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -555,7 +626,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'resolution' }"
                   @click="
-                    galleryStore.sortBy = 'resolution';
+                    galleryStore.setSorting('resolution', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -568,7 +639,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'ai_source' }"
                   @click="
-                    galleryStore.sortBy = 'ai_source';
+                    galleryStore.setSorting('ai_source', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -581,12 +652,7 @@
                 <a
                   :class="{ active: galleryStore.sortBy === 'random' }"
                   @click="
-                    if (galleryStore.sortBy === 'random') {
-                      galleryStore.reshuffleRandomWeights();
-                    } else {
-                      galleryStore.sortBy = 'random';
-                      galleryStore.reshuffleRandomWeights();
-                    }
+                    galleryStore.setSorting('random', galleryStore.sortOrder);
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -599,7 +665,7 @@
               <li>
                 <a
                   @click="
-                    galleryStore.sortOrder = 'asc';
+                    galleryStore.setSorting(galleryStore.sortBy, 'asc');
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -613,7 +679,7 @@
               <li>
                 <a
                   @click="
-                    galleryStore.sortOrder = 'desc';
+                    galleryStore.setSorting(galleryStore.sortBy, 'desc');
                     onSortChange();
                   "
                   class="flex justify-between items-center"
@@ -2014,7 +2080,8 @@ function onGroupChange() {
 }
 
 function toggleSortOrder() {
-  galleryStore.sortOrder = galleryStore.sortOrder === "asc" ? "desc" : "asc";
+  const newOrder = galleryStore.sortOrder === "asc" ? "desc" : "asc";
+  galleryStore.setSorting(galleryStore.sortBy, newOrder);
 }
 
 // Dialog functions
@@ -2568,6 +2635,10 @@ onMounted(async () => {
       }, 500);
     }
   });
+
+  // Сбрасываем кэш папок перед навигацией, чтобы не показывать
+  // удалённые/устаревшие папки из прошлой сессии
+  navigationStore.clearTreeCache();
 
   await navigationStore.loadDrives();
 

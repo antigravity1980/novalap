@@ -116,6 +116,7 @@ export const useNavigationStore = defineStore("navigation", {
         if (isDifferentPath) {
           galleryStore.resetSelection();
         }
+        galleryStore.loadSortingForFolder(path);
         galleryStore.setFiles(this.folders);
 
         // Кешируем поддерево для tree view
@@ -150,6 +151,7 @@ export const useNavigationStore = defineStore("navigation", {
           if (isDifferentPath) {
             galleryStore.resetSelection();
           }
+          galleryStore.loadSortingForFolder(path);
           galleryStore.setFiles(this.folders);
 
           await this._stopWatching();
@@ -176,6 +178,7 @@ export const useNavigationStore = defineStore("navigation", {
           if (isDifferentPath) {
             galleryStore.resetSelection();
           }
+          galleryStore.loadSortingForFolder(path);
           galleryStore.setFiles(this.folders);
 
           await this._stopWatching();
@@ -187,6 +190,15 @@ export const useNavigationStore = defineStore("navigation", {
           this.isLoading = false;
         }
       }
+    },
+
+    /** Сбрасывает кэш дерева папок и содержимое текущей папки.
+     * Вызывать при запуске программы перед navigateTo, чтобы
+     * не показывать устаревшие данные из прошлой сессии.
+     */
+    clearTreeCache() {
+      this.treeFolders = {};
+      this.folders = [];
     },
 
     async loadDrives() {
@@ -236,6 +248,7 @@ export const useNavigationStore = defineStore("navigation", {
           this.folders = folders;
           
           const galleryStore = useGalleryStore();
+          galleryStore.loadSortingForFolder(path);
           galleryStore.setFiles(folders);
 
           const treeData = await invoke("expand_folder", { path });

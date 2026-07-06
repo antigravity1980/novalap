@@ -201,6 +201,8 @@ export const useGalleryStore = defineStore("gallery", {
     // Сортировка
     sortBy: "name", // name, size, date, resolution, ai_source, model, loras
     sortOrder: "asc", // asc, desc
+    folderSortSettings: {}, // { [folderPath]: { sortBy, sortOrder } }
+    viewMode: "grid", // grid, list, table
 
     // Фильтры
     filters: {
@@ -525,9 +527,37 @@ export const useGalleryStore = defineStore("gallery", {
       }
     },
 
-    setSorting(sortBy, order) {
+    async setSorting(sortBy, order) {
+      if (sortBy === "random") {
+        this.reshuffleRandomWeights();
+      }
       this.sortBy = sortBy;
       this.sortOrder = order;
+
+      const { useNavigationStore } = await import("../navigation/store");
+      const navigationStore = useNavigationStore();
+      const currentPath = navigationStore.currentPath;
+      if (currentPath) {
+        if (!this.folderSortSettings) {
+          this.folderSortSettings = {};
+        }
+        this.folderSortSettings[currentPath] = { sortBy, sortOrder: order };
+      }
+    },
+
+    loadSortingForFolder(path) {
+      if (!path) return;
+      if (!this.folderSortSettings) {
+        this.folderSortSettings = {};
+      }
+      const settings = this.folderSortSettings[path];
+      if (settings) {
+        this.sortBy = settings.sortBy || "name";
+        this.sortOrder = settings.sortOrder || "asc";
+      } else {
+        this.sortBy = "name";
+        this.sortOrder = "asc";
+      }
     },
 
     reshuffleRandomWeights() {
@@ -972,5 +1002,8 @@ export const useGalleryStore = defineStore("gallery", {
         return null;
       }
     },
+  },
+  persist: {
+    paths: ["folderSortSettings", "viewMode"],
   },
 });
