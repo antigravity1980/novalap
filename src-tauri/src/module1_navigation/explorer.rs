@@ -234,7 +234,7 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
         if raw.is_empty() {
             continue;
         }
-        join_set.spawn_blocking(move || {
+        join_set.spawn(async move {
             let path = std::path::Path::new(&raw);
             if !path.exists() {
                 return EntryEnrichment {
@@ -283,7 +283,7 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                 };
 
                 let (resolution, duration, has_audio) = if is_video {
-                    if let Ok(video_meta) = crate::t_video::get_video_metadata(&raw) {
+                    if let Ok(video_meta) = crate::t_video::get_video_metadata_async(&raw).await {
                         (
                             Some(Resolution {
                                 width: video_meta.width,

@@ -45,7 +45,7 @@
         v-if="isVideo && isHovered && configStore.settings.videoHoverPreview"
         ref="hoverVideoRef"
         :src="getAssetSrc(file.path)"
-        class="w-full h-full object-contain absolute inset-0 z-10 bg-black"
+        class="w-full h-full object-contain absolute inset-0 z-10 bg-black pointer-events-none"
         muted
         autoplay
         loop
