@@ -38,8 +38,15 @@
       </div>
     </div>
 
-    <!-- Custom Volume Control Overlay -->
+    <!-- Custom Volume + Loop Control Overlay -->
     <div class="absolute bottom-16 right-4 flex items-center gap-2 bg-base-300/80 backdrop-blur px-3 py-1.5 rounded-full z-30 pointer-events-auto select-none shadow-lg">
+      <!-- Loop button -->
+      <button @click.stop="toggleLoop" :title="config.settings.loopVideo ? 'Disable loop' : 'Enable loop'" class="btn btn-ghost btn-circle btn-xs hover:bg-base-200 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="config.settings.loopVideo ? 'text-primary' : 'text-base-content/40'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+      <!-- Mute button -->
       <button @click.stop="toggleMute" class="btn btn-ghost btn-circle btn-xs hover:bg-base-200 flex items-center justify-center">
         <svg v-if="config.video.muted || config.video.volume === 0" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -544,21 +551,23 @@ onMounted(() => {
       activeVideo.value = 0;
       loadVideo(props.filePath);
     }
+
+    // Register wheel after DOM is ready (videoContainer must exist)
+    if (videoContainer.value) {
+      resizeObserver = new ResizeObserver(() => {
+        updateTransform({ recalcScale: true });
+      });
+      resizeObserver.observe(videoContainer.value);
+      const el = videoContainer.value as HTMLElement;
+      el.addEventListener('pointerdown', handlePinchPointerDown);
+      el.addEventListener('pointermove', handlePinchPointerMove, { passive: false });
+      el.addEventListener('pointerup', handlePinchPointerEnd);
+      el.addEventListener('pointercancel', handlePinchPointerEnd);
+      el.addEventListener('pointerleave', handlePinchPointerEnd);
+      el.addEventListener('wheel', handleWheel, { passive: false });
+    }
   });
 
-  if (videoContainer.value) {
-    resizeObserver = new ResizeObserver(() => {
-      updateTransform({ recalcScale: true });
-    });
-    resizeObserver.observe(videoContainer.value);
-    const el = videoContainer.value as HTMLElement;
-    el.addEventListener('pointerdown', handlePinchPointerDown);
-    el.addEventListener('pointermove', handlePinchPointerMove, { passive: false });
-    el.addEventListener('pointerup', handlePinchPointerEnd);
-    el.addEventListener('pointercancel', handlePinchPointerEnd);
-    el.addEventListener('pointerleave', handlePinchPointerEnd);
-    el.addEventListener('wheel', handleWheel, { passive: false });
-  }
   // Global capture-phase fallback for touchpad pinch (see Image.vue).
   window.addEventListener('wheel', handleGlobalPinchWheel, { capture: true, passive: false });
 });
@@ -610,6 +619,10 @@ watch(() => props.isSlideShow, (newVal) => {
     }
   }
 });
+
+function toggleLoop() {
+  config.settings.loopVideo = !config.settings.loopVideo;
+}
 
 function toggleMute() {
   const newMuted = !config.video.muted;

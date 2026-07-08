@@ -26,7 +26,8 @@ use tauri::{AppHandle, Manager};
 use tokio::sync::Mutex;
 
 static SIDE_CAR_DIR: OnceCell<PathBuf> = OnceCell::new();
-const PROCESS_TIMEOUT_SECS: u64 = 30;
+const PROCESS_TIMEOUT_SECS: u64 = 300; // 5 min budget for large file remux/transcode
+const LARGE_FILE_DIRECT_LIMIT_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GB
 const EXTERNAL_PLAYER_REQUIRED_ERROR: &str = "video_requires_external_player";
 
 fn thumbnail_ffmpeg_threads() -> usize {
@@ -826,7 +827,12 @@ pub async fn prepare_video(
     let force_process = force.as_deref() == Some("process");
     let force_fallback = force.as_deref() == Some("fallback");
 
-    if action == VideoAction::Direct && !force_process && !force_fallback {
+    // Guard: very large files (>2GB) must not be sent direct to WebView2 — it will OOM crash.
+    // Force them through the remux pipeline so the output gets moov-at-start + controlled buffering.
+    let file_size = tokio::fs::metadata(&file_path).await.map(|m| m.len()).unwrap_or(0);
+    let is_large_file = file_size > LARGE_FILE_DIRECT_LIMIT_BYTES;
+
+    if action == VideoAction::Direct && !force_process && !force_fallback && !is_large_file {
         return Ok(VideoPrepareResult {
             url: platform_video_url(&file_path)?,
             action: VideoAction::Direct,
@@ -841,6 +847,9 @@ pub async fn prepare_video(
             VideoAction::Remux => VideoAction::Transcode,
             VideoAction::Transcode => VideoAction::Transcode,
         }
+    } else if is_large_file && action == VideoAction::Direct {
+        // Large direct-play files: start with remux (copy streams) rather than full transcode
+        VideoAction::Remux
     } else {
         action
     };
