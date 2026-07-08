@@ -1008,8 +1008,9 @@
         "Fade",
         "None"
       ],
-      "auto_play_video": "Auto play video",
+      "auto_play_video": "Auto play video on open",
       "loop_video": "Loop video",
+      "video_hover_preview": "Play video preview on thumbnail hover",
       "show_comment": "Show comments",
       "show_comment_hint": "Show comments in the viewer",
       "external_image_editor": "Open image in",

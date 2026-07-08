@@ -131,6 +131,7 @@ export const useConfigStore = defineStore('configStore', {
       navigatorViewSize: 240,    // navigator view size (160, 240, 320, 400)
       autoPlayVideo: true,       // auto play video
       loopVideo: false,          // loop video (only effective when autoPlayVideo is off)
+      videoHoverPreview: true,   // play video preview inside thumbnail card on hover
       // showComment: false,        // show comment
       externalImageAppPath: '',    // external image app path
       externalImageAppName: '',    // external image app display name
@@ -266,6 +267,9 @@ export const useConfigStore = defineStore('configStore', {
     },
     setAutoPlayVideo(autoPlayVideo) {
       this.settings.autoPlayVideo = autoPlayVideo;
+    },
+    setVideoHoverPreview(videoHoverPreview) {
+      this.settings.videoHoverPreview = videoHoverPreview;
     },
     setNavigatorViewMode(navigatorViewMode) {
       this.settings.navigatorViewMode = navigatorViewMode;

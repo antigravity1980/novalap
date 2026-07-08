@@ -201,7 +201,7 @@ const updateTransform = (options: boolean | { resetRotation?: boolean, recalcSca
 
   video.style.transform = `translate(-50%, -50%) rotate(${rotate.value}deg) scale(${scale.value})`;
 
-  emit('scale', { scale: scale.value, displayScale: scale.value, minScale: 0.1, maxScale: 10 });
+  emit('scale', { scale: scale.value, displayScale: scale.value, minScale: 0.1, maxScale: 4 });
   emit('viewport-change', { scale: scale.value, isZoomFit: isFit.value, fileType: 2 });
 };
 
@@ -460,7 +460,7 @@ function handlePinchPointerMove(event: PointerEvent) {
   const pts = Array.from(activeTouchPointers.values());
   const distance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   if (distance < 1) return;
-  const newScale = Math.max(0.1, Math.min(10, pinchStartScale * (distance / pinchStartDistance)));
+  const newScale = Math.max(0.1, Math.min(4, pinchStartScale * (distance / pinchStartDistance)));
   scale.value = newScale;
   isFit.value = false;
   updateTransform();
@@ -500,11 +500,11 @@ function handleGlobalPinchWheel(event: WheelEvent) {
 function applyZoomFromWheel(event: WheelEvent) {
   const isPinch = event.ctrlKey && event.deltaMode === 0 && Math.abs(event.deltaY) < 50;
   if (isPinch) {
-    scale.value = Math.max(0.1, Math.min(10, scale.value * Math.exp(-event.deltaY / 96)));
+    scale.value = Math.max(0.1, Math.min(4, scale.value * Math.exp(-event.deltaY / 96)));
   } else {
     const zoomFactor = 0.1;
     scale.value = event.deltaY < 0
-      ? Math.min(scale.value * (1 + zoomFactor), 10)
+      ? Math.min(scale.value * (1 + zoomFactor), 4)
       : Math.max(scale.value * (1 - zoomFactor), 0.1);
   }
   isFit.value = false;
@@ -585,7 +585,7 @@ watch(() => props.isSlideShow, (newVal) => {
 });
 
 const zoomIn = () => {
-  scale.value = Math.min(scale.value * 2, 10);
+  scale.value = Math.min(scale.value * 2, 4);
   updateTransform();
 };
 const zoomOut = () => {
@@ -622,7 +622,7 @@ function applyViewportState(viewport: { scale?: number; isZoomFit?: boolean }, s
   }
 
   if (typeof viewport.scale === 'number') {
-    scale.value = Math.max(0.1, Math.min(10, viewport.scale));
+    scale.value = Math.max(0.1, Math.min(4, viewport.scale));
     isFit.value = false;
     if (silent) {
       noTransition.value = true;
@@ -709,7 +709,7 @@ function handleWheel(event: WheelEvent) {
     if (gestureType.value === 'zoom' || Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
       const zoomFactor = 0.01;
       const delta = -event.deltaY * zoomFactor;
-      scale.value = Math.max(0.1, Math.min(10, scale.value + delta));
+      scale.value = Math.max(0.1, Math.min(4, scale.value + delta));
       updateTransform();
     }
   } else {
@@ -717,7 +717,7 @@ function handleWheel(event: WheelEvent) {
       if (event.ctrlKey) {
         const zoomFactor = 0.1;
         scale.value = event.deltaY < 0
-          ? Math.min(scale.value * (1 + zoomFactor), 10)
+          ? Math.min(scale.value * (1 + zoomFactor), 4)
           : Math.max(scale.value * (1 - zoomFactor), 0.1);
         updateTransform();
       } else {
@@ -727,7 +727,7 @@ function handleWheel(event: WheelEvent) {
     } else {
       const zoomFactor = 0.1;
       scale.value = event.deltaY < 0
-        ? Math.min(scale.value * (1 + zoomFactor), 10)
+        ? Math.min(scale.value * (1 + zoomFactor), 4)
         : Math.max(scale.value * (1 - zoomFactor), 0.1);
       updateTransform();
     }

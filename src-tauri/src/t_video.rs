@@ -507,6 +507,7 @@ pub struct VideoMetadata {
     pub width: u32,
     pub height: u32,
     pub duration: u64,
+    pub has_audio: bool,
     pub e_make: Option<String>,
     pub e_model: Option<String>,
     pub e_date_time: Option<String>,
@@ -564,6 +565,9 @@ pub async fn get_video_metadata_async(file_path: &str) -> Result<VideoMetadata, 
         .and_then(|s| s.parse::<f64>().ok())
         .unwrap_or(0.0) as u64;
 
+    // Check if video contains an audio stream
+    let has_audio = streams.iter().any(|s| s["codec_type"] == "audio");
+
     // Extract tags
     let meta = if let Some(tags) = json["format"]["tags"].as_object() {
         tags.iter()
@@ -577,6 +581,7 @@ pub async fn get_video_metadata_async(file_path: &str) -> Result<VideoMetadata, 
         width: w,
         height: h,
         duration,
+        has_audio,
         e_make: first_exist(&meta, &["make", "camera_make"]),
         e_model: first_exist(&meta, &["model", "camera_model"]),
         e_software: first_exist(&meta, &["software", "encoder"]),

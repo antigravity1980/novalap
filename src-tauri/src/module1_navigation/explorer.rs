@@ -59,6 +59,8 @@ pub struct EntryEnrichment {
     pub file_count: Option<u32>,
     pub ai_source: Option<String>,
     pub resolution: Option<Resolution>,
+    pub duration: Option<i64>,
+    pub has_audio: Option<bool>,
 }
 
 /// Список файлов и директорий по пути
@@ -241,6 +243,8 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                     file_count: None,
                     ai_source: None,
                     resolution: None,
+                    duration: None,
+                    has_audio: None,
                 };
             }
             let metadata = match std::fs::metadata(&raw) {
@@ -252,6 +256,8 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                         file_count: None,
                         ai_source: None,
                         resolution: None,
+                        duration: None,
+                        has_audio: None,
                     };
                 }
             };
@@ -263,17 +269,44 @@ pub async fn enrich_entries(paths: Vec<String>) -> Result<Vec<EntryEnrichment>, 
                     file_count: Some(file_count),
                     ai_source: None,
                     resolution: None,
+                    duration: None,
+                    has_audio: None,
                 }
             } else {
                 let ai_source = quick_ai_source(&raw);
                 let ext_str = path.extension().map(|e| e.to_string_lossy().to_lowercase());
-                let resolution = get_file_resolution(path, ext_str.as_deref());
+                
+                let is_video = if let Some(ext) = &ext_str {
+                    crate::t_common::VIDEOS.contains(&ext.as_str())
+                } else {
+                    false
+                };
+
+                let (resolution, duration, has_audio) = if is_video {
+                    if let Ok(video_meta) = crate::t_video::get_video_metadata(&raw) {
+                        (
+                            Some(Resolution {
+                                width: video_meta.width,
+                                height: video_meta.height,
+                            }),
+                            Some(video_meta.duration as i64),
+                            Some(video_meta.has_audio),
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                } else {
+                    (get_file_resolution(path, ext_str.as_deref()), None, None)
+                };
+
                 EntryEnrichment {
                     path: raw,
                     dir_count: None,
                     file_count: None,
                     ai_source,
                     resolution,
+                    duration,
+                    has_audio,
                 }
             }
         });
@@ -577,19 +610,22 @@ pub async fn get_explorer_thumbnail(path: String, size: u32) -> Result<String, S
 
         // --- 3. Кеш холодный - декодируем и масштабируем ---
         let p = Path::new(&path_clone);
+        let ext = p.extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        let is_video = crate::t_common::VIDEOS.contains(&ext.as_str());
+
         let is_raw = crate::t_libraw::is_tiff_path(&path_clone)
-            || p.extension()
-                .map(|e| e.to_string_lossy().to_lowercase())
-                .map(|ext| {
-                    matches!(
-                        ext.as_str(),
-                        "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf"
-                    )
-                })
-                .unwrap_or(false);
+            || matches!(
+                ext.as_str(),
+                "cr2" | "cr3" | "nef" | "arw" | "dng" | "orf" | "rw2" | "pef" | "raf"
+            );
 
         let orientation = crate::t_image::get_image_orientation(&path_clone);
-        let thumb_bytes = if is_raw {
+        let thumb_bytes = if is_video {
+            crate::t_video::get_video_thumbnail_sync(&path_clone, size, None, None)
+        } else if is_raw {
             crate::t_image::get_raw_thumbnail(&path_clone, orientation, size)
         } else {
             crate::t_image::get_image_thumbnail(&path_clone, orientation, size)

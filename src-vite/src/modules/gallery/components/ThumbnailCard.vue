@@ -14,8 +14,10 @@
     @click="$emit('click', $event)"
     @dblclick="$emit('dblclick', $event)"
     @contextmenu.prevent.stop="handleContextMenu($event)"
-    @mouseenter="onHoverEnrich"
-    @focusin="onHoverEnrich"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
+    @focusin="handleMouseEnter"
+    @focusout="handleMouseLeave"
     draggable="true"
     @dragstart="handleDragStart"
     @dragover.prevent="isFolder ? (dragOverCard = true) : null"
@@ -26,33 +28,51 @@
   >
     <!-- Thumbnail Image Container -->
     <div
-      class="thumbnail-image flex items-center justify-center overflow-hidden relative select-none w-full"
+      class="thumbnail-image flex items-center justify-center overflow-hidden relative select-none w-full bg-base-300/30"
       :style="{ height: size * 0.75 + 'px' }"
     >
+      <!-- Image poster for both image and video -->
       <img
-        v-if="isImage && thumbnailUrl"
+        v-if="(isImage || (isVideo && !isHovered)) && thumbnailUrl"
         :src="thumbnailUrl"
         :alt="file.name"
         class="w-full h-full object-contain transition-transform duration-300 hover:scale-105"
         loading="lazy"
       />
-      <!-- Video tag/icon overlay -->
+
+      <!-- Hover video preview -->
+      <video
+        v-if="isVideo && isHovered && configStore.settings.videoHoverPreview"
+        ref="hoverVideoRef"
+        :src="getAssetSrc(file.path)"
+        class="w-full h-full object-contain absolute inset-0 z-10 bg-black"
+        muted
+        autoplay
+        loop
+        playsinline
+        @loadedmetadata="onHoverVideoMetadata"
+      ></video>
+
+      <!-- Video icon/duration overlay (only when not playing hover preview) -->
       <div
-        v-else-if="isVideo"
-        class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40 hover:text-base-contents/60"
+        v-if="isVideo && !(isHovered && configStore.settings.videoHoverPreview)"
+        class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1 z-10"
+      >
+        <span>▶</span>
+        <span>{{ file.duration ? formatDuration(file.duration) : $t("gallery.video_label").toUpperCase() }}</span>
+      </div>
+
+      <!-- Fallback video view if no thumbnail available and not hovered -->
+      <div
+        v-if="isVideo && !thumbnailUrl && !(isHovered && configStore.settings.videoHoverPreview)"
+        class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40 hover:text-base-content/60"
       >
         <span class="text-3xl filter drop-shadow">🎬</span>
-        <span
-          class="text-[10px] uppercase font-bold tracking-wider opacity-60"
-          >{{ $t("gallery.video_label") }}</span
-        >
-        <div
-          class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1"
-        >
-          <span>▶</span>
-          <span>{{ $t("gallery.video_label").toUpperCase() }}</span>
-        </div>
+        <span class="text-[10px] uppercase font-bold tracking-wider opacity-60">
+          {{ $t("gallery.video_label") }}
+        </span>
       </div>
+
       <!-- Папка -->
       <div
         v-else-if="isFolder"
@@ -64,9 +84,10 @@
           :style="{ width: (size * 0.35) + 'px', height: (size * 0.35) + 'px' }"
         />
       </div>
+
       <!-- Other files generic -->
       <div
-        v-else
+        v-else-if="!isImage && !isVideo"
         class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40"
       >
         <span class="text-3xl">📄</span>
@@ -94,25 +115,36 @@
         ></span>
       </div>
 
-      <!-- ComfyUI Badge in Top-Right Corner -->
-      <div
-        v-if="file.ai_source === 'ComfyUI'"
-        class="absolute top-2 z-10 transition-all duration-200"
-        :class="selected ? 'right-8' : 'right-2'"
-      >
-        <span
-          class="bg-yellow-400 text-black text-[9.5px] font-extrabold py-0.5 px-1.5 rounded shadow border border-yellow-500"
+      <!-- Top-Right Badges Container -->
+      <div class="absolute top-2 right-2 z-20 flex items-center gap-1.5">
+        <!-- Muted Badge for silent videos -->
+        <div
+          v-if="isVideo && file.has_audio === false"
+          class="bg-black/75 backdrop-blur text-white text-[10px] py-0.5 px-1.5 rounded shadow border border-white/10 flex items-center justify-center leading-none"
+          title="Без звука"
         >
-          ComfyUI
-        </span>
-      </div>
+          🔇
+        </div>
 
-      <!-- Selection checkmark badge -->
-      <div
-        v-if="selected"
-        class="absolute top-2 right-2 bg-primary text-primary-content w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-white/20 shadow-md z-20"
-      >
-        ✓
+        <!-- ComfyUI Badge -->
+        <div
+          v-if="file.ai_source === 'ComfyUI'"
+          class="transition-all duration-200"
+        >
+          <span
+            class="bg-yellow-400 text-black text-[9.5px] font-extrabold py-0.5 px-1.5 rounded shadow border border-yellow-500"
+          >
+            ComfyUI
+          </span>
+        </div>
+
+        <!-- Selection Checkmark -->
+        <div
+          v-if="selected"
+          class="bg-primary text-primary-content w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-white/20 shadow-md"
+        >
+          ✓
+        </div>
       </div>
     </div>
 
@@ -221,6 +253,38 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
 });
 
+const isHovered = ref(false);
+const hoverVideoRef = ref(null);
+
+function handleMouseEnter() {
+  isHovered.value = true;
+  onHoverEnrich();
+}
+
+function handleMouseLeave() {
+  isHovered.value = false;
+}
+
+function onHoverVideoMetadata(e) {
+  const videoEl = e.target;
+  if (videoEl) {
+    videoEl.playbackRate = 3.0;
+  }
+}
+
+function formatDuration(sec) {
+  if (!sec) return "";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const mStr = String(m).padStart(2, "0");
+  const sStr = String(s).padStart(2, "0");
+  if (h > 0) {
+    return `${h}:${mStr}:${sStr}`;
+  }
+  return `${m}:${sStr}`;
+}
+
 function onHoverEnrich() {
   if (galleryStore.needsEnrichment(props.file)) {
     galleryStore.requestEnrichments([props.file.path]);
@@ -319,7 +383,7 @@ let debounceTimeout = null;
 const sizeBuckets = [256, 512, 1024];
 
 async function loadThumbnail() {
-  if (!isImage.value) return;
+  if (!isImage.value && !isVideo.value) return;
 
   const currentPath = props.file.path;
   const targetSize = sizeBuckets.find(b => b >= props.size) || 1024;
@@ -349,7 +413,7 @@ async function loadThumbnail() {
   const ver = uiStore.thumbnailVersions[currentPath] || uiStore.fileVersions[currentPath] || 0;
   const versionQuery = ver ? `?v=${ver}` : "";
 
-  if (props.file.size < 200 * 1024) {
+  if (isImage.value && props.file.size < 200 * 1024) {
     const url = getPreviewUrl(0, currentPath) + versionQuery;
     setCachedThumbnail(cacheKey, url);
     thumbnailUrl.value = url;
