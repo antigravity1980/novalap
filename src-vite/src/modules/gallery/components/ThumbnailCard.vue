@@ -42,34 +42,33 @@
 
       <!-- Hover video preview -->
       <video
-        v-if="isVideo && isHovered && configStore.settings.videoHoverPreview"
+        v-if="isVideo && showHoverVideo"
         ref="hoverVideoRef"
-        :src="getAssetSrc(file.path)"
         :poster="thumbnailUrl"
         class="w-full h-full object-contain absolute inset-0 z-10 bg-transparent"
         style="background: transparent !important;"
         muted
-        autoplay
         loop
         playsinline
-        @loadedmetadata="onHoverVideoMetadata"
-        @playing="onHoverVideoPlaying"
+        preload="none"
+        @canplay="onHoverVideoCanPlay"
+        @error="stopHoverVideo"
         @click.stop="$emit('click', $event)"
         @dblclick.stop="$emit('dblclick', $event)"
       ></video>
 
       <!-- Video icon/duration overlay (only when not playing hover preview) -->
       <div
-        v-if="isVideo && !(isHovered && configStore.settings.videoHoverPreview)"
+        v-if="isVideo && !showHoverVideo"
         class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1 z-10"
       >
         <span>▶</span>
         <span>{{ file.duration ? formatDuration(file.duration) : $t("gallery.video_label").toUpperCase() }}</span>
       </div>
 
-      <!-- Fallback video view if no thumbnail available and not hovered -->
+      <!-- Fallback video view if no thumbnail available and not playing hover -->
       <div
-        v-if="isVideo && !thumbnailUrl && !(isHovered && configStore.settings.videoHoverPreview)"
+        v-if="isVideo && !thumbnailUrl && !showHoverVideo"
         class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40 hover:text-base-content/60"
       >
         <span class="text-3xl filter drop-shadow">🎬</span>
@@ -259,46 +258,73 @@ const props = defineProps({
 });
 
 const isHovered = ref(false);
-const hoverVideoRef = ref(null);
-const isVideoPreviewReady = ref(false);
+const hoverVideoRef = ref<HTMLVideoElement | null>(null);
+const showHoverVideo = ref(false);
+let hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
-watch(isHovered, async (newVal) => {
-  if (newVal) {
-    isVideoPreviewReady.value = false;
+function startHoverVideo() {
+  if (!configStore.settings.videoHoverPreview) return;
+  // Small delay so fast mouse passes don't trigger load
+  hoverTimer = setTimeout(async () => {
+    hoverTimer = null;
+    if (!isHovered.value) return;
+    showHoverVideo.value = true;
     await nextTick();
     const video = hoverVideoRef.value;
-    if (video) {
-      video.playbackRate = 3.0;
-      video.load();
-      video.play().catch(e => console.warn("Failed to autoplay hover video:", e));
+    if (!video) return;
+    const src = getAssetSrc(props.file.path);
+    if (!src) return;
+    video.src = src;
+    video.playbackRate = 3.0;
+    video.muted = true;
+    try {
+      await video.play();
+    } catch {
+      // autoplay blocked: video will play when canplay fires
     }
-  } else {
-    isVideoPreviewReady.value = false;
+  }, 200);
+}
+
+function stopHoverVideo() {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
   }
-});
+  const video = hoverVideoRef.value;
+  if (video) {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }
+  showHoverVideo.value = false;
+}
 
 function handleMouseEnter() {
   isHovered.value = true;
+  startHoverVideo();
   onHoverEnrich();
 }
 
 function handleMouseLeave() {
   isHovered.value = false;
+  stopHoverVideo();
 }
 
-function onHoverVideoMetadata(e) {
-  const videoEl = e.target;
-  if (videoEl) {
-    videoEl.playbackRate = 3.0;
-  }
+function onHoverVideoCanPlay(e: Event) {
+  const video = e.target as HTMLVideoElement;
+  if (!video) return;
+  video.playbackRate = 3.0;
+  video.play().catch(() => {});
 }
 
-function onHoverVideoPlaying(e) {
-  const videoEl = e.target;
-  if (videoEl) {
-    videoEl.playbackRate = 3.0;
-  }
-  isVideoPreviewReady.value = true;
+function onHoverVideoMetadata(e: Event) {
+  const videoEl = e.target as HTMLVideoElement;
+  if (videoEl) videoEl.playbackRate = 3.0;
+}
+
+function onHoverVideoPlaying(e: Event) {
+  const videoEl = e.target as HTMLVideoElement;
+  if (videoEl) videoEl.playbackRate = 3.0;
 }
 
 function formatDuration(sec) {
@@ -477,6 +503,11 @@ onBeforeUnmount(() => {
   if (debounceTimeout) {
     clearTimeout(debounceTimeout);
   }
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  stopHoverVideo();
 });
 watch(
   [
