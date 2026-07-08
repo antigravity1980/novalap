@@ -53,8 +53,8 @@
     "createUpdaterArtifacts": true,
     "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
     "resources": [
-      "resources/models/**/*",
-      "resources/ffmpeg/**/*"
+      "resources/models",
+      "resources/ffmpeg"
     ]
   },
   "plugins": {
