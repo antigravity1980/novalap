@@ -668,10 +668,11 @@ fn get_file_resolution(path: &Path, extension: Option<&str>) -> Option<Resolutio
             }
             Err(e) => {
                 let log_msg = format!("imagesize failed for {:?}: {:?}\n", path, e);
+                let log_path = std::env::temp_dir().join("novalap_debug_log.txt");
                 let _ = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(r"d:\NovaLAP\novalap\debug_log.txt")
+                    .open(log_path)
                     .and_then(|mut f| {
                         use std::io::Write;
                         write!(f, "{}", log_msg)
@@ -680,10 +681,11 @@ fn get_file_resolution(path: &Path, extension: Option<&str>) -> Option<Resolutio
         }
     } else {
         let log_msg = format!("get_file_resolution skipped (not an image) for {:?}, ext={:?}\n", path, ext);
+        let log_path = std::env::temp_dir().join("novalap_debug_log.txt");
         let _ = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(r"d:\NovaLAP\novalap\debug_log.txt")
+            .open(log_path)
             .and_then(|mut f| {
                 use std::io::Write;
                 write!(f, "{}", log_msg)
