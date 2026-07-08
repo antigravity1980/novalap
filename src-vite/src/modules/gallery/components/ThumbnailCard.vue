@@ -258,9 +258,9 @@ const props = defineProps({
 });
 
 const isHovered = ref(false);
-const hoverVideoRef = ref<HTMLVideoElement | null>(null);
+const hoverVideoRef = ref(null);
 const showHoverVideo = ref(false);
-let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+let hoverTimer = null;
 
 function startHoverVideo() {
   if (!configStore.settings.videoHoverPreview) return;
@@ -310,20 +310,20 @@ function handleMouseLeave() {
   stopHoverVideo();
 }
 
-function onHoverVideoCanPlay(e: Event) {
-  const video = e.target as HTMLVideoElement;
+function onHoverVideoCanPlay(e) {
+  const video = e.target;
   if (!video) return;
   video.playbackRate = 3.0;
   video.play().catch(() => {});
 }
 
-function onHoverVideoMetadata(e: Event) {
-  const videoEl = e.target as HTMLVideoElement;
+function onHoverVideoMetadata(e) {
+  const videoEl = e.target;
   if (videoEl) videoEl.playbackRate = 3.0;
 }
 
-function onHoverVideoPlaying(e: Event) {
-  const videoEl = e.target as HTMLVideoElement;
+function onHoverVideoPlaying(e) {
+  const videoEl = e.target;
   if (videoEl) videoEl.playbackRate = 3.0;
 }
 
