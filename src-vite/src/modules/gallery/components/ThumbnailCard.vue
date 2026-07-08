@@ -14,8 +14,6 @@
     @click="$emit('click', $event)"
     @dblclick="$emit('dblclick', $event)"
     @contextmenu.prevent.stop="handleContextMenu($event)"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
     @focusin="handleMouseEnter"
     @focusout="handleMouseLeave"
     draggable="true"
@@ -30,6 +28,8 @@
     <div
       class="thumbnail-image flex items-center justify-center overflow-hidden relative select-none w-full bg-base-300/30"
       :style="{ height: size * 0.75 + 'px' }"
+      @pointerenter="handleMouseEnter"
+      @pointerleave="handleMouseLeave"
     >
       <!-- Image poster for both image and video -->
       <img
@@ -45,13 +45,15 @@
         v-if="isVideo && showHoverVideo"
         ref="hoverVideoRef"
         :poster="thumbnailUrl"
-        class="w-full h-full object-contain absolute inset-0 z-10 bg-transparent"
+        class="w-full h-full object-contain absolute inset-0 z-10 bg-transparent transition-opacity duration-100"
+        :class="isVideoPreviewReady ? 'opacity-100' : 'opacity-0'"
         style="background: transparent !important;"
         muted
         loop
         playsinline
         preload="none"
         @canplay="onHoverVideoCanPlay"
+        @playing="onHoverVideoPlaying"
         @error="stopHoverVideo"
         @click.stop="$emit('click', $event)"
         @dblclick.stop="$emit('dblclick', $event)"
@@ -260,6 +262,7 @@ const props = defineProps({
 const isHovered = ref(false);
 const hoverVideoRef = ref(null);
 const showHoverVideo = ref(false);
+const isVideoPreviewReady = ref(false);
 let hoverTimer = null;
 
 function startHoverVideo() {
@@ -268,6 +271,7 @@ function startHoverVideo() {
   hoverTimer = setTimeout(async () => {
     hoverTimer = null;
     if (!isHovered.value) return;
+    isVideoPreviewReady.value = false;
     showHoverVideo.value = true;
     await nextTick();
     const video = hoverVideoRef.value;
@@ -296,6 +300,7 @@ function stopHoverVideo() {
     video.removeAttribute('src');
     video.load();
   }
+  isVideoPreviewReady.value = false;
   showHoverVideo.value = false;
 }
 
@@ -314,6 +319,7 @@ function onHoverVideoCanPlay(e) {
   const video = e.target;
   if (!video) return;
   video.playbackRate = 3.0;
+  isVideoPreviewReady.value = true;
   video.play().catch(() => {});
 }
 

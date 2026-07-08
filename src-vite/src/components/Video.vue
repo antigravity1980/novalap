@@ -39,7 +39,7 @@
     </div>
 
     <!-- Custom Volume + Loop Control Overlay -->
-    <div class="absolute bottom-16 right-4 flex items-center gap-2 bg-base-300/80 backdrop-blur px-3 py-1.5 rounded-full z-30 pointer-events-auto select-none shadow-lg">
+    <div class="absolute bottom-16 right-4 flex items-center gap-2 bg-base-300/80 backdrop-blur px-3 py-1.5 rounded-full z-30 pointer-events-auto select-none shadow-lg" style="z-index: 99999 !important;">
       <!-- Loop button -->
       <button @click.stop="toggleLoop" :title="config.settings.loopVideo ? 'Disable loop' : 'Enable loop'" class="btn btn-ghost btn-circle btn-xs hover:bg-base-200 flex items-center justify-center">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="config.settings.loopVideo ? 'text-primary' : 'text-base-content/40'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -509,19 +509,22 @@ function handlePinchPointerEnd(event: PointerEvent) {
   }
 }
 
-function handleGlobalPinchWheel(event: WheelEvent) {
-  if (!event.ctrlKey) return;
+function handleGlobalCaptureWheel(event: WheelEvent) {
   if (!videoContainer.value) return;
   const rect = (videoContainer.value as HTMLElement).getBoundingClientRect();
   if (
     event.clientX < rect.left || event.clientX > rect.right ||
     event.clientY < rect.top || event.clientY > rect.bottom
   ) return;
+
   event.preventDefault();
   event.stopPropagation();
+
   noTransition.value = true;
-  applyZoomFromWheel(event);
-  requestAnimationFrame(() => { noTransition.value = false; });
+  handleWheel(event);
+  requestAnimationFrame(() => {
+    noTransition.value = false;
+  });
 }
 
 // Browser-matching exp formula for touchpad pinch (small deltaY); coarser fixed
@@ -552,7 +555,7 @@ onMounted(() => {
       loadVideo(props.filePath);
     }
 
-    // Register wheel after DOM is ready (videoContainer must exist)
+    // Register listeners after DOM is ready
     if (videoContainer.value) {
       resizeObserver = new ResizeObserver(() => {
         updateTransform({ recalcScale: true });
@@ -564,12 +567,11 @@ onMounted(() => {
       el.addEventListener('pointerup', handlePinchPointerEnd);
       el.addEventListener('pointercancel', handlePinchPointerEnd);
       el.addEventListener('pointerleave', handlePinchPointerEnd);
-      el.addEventListener('wheel', handleWheel, { passive: false });
     }
   });
 
-  // Global capture-phase fallback for touchpad pinch (see Image.vue).
-  window.addEventListener('wheel', handleGlobalPinchWheel, { capture: true, passive: false });
+  // Global capture-phase listener intercepts all wheel events within video bounds before VideoJS blocks them
+  window.addEventListener('wheel', handleGlobalCaptureWheel, { capture: true, passive: false });
 });
 
 onBeforeUnmount(() => {
@@ -581,9 +583,8 @@ onBeforeUnmount(() => {
     el.removeEventListener('pointerup', handlePinchPointerEnd);
     el.removeEventListener('pointercancel', handlePinchPointerEnd);
     el.removeEventListener('pointerleave', handlePinchPointerEnd);
-    el.removeEventListener('wheel', handleWheel);
   }
-  window.removeEventListener('wheel', handleGlobalPinchWheel, { capture: true });
+  window.removeEventListener('wheel', handleGlobalCaptureWheel, { capture: true });
   players.value.forEach((p) => {
     if (p) {
       p.off();
