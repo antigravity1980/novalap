@@ -1,5 +1,5 @@
 <template>
-  <div ref="videoContainer" class="relative w-full h-full overflow-hidden cursor-pointer" style="touch-action: none;" @wheel.prevent="handleWheel">
+  <div ref="videoContainer" class="relative w-full h-full overflow-hidden cursor-pointer" style="touch-action: none;">
     <TransitionGroup :name="transitionName" @after-leave="handleTransitionEnd">
       <div
         v-for="index in [0, 1]"
@@ -36,6 +36,28 @@
           <button class="btn btn-primary btn-sm" @click.stop="openInExternalApp">{{ externalOpenLabel }}</button>
         </div>
       </div>
+    </div>
+
+    <!-- Custom Volume Control Overlay -->
+    <div class="absolute bottom-16 right-4 flex items-center gap-2 bg-base-300/80 backdrop-blur px-3 py-1.5 rounded-full z-30 pointer-events-auto select-none shadow-lg">
+      <button @click.stop="toggleMute" class="btn btn-ghost btn-circle btn-xs hover:bg-base-200 flex items-center justify-center">
+        <svg v-if="config.video.muted || config.video.volume === 0" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+        </svg>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+        </svg>
+      </button>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        :value="config.video.muted ? 0 : config.video.volume"
+        @input="onVolumeSliderInput"
+        class="range range-primary range-xs w-24"
+      />
     </div>
   </div>
 </template>
@@ -502,10 +524,13 @@ function applyZoomFromWheel(event: WheelEvent) {
   if (isPinch) {
     scale.value = Math.max(0.1, Math.min(4, scale.value * Math.exp(-event.deltaY / 96)));
   } else {
-    const zoomFactor = 0.1;
-    scale.value = event.deltaY < 0
-      ? Math.min(scale.value * (1 + zoomFactor), 4)
-      : Math.max(scale.value * (1 - zoomFactor), 0.1);
+    let deltaY = event.deltaY;
+    if (event.deltaMode === 1) deltaY *= 40;
+    else if (event.deltaMode === 2) deltaY *= 800;
+    const notches = Math.sign(deltaY) * (Math.abs(deltaY) / 100);
+    const ZOOM_FACTOR = 0.2;
+    const multiplier = Math.pow(1 + ZOOM_FACTOR, -notches);
+    scale.value = Math.max(0.1, Math.min(4, scale.value * multiplier));
   }
   isFit.value = false;
   updateTransform();
@@ -532,6 +557,7 @@ onMounted(() => {
     el.addEventListener('pointerup', handlePinchPointerEnd);
     el.addEventListener('pointercancel', handlePinchPointerEnd);
     el.addEventListener('pointerleave', handlePinchPointerEnd);
+    el.addEventListener('wheel', handleWheel, { passive: false });
   }
   // Global capture-phase fallback for touchpad pinch (see Image.vue).
   window.addEventListener('wheel', handleGlobalPinchWheel, { capture: true, passive: false });
@@ -546,6 +572,7 @@ onBeforeUnmount(() => {
     el.removeEventListener('pointerup', handlePinchPointerEnd);
     el.removeEventListener('pointercancel', handlePinchPointerEnd);
     el.removeEventListener('pointerleave', handlePinchPointerEnd);
+    el.removeEventListener('wheel', handleWheel);
   }
   window.removeEventListener('wheel', handleGlobalPinchWheel, { capture: true });
   players.value.forEach((p) => {
@@ -583,6 +610,32 @@ watch(() => props.isSlideShow, (newVal) => {
     }
   }
 });
+
+function toggleMute() {
+  const newMuted = !config.video.muted;
+  config.setVideoMuted(newMuted);
+  const player = getActivePlayer();
+  if (player) {
+    player.muted(newMuted);
+  }
+}
+
+function onVolumeSliderInput(e: Event) {
+  const val = parseFloat((e.target as HTMLInputElement).value);
+  config.setVideoVolume(val);
+  if (val > 0) {
+    config.setVideoMuted(false);
+  }
+  const player = getActivePlayer();
+  if (player) {
+    player.volume(val);
+    if (val > 0) {
+      player.muted(false);
+    } else {
+      player.muted(true);
+    }
+  }
+}
 
 const zoomIn = () => {
   scale.value = Math.min(scale.value * 2, 4);
@@ -651,6 +704,7 @@ defineExpose({
 
 function handleWheel(event: WheelEvent) {
   event.preventDefault();
+  event.stopPropagation();
 
   // Touchpad pinch (and Ctrl+wheel) arrives as a wheel event with ctrlKey=true.
   // Treat it as a direct zoom, bypassing the swipe/nav gesture-detection path.
@@ -707,28 +761,35 @@ function handleWheel(event: WheelEvent) {
     }
 
     if (gestureType.value === 'zoom' || Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-      const zoomFactor = 0.01;
-      const delta = -event.deltaY * zoomFactor;
-      scale.value = Math.max(0.1, Math.min(4, scale.value + delta));
+      let deltaY = event.deltaY;
+      if (event.deltaMode === 1) deltaY *= 40;
+      else if (event.deltaMode === 2) deltaY *= 800;
+      const notches = Math.sign(deltaY) * (Math.abs(deltaY) / 100);
+      const multiplier = Math.pow(1 + 0.2, -notches);
+      scale.value = Math.max(0.1, Math.min(4, scale.value * multiplier));
       updateTransform();
     }
   } else {
     if (config.settings.mouseWheelMode === 0) {
       if (event.ctrlKey) {
-        const zoomFactor = 0.1;
-        scale.value = event.deltaY < 0
-          ? Math.min(scale.value * (1 + zoomFactor), 4)
-          : Math.max(scale.value * (1 - zoomFactor), 0.1);
+        let deltaY = event.deltaY;
+        if (event.deltaMode === 1) deltaY *= 40;
+        else if (event.deltaMode === 2) deltaY *= 800;
+        const notches = Math.sign(deltaY) * (Math.abs(deltaY) / 100);
+        const multiplier = Math.pow(1 + 0.2, -notches);
+        scale.value = Math.max(0.1, Math.min(4, scale.value * multiplier));
         updateTransform();
       } else {
         const direction = event.deltaY < 0 ? 'prev' : 'next';
         emit('message-from-video-viewer', { message: direction });
       }
     } else {
-      const zoomFactor = 0.1;
-      scale.value = event.deltaY < 0
-        ? Math.min(scale.value * (1 + zoomFactor), 4)
-        : Math.max(scale.value * (1 - zoomFactor), 0.1);
+      let deltaY = event.deltaY;
+      if (event.deltaMode === 1) deltaY *= 40;
+      else if (event.deltaMode === 2) deltaY *= 800;
+      const notches = Math.sign(deltaY) * (Math.abs(deltaY) / 100);
+      const multiplier = Math.pow(1 + 0.2, -notches);
+      scale.value = Math.max(0.1, Math.min(4, scale.value * multiplier));
       updateTransform();
     }
   }

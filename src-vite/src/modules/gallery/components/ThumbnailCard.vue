@@ -45,12 +45,15 @@
         v-if="isVideo && isHovered && configStore.settings.videoHoverPreview"
         ref="hoverVideoRef"
         :src="getAssetSrc(file.path)"
-        class="w-full h-full object-contain absolute inset-0 z-10"
+        :poster="thumbnailUrl"
+        class="w-full h-full object-contain absolute inset-0 z-10 bg-transparent"
+        style="background: transparent !important;"
         muted
         autoplay
         loop
         playsinline
         @loadedmetadata="onHoverVideoMetadata"
+        @playing="onHoverVideoPlaying"
         @click.stop="$emit('click', $event)"
         @dblclick.stop="$emit('dblclick', $event)"
       ></video>
@@ -257,15 +260,20 @@ const props = defineProps({
 
 const isHovered = ref(false);
 const hoverVideoRef = ref(null);
+const isVideoPreviewReady = ref(false);
 
 watch(isHovered, async (newVal) => {
   if (newVal) {
+    isVideoPreviewReady.value = false;
     await nextTick();
     const video = hoverVideoRef.value;
     if (video) {
       video.playbackRate = 3.0;
+      video.load();
       video.play().catch(e => console.warn("Failed to autoplay hover video:", e));
     }
+  } else {
+    isVideoPreviewReady.value = false;
   }
 });
 
@@ -283,6 +291,14 @@ function onHoverVideoMetadata(e) {
   if (videoEl) {
     videoEl.playbackRate = 3.0;
   }
+}
+
+function onHoverVideoPlaying(e) {
+  const videoEl = e.target;
+  if (videoEl) {
+    videoEl.playbackRate = 3.0;
+  }
+  isVideoPreviewReady.value = true;
 }
 
 function formatDuration(sec) {
