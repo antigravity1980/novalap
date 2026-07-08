@@ -45,12 +45,14 @@
         v-if="isVideo && isHovered && configStore.settings.videoHoverPreview"
         ref="hoverVideoRef"
         :src="getAssetSrc(file.path)"
-        class="w-full h-full object-contain absolute inset-0 z-10 bg-black pointer-events-none"
+        class="w-full h-full object-contain absolute inset-0 z-10"
         muted
         autoplay
         loop
         playsinline
         @loadedmetadata="onHoverVideoMetadata"
+        @click.stop="$emit('click', $event)"
+        @dblclick.stop="$emit('dblclick', $event)"
       ></video>
 
       <!-- Video icon/duration overlay (only when not playing hover preview) -->
@@ -255,6 +257,17 @@ const props = defineProps({
 
 const isHovered = ref(false);
 const hoverVideoRef = ref(null);
+
+watch(isHovered, async (newVal) => {
+  if (newVal) {
+    await nextTick();
+    const video = hoverVideoRef.value;
+    if (video) {
+      video.playbackRate = 3.0;
+      video.play().catch(e => console.warn("Failed to autoplay hover video:", e));
+    }
+  }
+});
 
 function handleMouseEnter() {
   isHovered.value = true;

@@ -52,7 +52,9 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
-    "resources": {}
+    "resources": [
+      "resources/**/*"
+    ]
   },
   "plugins": {
     "updater": {
