@@ -50,7 +50,12 @@ pub fn init_ffmpeg_path(app: &AppHandle) {
 
     // 2. Production: use resource_dir
     if let Ok(res_dir) = app.path().resource_dir() {
-        let _ = SIDE_CAR_DIR.set(res_dir.join("ffmpeg"));
+        let p = res_dir.join("ffmpeg");
+        if p.exists() {
+            let _ = SIDE_CAR_DIR.set(p);
+        } else {
+            let _ = SIDE_CAR_DIR.set(res_dir.join("resources").join("ffmpeg"));
+        }
     }
 }
 
