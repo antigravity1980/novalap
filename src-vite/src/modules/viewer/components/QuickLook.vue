@@ -132,6 +132,56 @@
           </button>
         </div>
 
+        <!-- Video Controls (only for videos) -->
+        <div
+          v-if="isCurrentVideo"
+          class="flex items-center gap-4 bg-white/5 px-4 py-1.5 rounded-lg border border-white/5"
+        >
+          <!-- Loop Button -->
+          <button
+            class="btn btn-ghost btn-xs text-white/75 hover:text-white hover:bg-white/10 flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/10 transition-colors duration-200"
+            @click="toggleLoop"
+            :title="config.settings.loopVideo ? 'Отключить повтор' : 'Включить повтор'"
+          >
+            <span :class="config.settings.loopVideo ? 'text-primary' : 'text-white/40'">🔁</span>
+            <span>Повтор</span>
+          </button>
+
+          <!-- Mute Button -->
+          <button
+            class="btn btn-ghost btn-xs text-white/75 hover:text-white hover:bg-white/10 flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/10 transition-colors duration-200"
+            @click="toggleMute"
+            title="Звук"
+          >
+            <span>{{ (config.video.muted || config.video.volume === 0) ? '🔇' : '🔊' }}</span>
+            <span>{{ (config.video.muted || config.video.volume === 0) ? 'Без звука' : 'Звук' }}</span>
+          </button>
+
+          <!-- Volume Slider -->
+          <div class="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              :value="config.video.muted ? 0 : config.video.volume"
+              @input="onVolumeInput"
+              class="range range-xs range-primary w-24"
+            />
+          </div>
+
+          <div class="divider divider-horizontal h-4 bg-white/10 mx-1"></div>
+
+          <!-- Close action -->
+          <button
+            class="btn btn-ghost btn-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center gap-1 px-2 py-1 rounded border border-red-500/20"
+            @click="close"
+          >
+            <span>✕</span>
+            <span>Закрыть</span>
+          </button>
+        </div>
+
         <!-- Close action -->
         <button class="text-white/60 hover:text-white text-2xl" @click="close">
           ✕
@@ -256,14 +306,33 @@
           </div>
         </div>
 
-        <!-- Video player -->
-        <video
+        <!-- Video player container supporting zoom & pan -->
+        <div
           v-else-if="isCurrentVideo"
-          :src="currentFileUrl"
-          class="max-w-full max-h-[75vh] rounded"
-          controls
-          autoplay
-        ></video>
+          ref="videoContainerRef"
+          @mousemove="onMouseMove"
+          @mouseup="onMouseUp"
+          @mouseleave="onMouseUp"
+          @mousedown="handleMouseDownContainer"
+          @wheel="handleWheel"
+          class="relative cursor-move flex items-center justify-center overflow-hidden"
+          :style="{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+            transformOrigin: 'center center',
+          }"
+        >
+          <video
+            ref="videoPlayerRef"
+            :src="currentFileUrl"
+            class="max-w-[85vw] max-h-[72vh] rounded pointer-events-auto"
+            controls
+            autoplay
+            :loop="config.settings.loopVideo"
+            :muted="config.video.muted"
+            @volumechange="onVolumeChange"
+            @loadedmetadata="onVideoLoaded"
+          ></video>
+        </div>
 
         <!-- Fallback -->
         <div v-else class="text-white/50 text-lg">
@@ -326,6 +395,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { getPreviewUrl } from "@/common/utils";
 import { useUIStore } from "@/stores/uiStore";
+import { config } from "@/common/config";
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -348,6 +418,8 @@ const cacheBuster = ref(0);
 const saturation = ref(1.0);
 const gamma = ref(1.0);
 const imageLoaded = ref(false);
+const videoPlayerRef = ref(null);
+const videoLoaded = ref(false);
 
 // Undo stack in memory
 const undoStack = ref([]);
@@ -544,16 +616,16 @@ function toggleFlipHorizontal() {
 }
 
 function onMouseMove(event) {
-  if (!imageLoaded.value || !imageRef.value) return;
-
-  const width = imageRef.value.clientWidth;
-  const height = imageRef.value.clientHeight;
-
   if (isPanning.value) {
     panOffset.x = event.clientX - panStart.x;
     panOffset.y = event.clientY - panStart.y;
     return;
   }
+
+  if (!imageLoaded.value || !imageRef.value) return;
+
+  const width = imageRef.value.clientWidth;
+  const height = imageRef.value.clientHeight;
 
   if (isDragging.value && !isResizing.value) {
     const dx = event.clientX - dragStart.x;
@@ -808,6 +880,75 @@ function formatFileSize(bytes) {
 function onImageError(event) {
   event.target.style.display = "none";
 }
+
+const videoContainerRef = ref(null);
+
+function toggleLoop() {
+  config.settings.loopVideo = !config.settings.loopVideo;
+}
+
+function toggleMute() {
+  const newMuted = !config.video.muted;
+  config.setVideoMuted(newMuted);
+  const video = videoPlayerRef.value;
+  if (video) {
+    video.muted = newMuted;
+  }
+}
+
+function onVolumeInput(e) {
+  const val = parseFloat(e.target.value);
+  config.setVideoVolume(val);
+  if (val > 0) {
+    config.setVideoMuted(false);
+  }
+  const video = videoPlayerRef.value;
+  if (video) {
+    video.volume = val;
+    if (val > 0) {
+      video.muted = false;
+    } else {
+      video.muted = true;
+    }
+  }
+}
+
+function onVolumeChange(event) {
+  const video = event.target;
+  if (!video) return;
+  // Sync back to config store dynamically
+  config.setVideoVolume(video.volume);
+  config.setVideoMuted(video.muted);
+}
+
+function onVideoLoaded(e) {
+  videoLoaded.value = true;
+  const video = e.target;
+  if (video) {
+    video.volume = config.video.volume;
+    video.muted = config.video.muted;
+  }
+}
+
+watch(
+  () => config.video.muted,
+  (newMuted) => {
+    const video = videoPlayerRef.value;
+    if (video) {
+      video.muted = newMuted;
+    }
+  }
+);
+
+watch(
+  () => config.video.volume,
+  (newVolume) => {
+    const video = videoPlayerRef.value;
+    if (video) {
+      video.volume = newVolume;
+    }
+  }
+);
 </script>
 
 <style scoped>

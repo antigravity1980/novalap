@@ -65,7 +65,8 @@ pub struct EntryEnrichment {
 
 /// Список файлов и директорий по пути
 #[command]
-pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+pub async fn list_directory(app_handle: tauri::AppHandle, path: String) -> Result<Vec<FileEntry>, String> {
+    let _ = crate::t_utils::authorize_directory_scope(&app_handle, &path);
     tokio::task::spawn_blocking(move || {
         let dir_path = Path::new(&path);
 

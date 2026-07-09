@@ -132,6 +132,7 @@ export const useConfigStore = defineStore('configStore', {
       autoPlayVideo: true,       // auto play video
       loopVideo: false,          // loop video (only effective when autoPlayVideo is off)
       videoHoverPreview: true,   // play video preview inside thumbnail card on hover
+      videoAlwaysPlayPreviews: false, // play video preview continuously for all thumbnails
       // showComment: false,        // show comment
       externalImageAppPath: '',    // external image app path
       externalImageAppName: '',    // external image app display name
@@ -270,6 +271,9 @@ export const useConfigStore = defineStore('configStore', {
     },
     setVideoHoverPreview(videoHoverPreview) {
       this.settings.videoHoverPreview = videoHoverPreview;
+    },
+    setVideoAlwaysPlayPreviews(videoAlwaysPlayPreviews) {
+      this.settings.videoAlwaysPlayPreviews = videoAlwaysPlayPreviews;
     },
     setNavigatorViewMode(navigatorViewMode) {
       this.settings.navigatorViewMode = navigatorViewMode;

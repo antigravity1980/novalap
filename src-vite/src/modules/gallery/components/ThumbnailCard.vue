@@ -33,7 +33,7 @@
     >
       <!-- Image poster for both image and video -->
       <img
-        v-if="(isImage || (isVideo && !isHovered)) && thumbnailUrl"
+        v-if="(isImage || (isVideo && !isVideoPreviewReady)) && thumbnailUrl"
         :src="thumbnailUrl"
         :alt="file.name"
         class="w-full h-full object-contain transition-transform duration-300 hover:scale-105"
@@ -42,26 +42,28 @@
 
       <!-- Hover video preview -->
       <video
-        v-if="isVideo && showHoverVideo"
+        v-if="shouldShowVideo"
         ref="hoverVideoRef"
         :poster="thumbnailUrl"
         class="w-full h-full object-contain absolute inset-0 z-10 bg-transparent transition-opacity duration-100"
         :class="isVideoPreviewReady ? 'opacity-100' : 'opacity-0'"
         style="background: transparent !important;"
         muted
+        autoplay
         loop
         playsinline
-        preload="none"
+        preload="auto"
         @canplay="onHoverVideoCanPlay"
         @playing="onHoverVideoPlaying"
-        @error="stopHoverVideo"
+        @loadedmetadata="onHoverVideoMetadata"
+        @error="onHoverVideoError"
         @click.stop="$emit('click', $event)"
         @dblclick.stop="$emit('dblclick', $event)"
       ></video>
 
       <!-- Video icon/duration overlay (only when not playing hover preview) -->
       <div
-        v-if="isVideo && !showHoverVideo"
+        v-if="isVideo && !shouldShowVideo"
         class="absolute bottom-2 right-2 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 text-[10px] text-white font-mono flex items-center gap-1 z-10"
       >
         <span>▶</span>
@@ -70,7 +72,7 @@
 
       <!-- Fallback video view if no thumbnail available and not playing hover -->
       <div
-        v-if="isVideo && !thumbnailUrl && !showHoverVideo"
+        v-if="isVideo && !thumbnailUrl && !shouldShowVideo"
         class="w-full h-full flex flex-col items-center justify-center gap-1.5 text-base-content/40 hover:text-base-content/60"
       >
         <span class="text-3xl filter drop-shadow">🎬</span>
@@ -259,78 +261,179 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
 });
 
+const configStore = useConfigStore();
+const navigationStore = useNavigationStore();
+const galleryStore = useGalleryStore();
+const uiStore = useUIStore();
+
+const isFolder = computed(() => {
+  return (
+    props.file.is_dir === true ||
+    props.file.file_type === "directory" ||
+    props.file.is_directory === true
+  );
+});
+
+const isImage = computed(() => {
+  const ext = props.file.extension?.toLowerCase();
+  return [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "bmp",
+    "webp",
+    "avif",
+    "jxl",
+    "svg",
+    "ico",
+  ].includes(ext);
+});
+
+const isVideo = computed(() => {
+  const ext = props.file.extension?.toLowerCase();
+  return [
+    "mp4",
+    "mkv",
+    "avi",
+    "mov",
+    "webm",
+    "flv",
+    "wmv",
+    "mpeg",
+    "3gp",
+  ].includes(ext);
+});
+
 const isHovered = ref(false);
 const hoverVideoRef = ref(null);
 const showHoverVideo = ref(false);
 const isVideoPreviewReady = ref(false);
 let hoverTimer = null;
 
+const shouldShowVideo = computed(() => {
+  return isVideo.value && (showHoverVideo.value || configStore.settings.videoAlwaysPlayPreviews);
+});
+
+watch(
+  shouldShowVideo,
+  async (newVal) => {
+    console.log("[HoverVideo] shouldShowVideo changed:", newVal, props.file.name);
+    if (newVal) {
+      await nextTick();
+      const video = hoverVideoRef.value;
+      console.log("[HoverVideo] Watcher resolved video element:", video);
+      if (!video) return;
+      const src = getAssetSrc(props.file.path);
+      console.log("[HoverVideo] Watcher resolved src:", src);
+      if (!src) return;
+      video.src = src;
+      console.log("[HoverVideo] Watcher loading video");
+      video.load();
+      video.playbackRate = isHovered.value ? 3.0 : 1.0;
+      video.muted = true;
+      try {
+        console.log("[HoverVideo] Watcher calling play()");
+        await video.play();
+      } catch (e) {
+        console.warn("[HoverVideo] Watcher play failed:", e);
+      }
+    } else {
+      const video = hoverVideoRef.value;
+      if (video) {
+        console.log("[HoverVideo] Watcher pausing and cleaning video");
+        video.pause();
+        video.removeAttribute('src');
+        try { video.load(); } catch (e) {}
+      }
+      isVideoPreviewReady.value = false;
+    }
+  },
+  { immediate: true }
+);
+
 function startHoverVideo() {
+  console.log("[HoverVideo] startHoverVideo called, isHovered:", isHovered.value);
   if (!configStore.settings.videoHoverPreview) return;
-  // Small delay so fast mouse passes don't trigger load
-  hoverTimer = setTimeout(async () => {
+  hoverTimer = setTimeout(() => {
     hoverTimer = null;
+    console.log("[HoverVideo] Hover timer fired, isHovered:", isHovered.value);
     if (!isHovered.value) return;
     isVideoPreviewReady.value = false;
     showHoverVideo.value = true;
-    await nextTick();
-    const video = hoverVideoRef.value;
-    if (!video) return;
-    const src = getAssetSrc(props.file.path);
-    if (!src) return;
-    video.src = src;
-    video.playbackRate = 3.0;
-    video.muted = true;
-    try {
-      await video.play();
-    } catch {
-      // autoplay blocked: video will play when canplay fires
-    }
   }, 200);
 }
 
 function stopHoverVideo() {
+  console.log("[HoverVideo] stopHoverVideo called");
   if (hoverTimer) {
     clearTimeout(hoverTimer);
     hoverTimer = null;
   }
-  const video = hoverVideoRef.value;
-  if (video) {
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-  }
-  isVideoPreviewReady.value = false;
   showHoverVideo.value = false;
 }
 
+function onHoverVideoError(e) {
+  const video = e.target;
+  const err = video ? video.error : null;
+  console.error("[HoverVideo] Video error for path:", props.file.path, err);
+  stopHoverVideo();
+}
+
 function handleMouseEnter() {
+  console.log("[HoverVideo] handleMouseEnter for:", props.file.name);
   isHovered.value = true;
-  startHoverVideo();
+  if (configStore.settings.videoAlwaysPlayPreviews) {
+    const video = hoverVideoRef.value;
+    if (video) {
+      video.playbackRate = 3.0;
+    }
+  } else {
+    startHoverVideo();
+  }
   onHoverEnrich();
 }
 
 function handleMouseLeave() {
+  console.log("[HoverVideo] handleMouseLeave for:", props.file.name);
   isHovered.value = false;
-  stopHoverVideo();
+  if (configStore.settings.videoAlwaysPlayPreviews) {
+    const video = hoverVideoRef.value;
+    if (video) {
+      video.playbackRate = 1.0;
+    }
+  } else {
+    stopHoverVideo();
+  }
 }
 
 function onHoverVideoCanPlay(e) {
+  console.log("[HoverVideo] @canplay event fired");
   const video = e.target;
   if (!video) return;
-  video.playbackRate = 3.0;
+  video.playbackRate = isHovered.value ? 3.0 : 1.0;
   isVideoPreviewReady.value = true;
-  video.play().catch(() => {});
+  video.play().catch((err) => {
+    console.warn("[HoverVideo] play() in canplay handler failed:", err);
+  });
 }
 
 function onHoverVideoMetadata(e) {
+  console.log("[HoverVideo] @loadedmetadata event fired");
   const videoEl = e.target;
-  if (videoEl) videoEl.playbackRate = 3.0;
+  if (videoEl) {
+    videoEl.playbackRate = isHovered.value ? 3.0 : 1.0;
+    isVideoPreviewReady.value = true;
+  }
 }
 
 function onHoverVideoPlaying(e) {
+  console.log("[HoverVideo] @playing event fired");
   const videoEl = e.target;
-  if (videoEl) videoEl.playbackRate = 3.0;
+  if (videoEl) {
+    videoEl.playbackRate = isHovered.value ? 3.0 : 1.0;
+    isVideoPreviewReady.value = true;
+  }
 }
 
 function formatDuration(sec) {
@@ -381,10 +484,6 @@ const isAiSourcePending = computed(() => {
 
 defineEmits(["click", "dblclick"]);
 
-const configStore = useConfigStore();
-const navigationStore = useNavigationStore();
-const galleryStore = useGalleryStore();
-const uiStore = useUIStore();
 const contextMenuRef = ref(null);
 
 const isRenaming = ref(false);
@@ -399,44 +498,7 @@ const isCut = computed(() => {
   );
 });
 
-const isFolder = computed(() => {
-  return (
-    props.file.is_dir === true ||
-    props.file.file_type === "directory" ||
-    props.file.is_directory === true
-  );
-});
 
-const isImage = computed(() => {
-  const ext = props.file.extension?.toLowerCase();
-  return [
-    "jpg",
-    "jpeg",
-    "png",
-    "gif",
-    "bmp",
-    "webp",
-    "avif",
-    "jxl",
-    "svg",
-    "ico",
-  ].includes(ext);
-});
-
-const isVideo = computed(() => {
-  const ext = props.file.extension?.toLowerCase();
-  return [
-    "mp4",
-    "mkv",
-    "avi",
-    "mov",
-    "webm",
-    "flv",
-    "wmv",
-    "mpeg",
-    "3gp",
-  ].includes(ext);
-});
 
 // Async loading of generated thumbnails for large files to prevent UI freeze
 const thumbnailUrl = ref("");
